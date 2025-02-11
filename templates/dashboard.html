@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forecasting Tool</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* General Styling */
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7fc; /* Light Gray */
+        }
+
+        /* Navigation Bar */
+        .navbar {
+            background-color: #2B3A42; /* Professional Dark Gray */
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .navbar a {
+            color: #FFFFFF;
+            text-decoration: none;
+            font-size: 18px;
+            font-weight: bold;
+            margin-left: 15px;
+        }
+        .navbar a:hover {
+            color: #64D8CB; /* Turquoise */
+        }
+
+        /* Page Content */
+        .container {
+            padding: 40px;
+            text-align: center;
+        }
+        .container h1 {
+            color: #0B3D91; /* Deep Blue */
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+        }
+        .container p {
+            font-size: 1.2rem;
+            color: #555555; /* Subtle Gray */
+            margin-bottom: 30px;
+        }
+
+        /* Embedded Streamlit */
+        iframe {
+            width: 100%;
+            height: 90vh;
+            border: 1px solid #CCCCCC;
+            border-radius: 8px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+        }
+
+        /* Footer Styling */
+        footer {
+            background-color: #2B3A42;
+            color: white;
+            text-align: center;
+            padding: 15px 0;
+            font-size: 0.9rem;
+        }
+        footer a {
+            color: #64D8CB;
+            text-decoration: none;
+        }
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navigation Bar -->
+    <div class="navbar">
+        <a href="{{ url_for('home') }}">🏠 Back to Home</a>
+        <a href="http://localhost:8501" target="_blank">Reload Dashboard</a>
+    </div>
+
+    <!-- Dashboard Content -->
+    <div class="container">
+        <h1>Sales Forecasting Dashboard</h1>
+        <p>Analyze your sales data with AI-powered forecasting insights.</p>
+
+        <!-- Embedded Streamlit App -->
+        <iframe src="http://localhost:8501" title="Streamlit Forecasting Tool"></iframe>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <p>© 2025 SynovaAI | <a href="http://localhost:5000">Visit Main Site</a></p>
+    </footer>
+
+</body>
+</html>

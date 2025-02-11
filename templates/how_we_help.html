@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How We Help - SynovaAI</title>
+    <meta name="description" content="Empower your business with AI-driven predictive analytics solutions from SynovaAI.">
+    <!-- Open Graph Meta Tags for SEO -->
+    <meta property="og:title" content="How We Help - SynovaAI">
+    <meta property="og:description" content="Empower your business with AI-driven predictive analytics solutions from SynovaAI.">
+    <meta property="og:image" content="{{ url_for('static', filename='images/og-image.png') }}">
+    <meta property="og:url" content="https://www.synovaai.com/how-we-help">
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="how-we-help-page">
+
+    <!-- Header -->
+    <header>
+        <nav>
+            <ul>
+                <li><a href="{{ url_for('home') }}" aria-label="Home">Home</a></li>
+                <li><a href="{{ url_for('data_services') }}" aria-label="Data Services">Data Services</a></li>
+                <li><a href="{{ url_for('how_we_help') }}" aria-label="How We Help">How We Help</a></li>
+                <li><a href="{{ url_for('contact') }}" aria-label="Contact">Contact</a></li>
+            </ul>
+        </nav>
+        <div class="logo">SYNOVAAI</div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <article class="hero-text">
+            <h1>How We Help</h1>
+            <p>At SynovaAI, we empower businesses to make data-driven decisions with our AI-driven predictive analytics solutions.</p>
+        </article>
+    </section>
+
+    <!-- Our Approach Section -->
+    <section id="our-approach" class="data-services">
+        <h2>Our Approach</h2>
+        <div class="service-grid">
+            <div class="service-card">
+                <img src="{{ url_for('static', filename='images/data-analysis-icon.png') }}" alt="Data Analysis Icon" loading="lazy">
+                <h3>Data Analysis</h3>
+                <p>We analyze your data to identify trends, patterns, and insights that inform business decisions.</p>
+            </div>
+            <div class="service-card">
+                <img src="{{ url_for('static', filename='images/predictive-modeling-icon.png') }}" alt="Predictive Modeling Icon" loading="lazy">
+                <h3>Predictive Modeling</h3>
+                <p>We build predictive models that forecast future outcomes, enabling businesses to make informed decisions.</p>
+            </div>
+            <div class="service-card">
+                <img src="{{ url_for('static', filename='images/data-visualization-icon.png') }}" alt="Data Visualization Icon" loading="lazy">
+                <h3>Data Visualization</h3>
+                <p>We create interactive dashboards that visualize complex data, making it easy to understand and act on insights.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Benefits Section -->
+    <section id="benefits" class="data-services">
+        <h2>Benefits of Working with Us</h2>
+        <div class="service-grid">
+            <div class="service-card">
+                <img src="{{ url_for('static', filename='images/improved-decision-making-icon.png') }}" alt="Improved Decision Making Icon" loading="lazy">
+                <h3>Improved Decision Making</h3>
+                <p>Our predictive analytics solutions enable businesses to make informed decisions, driving growth and profitability.</p>
+            </div>
+            <div class="service-card">
+                <img src="{{ url_for('static', filename='images/increased-efficiency-icon.png') }}" alt="Increased Efficiency Icon" loading="lazy">
+                <h3>Increased Efficiency</h3>
+                <p>Our automated solutions streamline data analysis and modeling, freeing up resources for strategic initiatives.</p>
+            </div>
+            <div class="service-card">
+                <img src="{{ url_for('static', filename='images/enhanced-customer-experience-icon.png') }}" alt="Enhanced Customer Experience Icon" loading="lazy">
+                <h3>Enhanced Customer Experience</h3>
+                <p>Our predictive analytics solutions enable businesses to deliver personalized experiences, driving customer loyalty and retention.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Call to Action -->
+    <section class="cta">
+        <h2>Take the Next Step</h2>
+        <p>Discover how SynovaAI can transform your business. Contact us today to get started.</p>
+        <a href="{{ url_for('contact') }}" class="cta-button" aria-label="Get Started">Get Started</a>
+    </section>
+
+    <!-- Back to Top Button -->
+    <button onclick="scrollToTop()" class="top-button" aria-label="Back to Top">⬆ Back to Top</button>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2025 SynovaAI. All rights reserved.</p>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Smooth Scroll to Top
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Show "Back to Top" Button on Scroll
+        window.addEventListener("scroll", function() {
+            let backToTop = document.querySelector(".top-button");
+            if (window.scrollY > 100) {
+                backToTop.style.display = "block";
+            } else {
+                backToTop.style.display = "none";
+            }
+        });
+
+        // Animate Service Cards on Scroll
+        document.addEventListener("DOMContentLoaded", function() {
+            let cards = document.querySelectorAll(".service-card");
+            let observer = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add("show");
+                    }
+                });
+            }, { threshold: 0.2 });
+
+            cards.forEach(card => {
+                observer.observe(card);
+            });
+
+            // Fallback for browsers that don't support IntersectionObserver
+            if (!('IntersectionObserver' in window)) {
+                console.warn("IntersectionObserver not supported!");
+                document.querySelectorAll(".service-card").forEach(card => card.classList.add("show"));
+            }
+        });
+
+        // Google Analytics (Replace UA-XXXXXX-X with your tracking ID)
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'UA-XXXXXX-X');
+    </script>
+
+</body>
+</html>

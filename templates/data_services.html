@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Services - SynovaAI</title>
+    <meta name="description" content="Transform your business with AI-driven insights and analytics from SynovaAI.">
+    <!-- Open Graph Meta Tags for SEO -->
+    <meta property="og:title" content="Data Services - SynovaAI">
+    <meta property="og:description" content="Transform your business with AI-driven insights and analytics from SynovaAI.">
+    <meta property="og:image" content="{{ url_for('static', filename='images/og-image.png') }}">
+    <meta property="og:url" content="https://www.synovaai.com/data-services">
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="data-services-page">
+
+    <!-- Header -->
+    <header>
+        <nav>
+            <ul>
+                <li><a href="{{ url_for('home') }}" aria-label="Home">Home</a></li>
+                <li><a href="{{ url_for('data_services') }}" aria-label="Data Services">Data Services</a></li>
+                <li><a href="{{ url_for('how_we_help') }}" aria-label="How We Help">How We Help</a></li>
+                <li><a href="{{ url_for('contact') }}" aria-label="Contact">Contact</a></li>
+            </ul>
+        </nav>
+        <div class="logo">SYNOVAAI</div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <article class="hero-text">
+            <h1>Unlock the Power of Your Data</h1>
+            <p>Transform your business with AI-driven insights and analytics.</p>
+        </article>
+    </section>
+
+    <!-- Data Services Section -->
+    <section id="data-services" class="data-services">
+        <h2>What We Offer</h2>
+        <div class="service-grid">
+            <!-- Interactive Dashboards -->
+            <div class="service-card">
+                <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Dashboard Icon" loading="lazy">
+                <h3>Interactive Dashboards</h3>
+                <p>Real-time visualization of your key business metrics.</p>
+                <a href="{{ url_for('sales_dashboard') }}" class="cta-button" aria-label="Explore Dashboard">Explore Dashboard</a>
+            </div>
+
+            <!-- Forecasting Tool -->
+            <div class="service-card">
+                <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="Forecasting Tool Icon" loading="lazy">
+                <h3>Forecasting Tool</h3>
+                <p>Upload your data and generate accurate sales forecasts using our AI-driven tool.</p>
+                <a href="{{ url_for('forecasting_tool') }}" class="cta-button" aria-label="Use Forecasting Tool">Use Forecasting Tool</a>
+            </div>
+
+            <!-- Predictive Analytics -->
+            <div class="service-card">
+                <img src="{{ url_for('static', filename='images/ai-icon.png') }}" alt="AI Insights Icon" loading="lazy">
+                <h3>Predictive Analytics</h3>
+                <p>Use machine learning to analyze trends and make data-driven decisions.</p>
+            </div>
+
+            <!-- Self-Service Insights -->
+            <div class="service-card">
+                <img src="{{ url_for('static', filename='images/self-service-icon.png') }}" alt="Self-Service Icon" loading="lazy">
+                <h3>Self-Service Insights</h3>
+                <p>Upload your data and instantly generate insights without needing a data team.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Why Choose Us Section -->
+    <section id="why-choose-us" class="data-services">
+        <h2>Why Choose SynovaAI?</h2>
+        <div class="service-grid">
+            <div class="service-card">
+                <img src="{{ url_for('static', filename='images/scalability-icon.png') }}" alt="Scalability Icon" loading="lazy">
+                <h3>Scalability</h3>
+                <p>Our AI solutions grow with your business, adapting to your evolving needs.</p>
+            </div>
+            <div class="service-card">
+                <img src="{{ url_for('static', filename='images/efficiency-icon.png') }}" alt="Efficiency Icon" loading="lazy">
+                <h3>Efficiency</h3>
+                <p>Automate data analysis and focus on what matters most—your business strategy.</p>
+            </div>
+            <div class="service-card">
+                <img src="{{ url_for('static', filename='images/insights-icon.png') }}" alt="Insights Icon" loading="lazy">
+                <h3>Instant Insights</h3>
+                <p>Get actionable insights in real-time with AI-driven data processing.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Call to Action -->
+    <section class="cta">
+        <h2>Let's Get Started</h2>
+        <p>Discover how SynovaAI can transform your business with AI-powered insights.</p>
+        <a href="{{ url_for('contact') }}" class="cta-button" aria-label="Contact Us">Contact Us</a>
+    </section>
+
+    <!-- Back to Top Button -->
+    <button onclick="scrollToTop()" class="top-button" aria-label="Back to Top">⬆ Back to Top</button>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2025 SynovaAI. All rights reserved.</p>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Smooth Scroll to Top
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Show "Back to Top" Button on Scroll
+        window.addEventListener("scroll", function() {
+            let backToTop = document.querySelector(".top-button");
+            if (window.scrollY > 100) {
+                backToTop.style.display = "block";
+            } else {
+                backToTop.style.display = "none";
+            }
+        });
+
+        // Animate Service Cards on Scroll
+        document.addEventListener("DOMContentLoaded", function() {
+            let cards = document.querySelectorAll(".service-card");
+            let observer = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add("show");
+                    }
+                });
+            }, { threshold: 0.2 });
+
+            cards.forEach(card => {
+                observer.observe(card);
+            });
+
+            // Fallback for browsers that don't support IntersectionObserver
+            if (!('IntersectionObserver' in window)) {
+                console.warn("IntersectionObserver not supported!");
+                document.querySelectorAll(".service-card").forEach(card => card.classList.add("show"));
+            }
+        });
+
+        // Google Analytics (Replace UA-XXXXXX-X with your tracking ID)
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'UA-XXXXXX-X');
+    </script>
+
+</body>
+</html>

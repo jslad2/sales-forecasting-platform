@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact - SynovaAI</title>
+    <meta name="description" content="Contact SynovaAI to learn more about our predictive analytics solutions.">
+    <!-- Open Graph Meta Tags for SEO -->
+    <meta property="og:title" content="Contact - SynovaAI">
+    <meta property="og:description" content="Contact SynovaAI to learn more about our predictive analytics solutions.">
+    <meta property="og:image" content="{{ url_for('static', filename='images/og-image.png') }}">
+    <meta property="og:url" content="https://www.synovaai.com/contact">
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="contact-page">
+
+    <!-- Header -->
+    <header>
+        <nav>
+            <ul>
+                <li><a href="{{ url_for('home') }}" aria-label="Home">Home</a></li>
+                <li><a href="{{ url_for('data_services') }}" aria-label="Data Services">Data Services</a></li>
+                <li><a href="{{ url_for('how_we_help') }}" aria-label="How We Help">How We Help</a></li>
+                <li><a href="{{ url_for('contact') }}" aria-label="Contact">Contact</a></li>
+            </ul>
+        </nav>
+        <div class="logo">SYNOVAAI</div>
+    </header>
+
+    <!-- Main Content Wrapper -->
+    <div class="content-container">
+
+        <!-- Hero Section -->
+        <section class="hero">
+            <article class="hero-text">
+                <h1>Get in Touch</h1>
+                <p>Have a question or want to learn more about our predictive analytics solutions? We'd love to hear from you.</p>
+            </article>
+        </section>
+
+        <!-- Contact Form Section -->
+        <section class="contact-form">
+            <h2>Contact Us</h2>
+
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for category, message in messages %}
+                            <p class="flash {{ category }}">{{ message }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST" action="{{ url_for('contact') }}" onsubmit="return validateForm()">
+                <label for="name">Name:</label>
+                <input type="text" id="name" name="name" required aria-describedby="name-help">
+
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required aria-describedby="email-help">
+
+                <label for="message">Message:</label>
+                <textarea id="message" name="message" required aria-describedby="message-help"></textarea>
+
+                <button type="submit">Send Message</button>
+            </form>
+        </section>
+
+        <!-- Contact Information Section -->
+        <section class="contact-info">
+            <h2>Our Contact Information</h2>
+            <div class="service-grid">
+                <div class="service-card">
+                    <img src="{{ url_for('static', filename='images/address-icon.png') }}" alt="Address Icon" loading="lazy">
+                    <h3>Address</h3>
+                    <p>123 Main St, Anytown, USA 12345</p>
+                </div>
+                <div class="service-card">
+                    <img src="{{ url_for('static', filename='images/phone-icon.png') }}" alt="Phone Icon" loading="lazy">
+                    <h3>Phone Number</h3>
+                    <p>(123) 456-7890</p>
+                </div>
+                <div class="service-card">
+                    <img src="{{ url_for('static', filename='images/email-icon.png') }}" alt="Email Icon" loading="lazy">
+                    <h3>Email Address</h3>
+                    <p>info@synovai.com</p>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Back to Top Button -->
+    <button onclick="scrollToTop()" class="top-button" aria-label="Back to Top">⬆ Back to Top</button>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2025 SynovaAI. All rights reserved.</p>
+    </footer>
+
+    <!-- JavaScript for Form Validation & Smooth Scroll -->
+    <script>
+        // Smooth Scroll to Top
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Show "Back to Top" Button on Scroll
+        window.addEventListener("scroll", function() {
+            let backToTop = document.querySelector(".top-button");
+            if (window.scrollY > 100) {
+                backToTop.style.display = "block";
+            } else {
+                backToTop.style.display = "none";
+            }
+        });
+
+        // Basic Form Validation
+        function validateForm() {
+            let name = document.getElementById("name").value.trim();
+            let email = document.getElementById("email").value.trim();
+            let message = document.getElementById("message").value.trim();
+
+            if (name === "" || email === "" || message === "") {
+                alert("Please fill in all required fields.");
+                return false;
+            }
+            return true;
+        }
+
+        // Google Analytics (Replace UA-XXXXXX-X with your tracking ID)
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'UA-XXXXXX-X');
+    </script>
+
+</body>
+</html>
