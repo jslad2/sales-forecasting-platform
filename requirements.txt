@@ -1,10 +1,10 @@
 streamlit
 pandas
 prophet
-pmdarima
+pmdarima==1.8.5
 xgboost
 flaml
-numpy
+numpy==1.23.5
 plotly
 statsmodels
 optuna
