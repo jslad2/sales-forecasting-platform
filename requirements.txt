@@ -1,12 +1,14 @@
 streamlit
 pandas
 prophet
-pmdarima==1.8.5
+pmdarima
 xgboost
 flaml
-numpy==1.23.5
+numpy
 plotly
 statsmodels
 optuna
 scikit-learn
 matplotlib
+setuptools
+wheel
