@@ -1,0 +1,12 @@
+streamlit
+pandas
+prophet
+pmdarima
+xgboost
+flaml
+numpy
+plotly
+statsmodels
+optuna
+scikit-learn
+matplotlib
