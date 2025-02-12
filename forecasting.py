@@ -1,7 +1,7 @@
 import os
 
 # Force install dependencies in correct order
-os.system("pip install --no-cache-dir setuptools wheel numpy scipy scikit-learn")
+os.system("pip install --no-cache-dir setuptools wheel numpy==1.21.6 scipy==1.10.1 scikit-learn==1.3.0")
 
 import streamlit as st
 from forecasting_tool import main
