@@ -6,6 +6,6 @@
   "routes": [
     { "src": "/(.*)", "dest": "api/index.py" }
   ],
-  "buildCommand": "python3 -m pip install -r requirements-vercel.txt",
-  "outputDirectory": "api"
+  "buildCommand": "python3 -m pip install -r requirements-vercel.txt && mkdir -p .vercel/output && cp -r api .vercel/output/",
+  "outputDirectory": ".vercel/output"
 }
