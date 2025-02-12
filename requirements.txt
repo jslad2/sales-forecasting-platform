@@ -6,10 +6,10 @@ wheel
 streamlit
 pandas
 prophet
-pmdarima==2.0.3
 xgboost
 flaml
 plotly
 statsmodels
 optuna
 matplotlib
+pmdarima==2.0.3
