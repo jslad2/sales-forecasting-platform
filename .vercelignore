@@ -1,11 +1,20 @@
+# Ignore Git-related files
+.git/
+
+# Ignore Python caches
 venv/
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# Ignore logs and databases
 node_modules/
 .DS_Store
 *.log
 *.sqlite
 *.db
-.git/
+
+# Ignore build directories
+vercel/output/
+.vercel/output/
