@@ -13,3 +13,5 @@ plotly
 statsmodels
 optuna
 matplotlib
+flask
+gunicorn  # (optional, for better production performance)
