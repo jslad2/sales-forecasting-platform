@@ -3,5 +3,5 @@
   "routes": [
       { "src": "/(.*)", "dest": "api/index.py" }
   ],
-  "buildCommand": "pip install -r requirements-vercel.txt"
+  "buildCommand": "python3 -m pip install -r requirements-vercel.txt"
 }
