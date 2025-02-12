@@ -1,7 +1,11 @@
 {
   "version": 2,
-  "routes": [
-      { "src": "/(.*)", "dest": "api/index.py" }
+  "builds": [
+    { "src": "api/index.py", "use": "@vercel/python" }
   ],
-  "buildCommand": "python3 -m pip install -r requirements-vercel.txt"
+  "routes": [
+    { "src": "/(.*)", "dest": "api/index.py" }
+  ],
+  "buildCommand": "python3 -m pip install -r requirements-vercel.txt",
+  "outputDirectory": "api"
 }
