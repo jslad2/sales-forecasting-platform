@@ -1,3 +1,8 @@
+import os
+
+# Force install NumPy & dependencies before anything else
+os.system("pip install --no-cache-dir numpy==1.23.5 scipy==1.10.1 scikit-learn==1.3.0 setuptools wheel")
+
 import streamlit as st
 from forecasting_tool import main
 
