@@ -1,9 +1,12 @@
+import os
 from flask import Flask, render_template, send_from_directory
 
-# Initialize Flask app
-app = Flask(__name__, static_folder="static")
+# ✅ Initialize Flask App (Ensure Correct Paths)
+app = Flask(__name__, 
+            template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")), 
+            static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../static")))
 
-# Routes
+# ✅ Routes
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -36,17 +39,16 @@ def sales_dashboard():
 def self_service_insights():
     return render_template('self_service_insights.html')
 
-# Serve static files (CSS, JS, images)
+# ✅ Serve Static Files (CSS, JS, Images)
 @app.route('/static/<path:filename>')
 def serve_static(filename):
-    return send_from_directory('static', filename)
+    return send_from_directory(os.path.join(app.root_path, "static"), filename)
 
-# Serve CSS files from the CSS folder
 @app.route('/css/<path:filename>')
 def serve_css(filename):
-    return send_from_directory('css', filename)
+    return send_from_directory(os.path.join(app.root_path, "static/css"), filename)
 
-# Security headers for embedding Streamlit in iframes
+# ✅ Security Headers for Embedding
 @app.after_request
 def apply_security_headers(response):
     response.headers["Content-Security-Policy"] = "frame-ancestors 'self';"
@@ -54,7 +56,7 @@ def apply_security_headers(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     return response
 
-# Error handling
+# ✅ Error Handling (Ensure these templates exist in `/templates`)
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html'), 404
@@ -63,6 +65,9 @@ def page_not_found(e):
 def internal_server_error(e):
     return render_template('500.html'), 500
 
-# ✅ IMPORTANT: Expose `app` for Vercel (This is what Vercel expects)
+# ✅ Expose `app` for Vercel
+app = app
+
+# ✅ Run App Locally (For Debugging)
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
