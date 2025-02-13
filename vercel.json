@@ -1,11 +1,15 @@
 {
   "version": 2,
   "builds": [
-    { "src": "api/index.py", "use": "@vercel/python", "config": { "runtime": "python3.9" } }
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python",
+      "config": { "runtime": "python3.12" }
+    }
   ],
   "routes": [
     { "src": "/(.*)", "dest": "api/index.py" }
   ],
-  "buildCommand": "python -m pip install -r requirements-vercel.txt && mkdir -p .vercel/output && cp -r api .vercel/output/",
+  "buildCommand": "pip install -r requirements-vercel.txt && mkdir -p .vercel/output && cp -r api .vercel/output/",
   "outputDirectory": ".vercel/output"
 }
