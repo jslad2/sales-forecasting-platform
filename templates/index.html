@@ -5,15 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SynovaAI - Unlock Predictive Insights</title>
     <meta name="description" content="Empowering Your Business with Predictive AI">
-    
+    <meta name="keywords" content="Predictive AI, Data Analytics, Business Insights, SynovaAI">
+    <meta name="author" content="SynovaAI">
+    <link rel="canonical" href="https://www.synovaai.com" />
+
     <!-- Open Graph Meta Tags for SEO -->
     <meta property="og:title" content="SynovaAI - Unlock Predictive Insights">
     <meta property="og:description" content="Empowering Your Business with Predictive AI">
     <meta property="og:image" content="{{ url_for('static', filename='images/og-image.png') }}">
     <meta property="og:url" content="https://www.synovaai.com">
-    
+
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="SynovaAI - Unlock Predictive Insights">
+    <meta name="twitter:description" content="Empowering Your Business with Predictive AI">
+    <meta name="twitter:image" content="{{ url_for('static', filename='images/og-image.png') }}">
+
     <!-- Stylesheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preload" href="{{ url_for('static', filename='css/style.css') }}" as="style">
+    <link rel="preload" href="{{ url_for('static', filename='images/og-image.png') }}" as="image">
+
+    <!-- Smooth Scrolling -->
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+    </style>
 </head>
 <body class="home-page">
 
@@ -32,9 +50,9 @@
     <!-- Hero Section -->
     <section class="hero">
         <article class="hero-text">
-            <h1>Empowering Your Business with<br><span class="highlight">Predictive AI</span></h1>
+            <h1>Empowering Your Business with <span class="highlight">Predictive AI</span></h1>
             <p>Unlock the potential of your data with SynovaAI. Transform insights into impactful actions.</p>
-            <a href="https://sales-forecasting-platform-ymmlb4pgyhgjw9gg7useb4.streamlit.app" class="cta-button primary-button" target="_blank">Try Forecasting Now →</a>
+            <a href="https://sales-forecasting-platform-ymmlb4pgyhgjw9gg7useb4.streamlit.app" class="cta-button primary-button" target="_blank" aria-label="Try Forecasting Now">Try Forecasting Now →</a>
         </article>
     </section>
 
@@ -44,32 +62,34 @@
         <div class="service-grid">
             <!-- Forecasting Service -->
             <div class="service-card show">
-                <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="Forecasting Icon" loading="lazy">
+                <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="AI-driven forecasting icon" loading="lazy">
                 <h3>Forecasting</h3>
                 <p>Generate accurate, actionable sales forecasts using AI-driven predictive analytics.</p>
                 <a href="https://sales-forecasting-platform-ymmlb4pgyhgjw9gg7useb4.streamlit.app" target="_blank" class="cta-button" aria-label="Explore Forecasting">Explore Forecasting</a>
             </div>
             <!-- Dashboard Service -->
             <div class="service-card show">
-                <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Dashboard Icon" loading="lazy">
+                <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Interactive dashboard icon" loading="lazy">
                 <h3>Interactive Dashboards</h3>
                 <p>Visualize your data with real-time, interactive dashboards tailored to your needs.</p>
-                <a href="{{ url_for('sales_dashboard') }}" class="text-link">Sales Dashboard</a>
+                <a href="{{ url_for('sales_dashboard') }}" class="text-link" aria-label="Sales Dashboard">Sales Dashboard</a>
             </div>
             <!-- Self-Service Insights -->
             <div class="service-card show">
-                <img src="{{ url_for('static', filename='images/self-service-icon.png') }}" alt="Self-Service Icon" loading="lazy">
+                <img src="{{ url_for('static', filename='images/self-service-icon.png') }}" alt="Self-service analytics icon" loading="lazy">
                 <h3>Self-Service Insights</h3>
                 <p>Upload your data and get instant analytics, forecasts, and actionable insights.</p>
             </div>
         </div>
     </section>
 
-    <!-- Call to Action -->
-    <section class="cta">
-        <h2>Ready to Transform Your Data?</h2>
-        <p>Contact us today to explore AI-powered insights for your business.</p>
-        <a href="{{ url_for('contact') }}" class="cta-button" aria-label="Get Started">Get Started</a>
+    <!-- Call to Action (Improved) -->
+    <section class="cta improved-cta">
+        <div class="cta-content">
+            <h2>Ready to Take Your Business to the Next Level?</h2>
+            <p>Discover the power of AI-driven insights for smarter decision-making.</p>
+            <a href="{{ url_for('contact') }}" class="cta-button" aria-label="Get Started">Get Started</a>
+        </div>
     </section>
 
     <!-- Back to Top Button -->
@@ -78,7 +98,20 @@
     <!-- Footer -->
     <footer>
         <p>&copy; 2025 SynovaAI. All rights reserved.</p>
+        <div class="legal-links">
+            <a href="{{ url_for('privacy_policy') }}">Privacy Policy</a>
+            <a href="{{ url_for('terms_of_service') }}">Terms of Service</a>
+        </div>
     </footer>
 
+    <!-- Smooth Scroll Script -->
+    <script>
+        function scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+    </script>
 </body>
 </html>
