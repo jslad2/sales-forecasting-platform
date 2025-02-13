@@ -133,25 +133,13 @@ header .logo {
     outline-offset: 2px;
 }
 
-/* Data Services Section */
-.data-services {
-    padding: 50px 20px;
-    text-align: center;
-    background-color: var(--white-color);
-}
-
-.data-services h2 {
-    color: var(--primary-color);
-    margin-bottom: 40px;
-    font-size: var(--font-size-xl);
-    font-weight: bold;
-}
-
 /* Service Grid */
 .service-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 30px;
+    justify-content: center;
+    text-align: center;
 }
 
 /* Service Cards */
@@ -196,47 +184,6 @@ header .logo {
     font-size: var(--font-size-base);
 }
 
-/* Footer */
-footer {
-    background-color: var(--primary-color);
-    color: var(--white-color);
-    text-align: center;
-    padding: 20px;
-    font-size: 0.9rem;
-}
-
-/* Back to Top Button */
-.top-button {
-    position: fixed;
-    bottom: 20px;
-    right: 30px;
-    background-color: var(--secondary-color);
-    color: var(--white-color);
-    border: none;
-    padding: 12px 18px;
-    font-size: 14px;
-    border-radius: 6px;
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out, transform 0.2s ease-in-out;
-}
-
-.top-button:hover {
-    background-color: #56BBAF;
-    transform: scale(1.1);
-}
-
-.top-button:focus {
-    outline: 2px solid var(--accent-color);
-    outline-offset: 2px;
-}
-
-/* Show Back to Top when Scrolling */
-body.scrolled .top-button {
-    opacity: 1;
-}
-
-/* Responsive Design */
 @media (max-width: 768px) {
     .service-grid {
         grid-template-columns: repeat(2, 1fr);
@@ -248,55 +195,3 @@ body.scrolled .top-button {
         grid-template-columns: repeat(1, 1fr);
     }
 }
-
-/* Additional Styles for Forecasting Tool and Sales Dashboard Pages */
-.forecasting-tool-page,
-.sales-dashboard-page {
-    text-align: center;
-}
-
-.forecasting-tool-page main,
-.sales-dashboard-page main {
-    padding: 50px 20px;
-}
-
-.forecasting-tool-page h1,
-.sales-dashboard-page h1 {
-    font-size: var(--font-size-xl);
-    color: var(--primary-color);
-    margin-bottom: 20px;
-}
-
-.forecasting-tool-page p,
-.sales-dashboard-page p {
-    font-size: var(--font-size-lg);
-    color: var(--gray-color);
-    max-width: 800px;
-    margin: 0 auto 40px;
-}
-
-/* Streamlit Embed Styles */
-.streamlit-embed {
-    width: 100%;
-    margin: 0 auto;
-    border: none; /* Remove border for a seamless look */
-    overflow: hidden;
-    background-color: var(--white-color);
-}
-
-.streamlit-embed iframe {
-    border: none;
-    width: 100%;
-    height: calc(100vh - 150px); /* Adjust based on header/footer height */
-    display: block;
-    margin: 0;
-    padding: 0;
-    overflow: hidden; /* Hide the scrollbar */
-}
-
-@media (max-width: 768px) {
-    .streamlit-embed iframe {
-        height: calc(100vh - 200px); /* Adjust for smaller screens */
-    }
-}
-
