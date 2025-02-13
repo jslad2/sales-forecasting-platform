@@ -10,7 +10,5 @@
   "routes": [
     { "src": "/(.*)", "dest": "api/index.py" }
   ],
-  "buildCommand": "pip install -r requirements-vercel.txt && mkdir -p .vercel/output && cp -r api templates static .vercel/output/",
-  "outputDirectory": ".vercel/output",
-  "includeFiles": ["templates/**", "static/**"]
+  "buildCommand": "pip install -r requirements-vercel.txt"
 }
