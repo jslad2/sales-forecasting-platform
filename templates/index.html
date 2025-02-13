@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SynovaAI - AI Sales Forecasting</title>
-    <meta name="description" content="AI-powered sales forecasting and predictive analytics for businesses.">
+    <title>SynovaAI - Unlock Predictive Insights</title>
+    <meta name="description" content="Empowering Your Business with Predictive AI">
     
     <!-- Open Graph Meta Tags for SEO -->
-    <meta property="og:title" content="SynovaAI - AI Sales Forecasting">
-    <meta property="og:description" content="AI-powered sales forecasting and predictive analytics for businesses.">
+    <meta property="og:title" content="SynovaAI - Unlock Predictive Insights">
+    <meta property="og:description" content="Empowering Your Business with Predictive AI">
     <meta property="og:image" content="{{ url_for('static', filename='images/og-image.png') }}">
     <meta property="og:url" content="https://www.synovaai.com">
     
@@ -32,50 +32,48 @@
     <!-- Hero Section -->
     <section class="hero">
         <article class="hero-text">
-            <h1>AI-Powered Sales Forecasting for Smarter Business Decisions</h1>
-            <p>Upload your sales data and receive accurate, AI-driven forecasts in seconds.</p>
+            <h1>Empowering Your Business with<br><span class="highlight">Predictive AI</span></h1>
+            <p>Unlock the potential of your data with SynovaAI. Transform insights into impactful actions.</p>
             <a href="https://sales-forecasting-platform-ymmlb4pgyhgjw9gg7useb4.streamlit.app" class="cta-button primary-button" target="_blank">Try Forecasting Now →</a>
         </article>
     </section>
 
-    <!-- How It Works Section -->
-    <section class="how-it-works">
-        <h2>How It Works</h2>
-        <div class="steps">
-            <div class="step">
-                <img src="static/images/upload-icon.png" alt="Upload Data">
-                <h3>Upload Your Data</h3>
-                <p>Drag and drop your sales data (CSV) for instant analysis.</p>
+    <!-- Data Services Section -->
+    <section id="services" class="data-services">
+        <h2>Are you ready to unlock the potential of your data?</h2>
+        <div class="service-grid">
+            <!-- Forecasting Service -->
+            <div class="service-card show">
+                <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="Forecasting Icon" loading="lazy">
+                <h3>Forecasting</h3>
+                <p>Generate accurate, actionable sales forecasts using AI-driven predictive analytics.</p>
+                <a href="https://sales-forecasting-platform-ymmlb4pgyhgjw9gg7useb4.streamlit.app" target="_blank" class="cta-button" aria-label="Explore Forecasting">Explore Forecasting</a>
             </div>
-            <div class="step">
-                <img src="static/images/ai-icon.png" alt="AI Processing">
-                <h3>AI Forecasting</h3>
-                <p>Our AI generates future sales trends in real-time.</p>
+            <!-- Dashboard Service -->
+            <div class="service-card show">
+                <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Dashboard Icon" loading="lazy">
+                <h3>Interactive Dashboards</h3>
+                <p>Visualize your data with real-time, interactive dashboards tailored to your needs.</p>
+                <a href="{{ url_for('sales_dashboard') }}" class="text-link">Sales Dashboard</a>
             </div>
-            <div class="step">
-                <img src="static/images/insights-icon.png" alt="Insights">
-                <h3>Download & Act</h3>
-                <p>Use data-driven insights to optimize your strategy.</p>
+            <!-- Self-Service Insights -->
+            <div class="service-card show">
+                <img src="{{ url_for('static', filename='images/self-service-icon.png') }}" alt="Self-Service Icon" loading="lazy">
+                <h3>Self-Service Insights</h3>
+                <p>Upload your data and get instant analytics, forecasts, and actionable insights.</p>
             </div>
         </div>
     </section>
 
-    <!-- Why Choose Us Section -->
-    <section class="why-choose-us">
-        <h2>Why Choose SynovaAI?</h2>
-        <ul>
-            <li>🚀 <strong>Increase Revenue:</strong> Forecast future demand accurately.</li>
-            <li>📈 <strong>Reduce Inventory Risks:</strong> Prevent overstocking & shortages.</li>
-            <li>⏳ <strong>Save Time:</strong> AI handles forecasting for you.</li>
-        </ul>
-    </section>
-
     <!-- Call to Action -->
     <section class="cta">
-        <h2>Start Forecasting Today</h2>
-        <p>Try SynovaAI's forecasting tool for free and see the impact on your business.</p>
-        <a href="https://sales-forecasting-platform-ymmlb4pgyhgjw9gg7useb4.streamlit.app" class="cta-button primary-button" target="_blank">Get Started Now →</a>
+        <h2>Ready to Transform Your Data?</h2>
+        <p>Contact us today to explore AI-powered insights for your business.</p>
+        <a href="{{ url_for('contact') }}" class="cta-button" aria-label="Get Started">Get Started</a>
     </section>
+
+    <!-- Back to Top Button -->
+    <button onclick="scrollToTop()" class="top-button" aria-label="Back to Top">⬆ Back to Top</button>
 
     <!-- Footer -->
     <footer>
