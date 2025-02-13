@@ -1,5 +1,6 @@
 from flask import Flask, render_template, send_from_directory
-from werkzeug.middleware.dispatcher import DispatcherMiddleware
+from werkzeug.serving import run_simple
+from werkzeug.wrappers import Request, Response
 
 # Initialize Flask app
 app = Flask(__name__, static_folder="static")
@@ -70,5 +71,7 @@ def apply_security_headers(response):
 
 # Convert Flask app to a WSGI-compatible function for Vercel
 def handler(event, context):
-    """WSGI-compatible handler for Vercel."""
-    return DispatcherMiddleware(app)(event, context)
+    """Custom WSGI handler for Vercel."""
+    request = Request(event)
+    response = Response.from_app(app, request.environ)
+    return response(environ=request.environ, start_response=context)
