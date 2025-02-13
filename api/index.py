@@ -1,4 +1,5 @@
 from flask import Flask, render_template, send_from_directory
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
 
 # Initialize Flask app
 app = Flask(__name__, static_folder="static")
@@ -67,6 +68,7 @@ def apply_security_headers(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     return response
 
-# Convert Flask app to a serverless function for Vercel
-def handler(request, *args, **kwargs):
-    return app(request.environ, *args)
+# Convert Flask app to a WSGI-compatible function for Vercel
+def handler(event, context):
+    """WSGI-compatible handler for Vercel."""
+    return DispatcherMiddleware(app)(event, context)
