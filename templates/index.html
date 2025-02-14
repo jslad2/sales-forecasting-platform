@@ -21,9 +21,9 @@
     <header>
         <nav>
             <ul>
-                <li><a href="data_services.html">Data Services</a></li>
-                <li><a href="how_we_help.html">How We Help</a></li>
-                <li><a href="contact.html">Contact</a></li>
+                <li><a href="/data_services.html">Data Services</a></li>
+                <li><a href="/how_we_help.html">How We Help</a></li>
+                <li><a href="/contact.html">Contact</a></li>
             </ul>
         </nav>
         <div class="logo">SYNOVAAI</div>
@@ -34,7 +34,7 @@
         <article class="hero-text">
             <h1>AI-Powered Sales Forecasting & Insights</h1>
             <p>Turn raw data into AI-powered sales forecasts and insights—instantly!</p>
-            <a href="data_services.html" class="cta-button primary-button">Get Started with AI Forecasting</a>
+            <a href="/data_services.html" class="cta-button primary-button" target="_blank">Discover More</a>
         </article>
     </section>
 
@@ -54,7 +54,7 @@
         <div class="cta-content">
             <h2>Unlock the Power of AI Insights</h2>
             <p>Discover how SynovaAI can transform your business with intelligent data insights.</p>
-            <a href="data_services.html" class="cta-button" aria-label="Explore Our AI Tools">Explore Our AI Tools</a>
+            <a href="/data_services.html" class="cta-button" aria-label="Explore Our AI Tools">Explore Our AI Tools</a>
         </div>
     </section>
 
@@ -63,33 +63,21 @@
 
     <!-- Footer -->
     <footer>
-        <p>&copy; <span id="current-year">2025</span> SynovaAI. All rights reserved.</p>
+        <p>&copy; 2025 SynovaAI. All rights reserved.</p>
         <div class="footer-links">
-            <a href="privacy_policy.html">Privacy Policy</a>
-            <a href="terms_of_service.html">Terms of Service</a>
+            <a href="/privacy_policy.html">Privacy Policy</a>
+            <a href="/terms_of_service.html">Terms of Service</a>
         </div>
     </footer>
 
-    <!-- JavaScript -->
+    <!-- JavaScript to Ensure Cards Show Properly -->
     <script>
-        // Smooth scroll to top
-        function scrollToTop() {
-            window.scrollTo({
-                top: 0,
-                behavior: 'smooth'
-            });
-        }
-
-        // Ensure service cards are visible
         document.addEventListener("DOMContentLoaded", function() {
             document.querySelectorAll(".service-card").forEach(card => {
                 card.classList.add("show");
             });
-
-            // Update copyright year dynamically
-            const currentYear = new Date().getFullYear();
-            document.getElementById("current-year").textContent = currentYear;
         });
     </script>
+
 </body>
 </html>
