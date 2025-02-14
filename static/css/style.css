@@ -176,7 +176,7 @@ header .logo {
 
 /* Service Cards */
 .service-card {
-    background-color: var(--white-color);
+    background-color: #F8F9FA; /* Light Grayish Background */
     border: 1px solid #DADADA;
     border-radius: 15px;
     padding: 30px;
@@ -195,11 +195,11 @@ header .logo {
     transition: opacity 0.6s ease, transform 0.6s ease;
 }
 
-/* Hover Effect - Makes cards feel interactive */
+/* Hover Effect - Slightly Darker Background */
 .service-card:hover {
     transform: translateY(-8px);
     box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15);
-    background: #F9FAFB;
+    background: #F1F3F5; /* Slightly Darker Shade on Hover */
 }
 
 /* Service Card Images */
