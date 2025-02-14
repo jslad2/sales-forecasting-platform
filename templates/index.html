@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SynovaAI - AI-Powered Sales Forecasting & Insights</title>
-    <meta name="description" content="Turn raw data into AI-powered sales forecasts and insights—instantly!">
+    <title>SynovaAI - Unlock Predictive Insights</title>
+    <meta name="description" content="Empowering Your Business with Predictive AI">
     
     <!-- Open Graph Meta Tags for SEO -->
-    <meta property="og:title" content="SynovaAI - AI-Powered Sales Forecasting & Insights">
-    <meta property="og:description" content="Turn raw data into AI-powered sales forecasts and insights—instantly!">
+    <meta property="og:title" content="SynovaAI - Unlock Predictive Insights">
+    <meta property="og:description" content="Empowering Your Business with Predictive AI">
     <meta property="og:image" content="static/images/og-image.png">
     <meta property="og:url" content="https://www.synovaai.com">
     
@@ -21,9 +21,9 @@
     <header>
         <nav>
             <ul>
-                <li><a href="/data_services.html">Data Services</a></li>
-                <li><a href="/how_we_help.html">How We Help</a></li>
-                <li><a href="/contact.html">Contact</a></li>
+                <li><a href="data_services.html">Data Services</a></li>
+                <li><a href="how_we_help.html">How We Help</a></li>
+                <li><a href="contact.html">Contact</a></li>
             </ul>
         </nav>
         <div class="logo">SYNOVAAI</div>
@@ -32,29 +32,45 @@
     <!-- Hero Section -->
     <section class="hero">
         <article class="hero-text">
-            <h1>AI-Powered Sales Forecasting & Insights</h1>
-            <p>Turn raw data into AI-powered sales forecasts and insights—instantly!</p>
-            <a href="/data_services.html" class="cta-button primary-button" target="_blank">Discover More</a>
+            <h1>Empowering Your Business with<br><span class="highlight">Predictive AI</span></h1>
+            <p>Unlock the potential of your data with SynovaAI. Transform insights into impactful actions.</p>
+            <a href="data_services.html" class="cta-button primary-button">Discover More</a>
         </article>
     </section>
 
-    <!-- Featured Tool: Forecasting -->
-    <section id="featured-tool" class="data-services">
-        <h2>Start Forecasting Your Sales Today</h2>
-        <div class="service-card show centered-card">
-            <img src="static/images/forecasting-icon.png" alt="Forecasting Icon" loading="lazy">
-            <h3>AI Sales Forecasting</h3>
-            <p>Generate accurate, actionable sales forecasts using AI-driven predictive analytics.</p>
-            <a href="https://sales-forecasting-platform-ymmlb4pgyhgjw9gg7useb4.streamlit.app" target="_blank" class="cta-button" aria-label="Explore Forecasting">Explore Forecasting</a>
+    <!-- Data Services Section -->
+    <section id="services" class="data-services">
+        <h2>Are you ready to unlock the potential of your data?</h2>
+        <div class="service-grid">
+            <!-- Forecasting Service -->
+            <div class="service-card show">
+                <img src="static/images/forecasting-icon.png" alt="Forecasting Icon" loading="lazy" onerror="this.onerror=null; this.src='static/images/default-placeholder.png'">
+                <h3>Forecasting</h3>
+                <p>Generate accurate, actionable sales forecasts using AI-driven predictive analytics.</p>
+                <a href="https://sales-forecasting-platform-ymmlb4pgyhgjw9gg7useb4.streamlit.app" target="_blank" class="cta-button" aria-label="Explore Forecasting">Explore Forecasting</a>
+            </div>
+            <!-- Dashboard Service -->
+            <div class="service-card show">
+                <img src="static/images/dashboard-icon.png" alt="Dashboard Icon" loading="lazy" onerror="this.onerror=null; this.src='static/images/default-placeholder.png'">
+                <h3>Interactive Dashboards</h3>
+                <p>Visualize your data with real-time, interactive dashboards tailored to your needs.</p>
+                <a href="sales_dashboard.html" class="text-link">Sales Dashboard</a>
+            </div>
+            <!-- Self-Service Insights -->
+            <div class="service-card show">
+                <img src="static/images/self-service-icon.png" alt="Self-Service Icon" loading="lazy" onerror="this.onerror=null; this.src='static/images/default-placeholder.png'">
+                <h3>Self-Service Insights</h3>
+                <p>Upload your data and get instant analytics, forecasts, and actionable insights.</p>
+            </div>
         </div>
     </section>
 
-    <!-- Call to Action -->
+    <!-- Call to Action (Improved) -->
     <section class="cta improved-cta">
         <div class="cta-content">
-            <h2>Unlock the Power of AI Insights</h2>
-            <p>Discover how SynovaAI can transform your business with intelligent data insights.</p>
-            <a href="/data_services.html" class="cta-button" aria-label="Explore Our AI Tools">Explore Our AI Tools</a>
+            <h2>Ready to Take Your Business to the Next Level?</h2>
+            <p>Discover the power of AI-driven insights for smarter decision-making.</p>
+            <a href="contact.html" class="cta-button" aria-label="Get Started">Get Started</a>
         </div>
     </section>
 
@@ -64,20 +80,24 @@
     <!-- Footer -->
     <footer>
         <p>&copy; 2025 SynovaAI. All rights reserved.</p>
-        <div class="footer-links">
-            <a href="/privacy_policy.html">Privacy Policy</a>
-            <a href="/terms_of_service.html">Terms of Service</a>
-        </div>
     </footer>
 
-    <!-- JavaScript to Ensure Cards Show Properly -->
+    <!-- JavaScript for Smooth Scrolling and Card Visibility -->
     <script>
+        // Smooth scroll to top
+        function scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+
+        // Ensure service cards are visible
         document.addEventListener("DOMContentLoaded", function() {
             document.querySelectorAll(".service-card").forEach(card => {
                 card.classList.add("show");
             });
         });
     </script>
-
 </body>
 </html>
