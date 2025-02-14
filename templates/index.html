@@ -43,25 +43,34 @@
         <h2>Unlock the Potential of Your Data</h2>
         <div class="service-grid">
             <!-- Forecasting Service -->
-            <div class="service-card">
-                <img src="static/images/forecasting-icon.png" alt="Forecasting Icon" loading="lazy">
-                <h3>Forecasting</h3>
-                <p>Generate accurate, actionable sales forecasts using AI-driven predictive analytics.</p>
-            </div>
+            <a href="{{ url_for('data_services') }}#forecasting" class="service-card-link">
+                <div class="service-card">
+                    <img src="static/images/forecasting-icon.png" alt="Forecasting Icon" loading="lazy">
+                    <h3>Forecasting</h3>
+                    <p>Generate accurate, actionable sales forecasts using AI-driven predictive analytics.</p>
+                </div>
+            </a>
+            
             <!-- Dashboard Service -->
-            <div class="service-card">
-                <img src="static/images/dashboard-icon.png" alt="Dashboard Icon" loading="lazy">
-                <h3>Interactive Dashboards</h3>
-                <p>Visualize your data with real-time, interactive dashboards tailored to your needs.</p>
-            </div>
+            <a href="{{ url_for('data_services') }}#dashboards" class="service-card-link">
+                <div class="service-card">
+                    <img src="static/images/dashboard-icon.png" alt="Dashboard Icon" loading="lazy">
+                    <h3>Interactive Dashboards</h3>
+                    <p>Visualize your data with real-time, interactive dashboards tailored to your needs.</p>
+                </div>
+            </a>
+            
             <!-- Support & Consulting -->
-            <div class="service-card">
-                <img src="static/images/support-icon.png" alt="Support & Consulting Icon" loading="lazy">
-                <h3>Support & Consulting</h3>
-                <p>Expert guidance in Power BI, SQL, and data forecasting to optimize your business decisions.</p>
-            </div>
+            <a href="{{ url_for('data_services') }}#consulting" class="service-card-link">
+                <div class="service-card">
+                    <img src="static/images/support-icon.png" alt="Support & Consulting Icon" loading="lazy">
+                    <h3>Support & Consulting</h3>
+                    <p>Expert guidance in Power BI, SQL, and data forecasting to optimize your business decisions.</p>
+                </div>
+            </a>
         </div>
     </section>
+
 
     <!-- Single Data Services Link -->
     <div class="data-services-link">
