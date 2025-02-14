@@ -111,7 +111,39 @@ header .logo {
     margin-bottom: 30px;
 }
 
-/* CTA Button */
+/* CTA Section - Improved Layout */
+.cta {
+    background: linear-gradient(135deg, #2B3A42, #354854);
+    color: var(--white-color);
+    text-align: center;
+    padding: 80px 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Container to center content */
+.cta-container {
+    max-width: 800px;
+    text-align: center;
+    padding: 20px;
+}
+
+/* CTA Heading */
+.cta h2 {
+    font-size: var(--font-size-xl);
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+/* CTA Description */
+.cta p {
+    font-size: var(--font-size-lg);
+    margin-bottom: 25px;
+    color: #E0E0E0;
+}
+
+/* Keep existing CTA button styles */
 .cta-button {
     background: linear-gradient(90deg, var(--secondary-color), var(--accent-color));
     color: var(--white-color);
@@ -124,8 +156,10 @@ header .logo {
     text-align: center;
     position: relative;
     overflow: hidden;
+    box-shadow: 0px 4px 10px rgba(255, 136, 0, 0.3);
 }
 
+/* Button Animation */
 .cta-button::after {
     content: '';
     position: absolute;
@@ -145,13 +179,14 @@ header .logo {
 
 .cta-button:hover {
     transform: scale(1.05);
-    box-shadow: 0px 4px 10px rgba(255, 136, 0, 0.3);
+    box-shadow: 0px 6px 12px rgba(255, 136, 0, 0.4);
 }
 
 .cta-button:focus {
     outline: 2px solid var(--accent-color);
     outline-offset: 2px;
 }
+
 
 /* Data Services Section */
 .data-services {
