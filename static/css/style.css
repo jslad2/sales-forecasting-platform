@@ -1,15 +1,15 @@
 /* General Styling */
 :root {
-    --primary-color: #1E2A38;
-    --secondary-color: #58C7B5;
-    --accent-color: #FF7A00;
-    --background-color: #F3F4F6;
-    --text-color: #222222;
+    --primary-color: #2B3A42;
+    --secondary-color: #64D8CB;
+    --accent-color: #FF8800;
+    --background-color: #F8F9FA;
+    --text-color: #333333;
     --white-color: #FFFFFF;
-    --gray-color: #555555;
-    --font-size-base: 1.1rem;
-    --font-size-lg: 1.4rem;
-    --font-size-xl: 2.2rem;
+    --gray-color: #666666;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.25rem;
+    --font-size-xl: 2rem;
     --breakpoint-sm: 480px;
     --breakpoint-md: 768px;
     --breakpoint-lg: 1024px;
@@ -28,7 +28,6 @@ body {
 h1, h2, h3 {
     font-family: 'Roboto', sans-serif;
     font-weight: 700;
-    color: var(--primary-color);
 }
 
 /* Header Styling */
@@ -42,9 +41,10 @@ header {
     position: sticky;
     top: 0;
     z-index: 1000;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+/* Navigation Menu */
 header nav ul {
     list-style: none;
     margin: 0;
@@ -53,7 +53,7 @@ header nav ul {
 }
 
 header nav li {
-    margin-right: 25px;
+    margin-right: 20px;
 }
 
 header nav a {
@@ -61,43 +61,63 @@ header nav a {
     text-decoration: none;
     font-weight: bold;
     font-size: var(--font-size-base);
-    padding: 12px 18px;
-    border-radius: 5px;
+    padding: 10px 15px;
     transition: all 0.3s ease-in-out;
+    border-radius: 5px;
 }
 
 header nav a:hover {
     background-color: var(--accent-color);
     color: var(--white-color);
-    box-shadow: 0px 5px 12px rgba(255, 122, 0, 0.3);
+    box-shadow: 0px 4px 10px rgba(255, 136, 0, 0.3);
+}
+
+header nav a:focus {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+/* Logo */
+header .logo {
+    font-size: var(--font-size-xl);
+    font-weight: bold;
+    color: var(--secondary-color);
+    text-decoration: none;
 }
 
 /* Hero Section */
 .hero {
-    background: linear-gradient(135deg, var(--primary-color), #324A5E);
+    background: linear-gradient(135deg, var(--primary-color), #354854);
     color: var(--white-color);
     text-align: center;
-    padding: 120px 30px;
+    padding: 100px 20px;
+    animation: gradientShift 10s infinite alternate;
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 100% 50%; }
 }
 
 .hero h1 {
     font-size: var(--font-size-xl);
-    margin-bottom: 15px;
-    text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+    margin-bottom: 20px;
+    font-weight: 700;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .hero p {
     font-size: var(--font-size-lg);
-    margin-bottom: 25px;
+    margin-bottom: 30px;
 }
 
 /* CTA Button */
 .cta-button {
     background: linear-gradient(90deg, var(--secondary-color), var(--accent-color));
     color: var(--white-color);
-    padding: 15px 35px;
+    padding: 15px 30px;
     font-size: var(--font-size-lg);
-    border-radius: 10px;
+    border-radius: 8px;
     font-weight: bold;
     transition: all 0.3s ease-in-out;
     display: inline-block;
@@ -106,21 +126,45 @@ header nav a:hover {
     overflow: hidden;
 }
 
-.cta-button:hover {
-    transform: scale(1.05);
-    box-shadow: 0px 6px 15px rgba(255, 122, 0, 0.3);
+.cta-button::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 300%;
+    height: 300%;
+    background-color: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    transition: transform 0.5s ease;
 }
 
-/* Service Cards Section */
+.cta-button:hover::after {
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.cta-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0px 4px 10px rgba(255, 136, 0, 0.3);
+}
+
+.cta-button:focus {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+/* Data Services Section */
 .data-services {
-    padding: 60px 30px;
+    padding: 50px 20px;
     text-align: center;
     background-color: var(--white-color);
 }
 
 .data-services h2 {
+    color: var(--primary-color);
+    margin-bottom: 40px;
     font-size: var(--font-size-xl);
-    margin-bottom: 35px;
+    font-weight: bold;
 }
 
 /* Service Grid */
@@ -130,26 +174,34 @@ header nav a:hover {
     gap: 30px;
 }
 
-/* Enhanced Service Cards */
+/* Service Cards */
 .service-card {
     background-color: var(--white-color);
-    border-radius: 15px;
-    padding: 35px;
-    text-align: center;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
     border: 1px solid #E0E0E0;
+    border-radius: 12px;
+    padding: 25px;
+    text-align: center;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    opacity: 0;
+    transform: translateY(20px);
+    will-change: transform, opacity;
+}
+
+.service-card.show {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.6s ease, transform 0.6s ease;
 }
 
 .service-card:hover {
-    transform: translateY(-7px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-    background: #F9FAFB;
+    transform: translateY(-10px);
+    box-shadow: 0 15px 25px rgba(0, 0, 0, 0.2);
 }
 
 .service-card img {
-    width: 75px;
-    margin-bottom: 20px;
+    width: 60px;
+    margin-bottom: 15px;
     transition: transform 0.3s ease;
 }
 
@@ -158,37 +210,57 @@ header nav a:hover {
 }
 
 .service-card h3 {
-    font-size: 1.6rem;
-    font-weight: bold;
+    margin-bottom: 15px;
+    color: var(--primary-color);
+    font-size: var(--font-size-lg);
+    font-weight: 600;
 }
 
 .service-card p {
-    font-size: 1.2rem;
     color: var(--gray-color);
-    font-weight: 500;
+    font-size: var(--font-size-base);
 }
 
-/* Centralized Data Services Link */
-.data-services-link {
+/* Forecasting Tool Section */
+.forecasting-tool {
     text-align: center;
-    margin-top: 40px;
+    max-width: 800px;
+    margin: 50px auto;
+    padding: 40px;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
-.data-services-link a {
-    font-size: 1.3rem;
-    font-weight: bold;
-    text-decoration: none;
-    padding: 14px 30px;
+.forecasting-tool h2 {
+    font-size: var(--font-size-xl);
+    color: var(--primary-color);
+    margin-bottom: 15px;
+}
+
+.forecasting-tool p {
+    font-size: var(--font-size-lg);
+    color: var(--gray-color);
+    margin-bottom: 20px;
+}
+
+/* Improve CTA Button */
+.forecasting-tool .cta-button {
+    font-size: var(--font-size-lg);
+    padding: 15px 30px;
     border-radius: 8px;
+    display: inline-block;
+    text-transform: uppercase;
+    font-weight: bold;
+    transition: all 0.3s ease-in-out;
     background: linear-gradient(90deg, var(--secondary-color), var(--accent-color));
     color: white;
-    transition: all 0.3s ease-in-out;
-    display: inline-block;
+    text-decoration: none;
 }
 
-.data-services-link a:hover {
+.forecasting-tool .cta-button:hover {
     transform: scale(1.05);
-    box-shadow: 0px 6px 15px rgba(255, 122, 0, 0.3);
+    box-shadow: 0px 6px 15px rgba(255, 136, 0, 0.3);
 }
 
 /* Footer */
@@ -196,24 +268,39 @@ footer {
     background-color: var(--primary-color);
     color: var(--white-color);
     text-align: center;
-    padding: 50px 20px;
+    padding: 40px 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
 }
 
 .footer-links {
-    margin-top: 15px;
+    margin-top: 20px;
 }
 
 .footer-links a {
     color: var(--white-color);
     text-decoration: none;
-    margin: 0 12px;
+    margin: 0 10px;
     font-size: 1.2rem;
 }
 
 .footer-links a:hover {
+    color: var(--secondary-color);
+}
+
+.social-icons {
+    margin-top: 20px;
+}
+
+.social-icons a {
+    color: var(--white-color);
+    margin: 0 10px;
+    font-size: 1.5rem;
+    transition: color 0.3s ease;
+}
+
+.social-icons a:hover {
     color: var(--secondary-color);
 }
 
@@ -225,9 +312,9 @@ footer {
     background-color: var(--secondary-color);
     color: var(--white-color);
     border: none;
-    padding: 14px 22px;
+    padding: 12px 18px;
     font-size: 14px;
-    border-radius: 8px;
+    border-radius: 6px;
     cursor: pointer;
     opacity: 0;
     transition: opacity 0.3s ease-in-out, transform 0.2s ease-in-out;
@@ -236,6 +323,11 @@ footer {
 .top-button:hover {
     background-color: #56BBAF;
     transform: scale(1.1);
+}
+
+.top-button:focus {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
 }
 
 /* Show Back to Top when Scrolling */
@@ -264,15 +356,66 @@ body.scrolled .top-button {
     }
 
     .hero h1 {
-        font-size: 1.6rem;
+        font-size: 1.5rem;
     }
 
     .hero p {
-        font-size: 1.1rem;
+        font-size: 1rem;
     }
 }
 
 /* Smooth Scrolling */
 html {
     scroll-behavior: smooth;
+}
+
+/* Additional Styles for Forecasting Tool and Sales Dashboard Pages */
+.forecasting-tool-page,
+.sales-dashboard-page {
+    text-align: center;
+}
+
+.forecasting-tool-page main,
+.sales-dashboard-page main {
+    padding: 50px 20px;
+}
+
+.forecasting-tool-page h1,
+.sales-dashboard-page h1 {
+    font-size: var(--font-size-xl);
+    color: var(--primary-color);
+    margin-bottom: 20px;
+}
+
+.forecasting-tool-page p,
+.sales-dashboard-page p {
+    font-size: var(--font-size-lg);
+    color: var(--gray-color);
+    max-width: 800px;
+    margin: 0 auto 40px;
+}
+
+/* Streamlit Embed Styles */
+.streamlit-embed {
+    width: 100%;
+    margin: 0 auto;
+    border: none; /* Remove border for a seamless look */
+    overflow: hidden;
+    background-color: var(--white-color);
+}
+
+.streamlit-embed iframe {
+    border: none;
+    width: 100%;
+    height: calc(100vh - 150px); /* Adjust based on header/footer height */
+    display: block;
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Hide the scrollbar */
+}
+
+@media (max-width: 768px) {
+    .streamlit-embed iframe {
+        height: calc(100vh - 200px); /* Adjust for smaller screens */
+    }
 }
