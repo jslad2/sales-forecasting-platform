@@ -36,84 +36,73 @@
         </article>
     </section>
 
+    <!-- What We Offer Section (Now at the Top) -->
+    <section id="data-services" class="data-services">
+        <h2>What We Offer</h2>
+        <p>At SynovaAI, we provide cutting-edge AI-driven solutions to help you make better business decisions.</p>
+        <div class="service-grid">
+            <!-- Forecasting -->
+            <a href="#forecasting" class="service-card-link">
+                <div class="service-card">
+                    <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="Forecasting Icon" loading="lazy">
+                    <h3>AI-Powered Forecasting</h3>
+                    <p>Predict trends, optimize inventory, and maximize revenue.</p>
+                </div>
+            </a>
+
+            <!-- Interactive Dashboards -->
+            <a href="#dashboards" class="service-card-link">
+                <div class="service-card">
+                    <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Dashboard Icon" loading="lazy">
+                    <h3>Interactive Dashboards</h3>
+                    <p>Gain real-time insights with fully customizable dashboards.</p>
+                </div>
+            </a>
+
+            <!-- Support & Consulting -->
+            <a href="#consulting" class="service-card-link">
+                <div class="service-card">
+                    <img src="{{ url_for('static', filename='images/support-icon.png') }}" alt="Support & Consulting Icon" loading="lazy">
+                    <h3>Support & Consulting</h3>
+                    <p>Expert guidance in Power BI, SQL, and data forecasting.</p>
+                </div>
+            </a>
+        </div>
+    </section>
+
+    <!-- Detailed Service Sections -->
     <section id="forecasting">
         <h2>AI-Powered Forecasting</h2>
-        <p>Our AI forecasting tool helps businesses predict trends, optimize inventory, and maximize revenue...</p>
+        <p>Our AI forecasting tool helps businesses predict trends, optimize inventory, and maximize revenue. 
+           With machine learning models, we analyze historical data to provide accurate demand forecasts.</p>
+        <ul>
+            <li>✅ Sales & Demand Forecasting</li>
+            <li>✅ Inventory Optimization</li>
+            <li>✅ AI-Powered Trend Analysis</li>
+        </ul>
     </section>
     
     <section id="dashboards">
         <h2>Interactive Dashboards</h2>
-        <p>Gain real-time insights with fully customizable dashboards designed to track key performance indicators...</p>
+        <p>Gain real-time insights with fully customizable dashboards designed to track key performance indicators.
+           We integrate data from multiple sources to provide you with a seamless data visualization experience.</p>
+        <ul>
+            <li>📊 Real-Time Data Insights</li>
+            <li>📈 KPI Tracking & Reporting</li>
+            <li>🔗 Power BI & SQL Integration</li>
+        </ul>
     </section>
     
     <section id="consulting">
         <h2>Support & Consulting</h2>
-        <p>Get expert guidance in Power BI, SQL, and data forecasting to optimize your business decisions...</p>
+        <p>We provide expert consulting services to help you set up, manage, and optimize your data analytics pipeline. 
+           From Power BI dashboards to advanced SQL querying, we offer tailored solutions to meet your needs.</p>
+        <ul>
+            <li>🎯 Power BI & SQL Optimization</li>
+            <li>📊 Data Strategy Consulting</li>
+            <li>🚀 AI & Predictive Modeling Support</li>
+        </ul>
     </section>    
-
-    <!-- Data Services Section -->
-    <section id="data-services" class="data-services">
-        <h2>What We Offer</h2>
-        <div class="service-grid">
-            <!-- Interactive Dashboards -->
-            <div class="service-card">
-                <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Dashboard Icon" loading="lazy">
-                <h3>Interactive Dashboards</h3>
-                <p>Real-time visualization of your key business metrics.</p>
-                <a href="{{ url_for('sales_dashboard') }}" class="cta-button" aria-label="Explore Dashboard">Explore Dashboard</a>
-            </div>
-
-            <!-- Forecasting Tool -->
-            <div class="service-card">
-                <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="Forecasting Tool Icon" loading="lazy">
-                <h3>Forecasting Tool</h3>
-                <p>Upload your data and generate accurate sales forecasts using our AI-driven tool.</p>
-                <a href="https://sales-forecasting-platform-ymmlb4pgyhgjw9gg7useb4.streamlit.app" 
-                class="cta-button" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                aria-label="Use Forecasting Tool">
-                Use Forecasting Tool
-                </a>
-            </div>
-
-            <!-- Predictive Analytics -->
-            <div class="service-card">
-                <img src="{{ url_for('static', filename='images/ai-icon.png') }}" alt="AI Insights Icon" loading="lazy">
-                <h3>Predictive Analytics</h3>
-                <p>Use machine learning to analyze trends and make data-driven decisions.</p>
-            </div>
-
-            <!-- Self-Service Insights -->
-            <div class="service-card">
-                <img src="{{ url_for('static', filename='images/self-service-icon.png') }}" alt="Self-Service Icon" loading="lazy">
-                <h3>Self-Service Insights</h3>
-                <p>Upload your data and instantly generate insights without needing a data team.</p>
-            </div>
-        </div>
-    </section>
-
-    <!-- Why Choose Us Section -->
-    <section id="why-choose-us" class="data-services">
-        <h2>Why Choose SynovaAI?</h2>
-        <div class="service-grid">
-            <div class="service-card">
-                <img src="{{ url_for('static', filename='images/scalability-icon.png') }}" alt="Scalability Icon" loading="lazy">
-                <h3>Scalability</h3>
-                <p>Our AI solutions grow with your business, adapting to your evolving needs.</p>
-            </div>
-            <div class="service-card">
-                <img src="{{ url_for('static', filename='images/efficiency-icon.png') }}" alt="Efficiency Icon" loading="lazy">
-                <h3>Efficiency</h3>
-                <p>Automate data analysis and focus on what matters most—your business strategy.</p>
-            </div>
-            <div class="service-card">
-                <img src="{{ url_for('static', filename='images/insights-icon.png') }}" alt="Insights Icon" loading="lazy">
-                <h3>Instant Insights</h3>
-                <p>Get actionable insights in real-time with AI-driven data processing.</p>
-            </div>
-        </div>
-    </section>
 
     <!-- Call to Action -->
     <section class="cta">
@@ -168,12 +157,6 @@
                 document.querySelectorAll(".service-card").forEach(card => card.classList.add("show"));
             }
         });
-
-        // Google Analytics (Replace UA-XXXXXX-X with your tracking ID)
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'UA-XXXXXX-X');
     </script>
 
 </body>

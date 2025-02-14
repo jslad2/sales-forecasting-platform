@@ -232,18 +232,26 @@ header .logo {
     line-height: 1.6;
 }
 
-/* Responsive Tweaks */
-@media (max-width: 768px) {
-    .service-card {
-        padding: 25px;
-    }
-    
-    .service-card h3 {
-        font-size: 1.2rem;
-    }
+/* Service Grid - Ensures Cards Are in a Row */
+.service-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); /* 3 Cards in a Row */
+    gap: 30px;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
 
-    .service-card p {
-        font-size: 1rem;
+/* Responsive Adjustments */
+@media (max-width: 1024px) {
+    .service-grid {
+        grid-template-columns: repeat(2, 1fr); /* 2 Columns on Medium Screens */
+    }
+}
+
+@media (max-width: 768px) {
+    .service-grid {
+        grid-template-columns: 1fr; /* Stack Cards on Small Screens */
     }
 }
 
