@@ -70,39 +70,63 @@
         </div>
     </section>
 
-    <!-- Detailed Service Sections -->
-    <section id="forecasting">
-        <h2>AI-Powered Forecasting</h2>
-        <p>Our AI forecasting tool helps businesses predict trends, optimize inventory, and maximize revenue. 
-           With machine learning models, we analyze historical data to provide accurate demand forecasts.</p>
-        <ul>
-            <li>✅ Sales & Demand Forecasting</li>
-            <li>✅ Inventory Optimization</li>
-            <li>✅ AI-Powered Trend Analysis</li>
-        </ul>
+    <!-- AI-Powered Forecasting -->
+    <section id="forecasting" class="service-detail">
+        <div class="service-detail-container">
+            <div class="service-detail-image">
+                <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="AI Forecasting">
+            </div>
+            <div class="service-detail-content">
+                <h2>AI-Powered Forecasting</h2>
+                <p>Our AI forecasting tool helps businesses predict trends, optimize inventory, and maximize revenue. 
+                Using machine learning models, we analyze historical data to provide highly accurate demand forecasts.</p>
+                <ul>
+                    <li>✅ <strong>Sales & Demand Forecasting</strong> - Predict future trends based on data patterns.</li>
+                    <li>✅ <strong>Inventory Optimization</strong> - Avoid overstocking or shortages.</li>
+                    <li>✅ <strong>AI-Powered Trend Analysis</strong> - Identify hidden patterns in customer behavior.</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Interactive Dashboards -->
+    <section id="dashboards" class="service-detail">
+        <div class="service-detail-container reverse">
+            <div class="service-detail-image">
+                <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Interactive Dashboards">
+            </div>
+            <div class="service-detail-content">
+                <h2>Interactive Dashboards</h2>
+                <p>Gain real-time insights with fully customizable dashboards designed to track key performance indicators.
+                Our dashboards integrate data from multiple sources, providing you with a seamless data visualization experience.</p>
+                <ul>
+                    <li>📊 <strong>Real-Time Data Insights</strong> - Stay updated with live reports.</li>
+                    <li>📈 <strong>KPI Tracking & Reporting</strong> - Monitor essential business metrics.</li>
+                    <li>🔗 <strong>Power BI & SQL Integration</strong> - Seamlessly connect your data sources.</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Support & Consulting -->
+    <section id="consulting" class="service-detail">
+        <div class="service-detail-container">
+            <div class="service-detail-image">
+                <img src="{{ url_for('static', filename='images/support-icon.png') }}" alt="Support & Consulting">
+            </div>
+            <div class="service-detail-content">
+                <h2>Support & Consulting</h2>
+                <p>We provide expert consulting services to help you set up, manage, and optimize your data analytics pipeline.
+                Whether it’s Power BI dashboards or advanced SQL queries, we offer tailored solutions to meet your needs.</p>
+                <ul>
+                    <li>🎯 <strong>Power BI & SQL Optimization</strong> - Get the most out of your reporting tools.</li>
+                    <li>📊 <strong>Data Strategy Consulting</strong> - Improve your data-driven decision-making.</li>
+                    <li>🚀 <strong>AI & Predictive Modeling Support</strong> - Implement cutting-edge AI insights.</li>
+                </ul>
+            </div>
+        </div>
     </section>
     
-    <section id="dashboards">
-        <h2>Interactive Dashboards</h2>
-        <p>Gain real-time insights with fully customizable dashboards designed to track key performance indicators.
-           We integrate data from multiple sources to provide you with a seamless data visualization experience.</p>
-        <ul>
-            <li>📊 Real-Time Data Insights</li>
-            <li>📈 KPI Tracking & Reporting</li>
-            <li>🔗 Power BI & SQL Integration</li>
-        </ul>
-    </section>
-    
-    <section id="consulting">
-        <h2>Support & Consulting</h2>
-        <p>We provide expert consulting services to help you set up, manage, and optimize your data analytics pipeline. 
-           From Power BI dashboards to advanced SQL querying, we offer tailored solutions to meet your needs.</p>
-        <ul>
-            <li>🎯 Power BI & SQL Optimization</li>
-            <li>📊 Data Strategy Consulting</li>
-            <li>🚀 AI & Predictive Modeling Support</li>
-        </ul>
-    </section>    
 
     <!-- Call to Action -->
     <section class="cta">

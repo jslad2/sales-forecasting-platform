@@ -453,3 +453,83 @@ html {
         height: calc(100vh - 200px); /* Adjust for smaller screens */
     }
 }
+
+/* Service Detail Section */
+.service-detail {
+    padding: 60px 0;
+    background-color: #F8F9FA;
+}
+
+.service-detail-container {
+    display: flex;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+    gap: 40px;
+}
+
+/* Reverse layout for alternating sections */
+.service-detail-container.reverse {
+    flex-direction: row-reverse;
+}
+
+.service-detail-image img {
+    width: 120px;
+    height: auto;
+}
+
+/* Service Text Content */
+.service-detail-content {
+    flex: 1;
+}
+
+.service-detail-content h2 {
+    font-size: 1.8rem;
+    color: var(--primary-color);
+    margin-bottom: 15px;
+}
+
+.service-detail-content p {
+    font-size: 1.1rem;
+    color: var(--gray-color);
+    margin-bottom: 20px;
+}
+
+/* Styled List */
+.service-detail-content ul {
+    list-style: none;
+    padding: 0;
+}
+
+.service-detail-content ul li {
+    font-size: 1.1rem;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+}
+
+/* Icons next to list items */
+.service-detail-content ul li strong {
+    margin-left: 8px;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .service-detail-container {
+        flex-direction: column;
+        text-align: center;
+        padding: 30px;
+    }
+
+    .service-detail-container.reverse {
+        flex-direction: column;
+    }
+
+    .service-detail-image img {
+        width: 100px;
+    }
+}
