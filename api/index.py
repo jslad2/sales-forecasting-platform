@@ -156,6 +156,11 @@ def logout():
     session.pop('user', None)
     return redirect(url_for('home'))
 
+# ✅ Stripe Payment Route
+@app.route('/checkout/pro')
+def checkout_pro():
+    return redirect("https://buy.stripe.com/eVa00j89SeIM9hKeUU")
+
 # ✅ Serve Static Files
 @app.route('/static/<path:filename>')
 def serve_static(filename):
