@@ -210,6 +210,8 @@ header .logo {
 
 /* Service Cards */
 .service-card {
+    opacity: 1 !important;
+    display: block !important;
     background: linear-gradient(180deg, #F9FAFB 0%, #F3F4F6 100%); /* Soft gradient */
     border: 1px solid #D0D3D8;
     border-radius: 15px;
