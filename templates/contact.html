@@ -55,20 +55,14 @@
             {% endwith %}
 
             <form method="POST" action="{{ url_for('contact') }}" onsubmit="return validateForm()">
-                <!-- CSRF Token for Security -->
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
                 <label for="name">Name:</label>
                 <input type="text" id="name" name="name" required aria-describedby="name-help">
-                <span id="name-help" class="help-text">Please enter your full name.</span>
 
                 <label for="email">Email:</label>
                 <input type="email" id="email" name="email" required aria-describedby="email-help">
-                <span id="email-help" class="help-text">Please enter a valid email address.</span>
 
                 <label for="message">Message:</label>
-                <textarea id="message" name="message" required aria-describedby="message-help" maxlength="500"></textarea>
-                <span id="message-help" class="help-text">Maximum 500 characters.</span>
+                <textarea id="message" name="message" required aria-describedby="message-help"></textarea>
 
                 <button type="submit">Send Message</button>
             </form>
@@ -79,19 +73,24 @@
             <h2>Our Contact Information</h2>
             <div class="service-grid">
                 <div class="service-card">
+                    <!--<img src="{{ url_for('static', filename='images/address-icon.png') }}" alt="Address Icon" loading="lazy">-->
                     <h3>Address</h3>
                     <p>123 Main St, Anytown, USA 12345</p>
                 </div>
                 <div class="service-card">
+                    <!--<img src="{{ url_for('static', filename='images/phone-icon.png') }}" alt="Phone Icon" loading="lazy">-->
                     <h3>Phone Number</h3>
                     <p>(123) 456-7890</p>
                 </div>
                 <div class="service-card">
+                    <!--<img src="{{ url_for('static', filename='images/email-icon.png') }}" alt="Email Icon" loading="lazy">-->
                     <h3>Email Address</h3>
                     <p>info@synovai.com</p>
                 </div>
             </div>
         </section>
+
+
     </div>
 
     <!-- Back to Top Button -->
@@ -119,31 +118,16 @@
             }
         });
 
-        // Enhanced Form Validation
+        // Basic Form Validation
         function validateForm() {
             let name = document.getElementById("name").value.trim();
             let email = document.getElementById("email").value.trim();
             let message = document.getElementById("message").value.trim();
 
-            // Check for empty fields
             if (name === "" || email === "" || message === "") {
                 alert("Please fill in all required fields.");
                 return false;
             }
-
-            // Validate email format
-            let emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailPattern.test(email)) {
-                alert("Please enter a valid email address.");
-                return false;
-            }
-
-            // Validate message length
-            if (message.length > 500) {
-                alert("Message must be 500 characters or less.");
-                return false;
-            }
-
             return true;
         }
 
