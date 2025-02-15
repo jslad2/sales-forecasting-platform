@@ -643,6 +643,8 @@ html {
 
 /* Contact Info Section */
 .contact-info {
+    display: block !important; /* Force it to be visible */
+    opacity: 1 !important; /* Ensure visibility */
     max-width: 900px;
     margin: 50px auto;
     text-align: center;
@@ -662,14 +664,13 @@ html {
     flex-wrap: wrap;
 }
 
-.contact-info .service-card {
-    background: white;
-    border-radius: 12px;
-    padding: 20px;
-    text-align: center;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    width: 250px;
+.contact-info .service-grid {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    flex-wrap: wrap;
 }
+
 
 .contact-info .service-card img {
     width: 50px;
