@@ -686,3 +686,93 @@ html {
         align-items: center;
     }
 }
+
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background-color: #f8f9fa;
+    margin: 0;
+    padding: 0;
+}
+
+header {
+    background: #2B3A42;
+    color: white;
+    padding: 20px;
+}
+
+h1 {
+    margin: 0;
+    font-size: 2rem;
+}
+
+p {
+    font-size: 1.2rem;
+}
+
+.pricing-container {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin: 50px auto;
+}
+
+.pricing-card {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    width: 300px;
+    text-align: center;
+}
+
+.pricing-card h2 {
+    font-size: 1.8rem;
+    margin-bottom: 10px;
+}
+
+.price {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 20px;
+}
+
+ul {
+    list-style: none;
+    padding: 0;
+}
+
+ul li {
+    font-size: 1.1rem;
+    margin-bottom: 10px;
+}
+
+.cta-button {
+    display: inline-block;
+    text-decoration: none;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-size: 1.2rem;
+    color: white;
+    background: #64D8CB;
+    transition: 0.3s ease;
+}
+
+.cta-button:hover {
+    background: #56BBAF;
+}
+
+.pro-btn {
+    background: #FF8800;
+}
+
+.pro-btn:hover {
+    background: #E07000;
+}
+
+footer {
+    margin-top: 50px;
+    padding: 20px;
+    background: #2B3A42;
+    color: white;
+}

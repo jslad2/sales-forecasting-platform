@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing - AI-Powered Forecasting</title>
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <h1>Choose Your Plan</h1>
+        <p>Start with our free tier or upgrade to unlock full features.</p>
+    </header>
+
+    <!-- Pricing Table -->
+    <section class="pricing-container">
+        <div class="pricing-card">
+            <h2>Free Tier</h2>
+            <p class="price">$0 / month</p>
+            <ul>
+                <li>🔹 Access basic forecasting</li>
+                <li>🔹 View sales predictions</li>
+                <li>❌ No downloads</li>
+                <li>❌ Limited forecast depth</li>
+            </ul>
+            <a href="{{ url_for('signup') }}" class="cta-button">Start for Free</a>
+        </div>
+
+        <div class="pricing-card pro">
+            <h2>Pro Plan</h2>
+            <p class="price">$19.99 / month</p>
+            <ul>
+                <li>✅ Full forecasting access</li>
+                <li>✅ Download reports</li>
+                <li>✅ Advanced analytics</li>
+                <li>✅ Priority support</li>
+            </ul>
+            <a href="https://buy.stripe.com/eVa00j89SeIM9hKeUU" class="cta-button pro-btn">Upgrade to Pro</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2025 SynovaAI. All rights reserved.</p>
+    </footer>
+
+</body>
+</html>
