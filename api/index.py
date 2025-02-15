@@ -19,6 +19,14 @@ def services():
 def how_we_help():
     return render_template('how_we_help.html')
 
+@app.route('/pricing')
+def pricing():
+    return render_template('pricing.html')
+
+@app.route('/success')
+def success():
+    return render_template('success.html')
+
 @app.route('/contact')
 def contact():
     return render_template('contact.html')
