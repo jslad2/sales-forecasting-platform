@@ -1,53 +1,162 @@
 import os
-from flask import Flask, render_template, send_from_directory
+import sqlite3
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # ✅ Initialize Flask App (Ensure Correct Paths)
 app = Flask(__name__, 
             template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")), 
             static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../static")))
 
-# ✅ Routes
+app.secret_key = "your_secret_key"  # Change this for security
+
+# ✅ Database Connection
+def get_db_connection():
+    conn = sqlite3.connect('database.db')
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# ✅ Home Page
 @app.route('/')
 def home():
     return render_template('index.html')
 
+# ✅ Services Page
 @app.route('/services')
 def services():
     return render_template('data_services.html')
 
+# ✅ How We Help Page
 @app.route('/how-we-help')
 def how_we_help():
     return render_template('how_we_help.html')
 
+# ✅ Pricing Page
 @app.route('/pricing')
 def pricing():
     return render_template('pricing.html')
 
+# ✅ Success Page
 @app.route('/success')
 def success():
     return render_template('success.html')
 
+# ✅ Contact Page
 @app.route('/contact')
 def contact():
     return render_template('contact.html')
 
+# ✅ Data Services Page
 @app.route('/data-services')
 def data_services():
     return render_template('data_services.html')
 
+# ✅ Forecasting Tool Page (Restricted)
 @app.route('/forecasting-tool')
 def forecasting_tool():
-    return render_template('forecasting_tool.html')
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    user = conn.execute("SELECT tier FROM users WHERE email = ?", (session['user'],)).fetchone()
+    conn.close()
 
+    if user and user['tier'] == 'pro':
+        return render_template('forecasting_tool.html', pro_user=True)
+    else:
+        return render_template('forecasting_tool.html', pro_user=False)
+
+# ✅ Sales Dashboard Page (Restricted)
 @app.route('/sales-dashboard')
 def sales_dashboard():
-    return render_template('sales_dashboard.html')
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    user = conn.execute("SELECT tier FROM users WHERE email = ?", (session['user'],)).fetchone()
+    conn.close()
 
+    if user and user['tier'] == 'pro':
+        return render_template('sales_dashboard.html', pro_user=True)
+    else:
+        return render_template('sales_dashboard.html', pro_user=False)
+
+# ✅ Self-Service Insights Page
 @app.route('/self-service-insights')
 def self_service_insights():
     return render_template('self_service_insights.html')
 
-# ✅ Serve Static Files (CSS, JS, Images)
+# ✅ Register Route
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+        hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check if user already exists
+        cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
+        existing_user = cursor.fetchone()
+
+        if existing_user:
+            return "User already exists. Please <a href='/login'>login</a>."
+
+        # Insert new user as "Free Tier"
+        cursor.execute("INSERT INTO users (email, password, tier) VALUES (?, ?, ?)", (email, hashed_password, "free"))
+        conn.commit()
+        conn.close()
+
+        session['user'] = email  # Log in user after sign-up
+        return redirect(url_for('dashboard'))  # Redirect to dashboard
+
+    return render_template('register.html')
+
+# ✅ Login Route
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+
+        conn = get_db_connection()
+        user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        conn.close()
+
+        if user and check_password_hash(user['password'], password):
+            session['user'] = email
+            return redirect(url_for('dashboard'))
+
+        return "Invalid login. <a href='/login'>Try again</a>."
+
+    return render_template('login.html')
+
+# ✅ Dashboard Route (Checks Free vs. Pro)
+@app.route('/dashboard')
+def dashboard():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT tier FROM users WHERE email = ?", (session['user'],))
+    user = cursor.fetchone()
+    conn.close()
+
+    if user and user['tier'] == 'pro':
+        return render_template('dashboard.html', pro_user=True)
+    else:
+        return render_template('dashboard.html', pro_user=False)
+
+# ✅ Logout Route
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    return redirect(url_for('home'))
+
+# ✅ Serve Static Files
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     return send_from_directory(os.path.join(app.root_path, "static"), filename)
@@ -56,7 +165,7 @@ def serve_static(filename):
 def serve_css(filename):
     return send_from_directory(os.path.join(app.root_path, "static/css"), filename)
 
-# ✅ Security Headers for Embedding
+# ✅ Security Headers
 @app.after_request
 def apply_security_headers(response):
     response.headers["Content-Security-Policy"] = "frame-ancestors 'self';"
@@ -64,7 +173,7 @@ def apply_security_headers(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     return response
 
-# ✅ Error Handling (Ensure these templates exist in `/templates`)
+# ✅ Error Handling
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html'), 404
@@ -72,9 +181,6 @@ def page_not_found(e):
 @app.errorhandler(500)
 def internal_server_error(e):
     return render_template('500.html'), 500
-
-# ✅ Expose `app` for Vercel
-app = app
 
 # ✅ Run App Locally (For Debugging)
 if __name__ == "__main__":
