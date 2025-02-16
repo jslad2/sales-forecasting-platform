@@ -1,6 +1,5 @@
 import os
 import sqlite3
-import supabase
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
@@ -13,12 +12,7 @@ print(installed_packages.stdout)
 
 load_dotenv()  # Load environment variables from .env file
 
-# ✅ Supabase Configuration
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# ✅ Initialize Supabase Client
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ✅ Initialize Flask App (Ensure Correct Paths)
 app = Flask(__name__, 
@@ -103,49 +97,7 @@ def sales_dashboard():
 def self_service_insights():
     return render_template('self_service_insights.html')
 
-# ✅ Register Route (Signup with Supabase)
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
-        hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
 
-        # ✅ Create user in Supabase Auth
-        try:
-            response = supabase.auth.sign_up({"email": email, "password": password})
-            if response.user:
-                # ✅ Insert user into 'users' table with 'free' tier
-                supabase.table("users").insert({"email": email, "password_hash": hashed_password, "tier": "free"}).execute()
-
-                session['user'] = email  # Log in user after sign-up
-                return redirect(url_for('dashboard'))
-            else:
-                return "Error: Unable to create user."
-        except Exception as e:
-            return f"Error: {str(e)}"
-
-    return render_template('register.html')
-
-# ✅ Login Route (Sign in with Supabase)
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
-
-        # ✅ Authenticate user with Supabase
-        try:
-            response = supabase.auth.sign_in_with_password({"email": email, "password": password})
-            if response.user:
-                session['user'] = email
-                return redirect(url_for('dashboard'))
-            else:
-                return "Invalid login. <a href='/login'>Try again</a>."
-        except Exception as e:
-            return f"Error: {str(e)}"
-
-    return render_template('login.html')
 
 # ✅ Dashboard Route (Checks Free vs. Pro)
 @app.route('/dashboard')
