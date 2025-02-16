@@ -6,7 +6,7 @@ from supabase import create_client, Client
 
 # ✅ Supabase Configuration (Set these as environment variables or replace them)
 SUPABASE_URL = "https://ewdilyhplzrxyrbtkmjy.supabase.co"  # Replace with your Supabase URL
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3ZGlseWhwbHpyeHlyYnRrbWp5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczOTcyMDI4MSwiZXhwIjoyMDU1Mjk2MjgxfQ.KYQxcNQwuvsizAJbhheUgCzCBvqoZwrWHJ56TgaSB5k"  # Replace with your Supabase API Key
+SUPABASE_KEY = ""  # Replace with your Supabase API Key
 
 # ✅ Initialize Supabase Client
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
