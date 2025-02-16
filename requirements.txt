@@ -14,3 +14,4 @@ statsmodels
 optuna
 matplotlib
 gunicorn  # (optional, for better production performance)
+supabase
