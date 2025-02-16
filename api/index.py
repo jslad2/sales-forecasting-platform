@@ -5,17 +5,12 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import supabase
 import subprocess
 
-def log_installed_packages():
-    try:
-        installed_packages = subprocess.run(["pip", "list"], capture_output=True, text=True)
-        print("\n=== Installed Packages in Vercel ===")
-        print(installed_packages.stdout)
-        print("\n====================================\n")
-    except Exception as e:
-        print(f"Error fetching installed packages: {e}")
+def installed_packages():
+    result = subprocess.run(["pip", "list"], capture_output=True, text=True)
+    return result.stdout
 
-log_installed_packages()
-
+print("=== INSTALLED PACKAGES ===")
+print(installed_packages())
 
 
 # ✅ Initialize Flask App (Ensure Correct Paths)
