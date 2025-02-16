@@ -2,6 +2,14 @@ import os
 import sqlite3
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
+from supabase import create_client, Client
+
+# ✅ Supabase Configuration (Set these as environment variables or replace them)
+SUPABASE_URL = "https://ewdilyhplzrxyrbtkmjy.supabase.co"  # Replace with your Supabase URL
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3ZGlseWhwbHpyeHlyYnRrbWp5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczOTcyMDI4MSwiZXhwIjoyMDU1Mjk2MjgxfQ.KYQxcNQwuvsizAJbhheUgCzCBvqoZwrWHJ56TgaSB5k"  # Replace with your Supabase API Key
+
+# ✅ Initialize Supabase Client
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ✅ Initialize Flask App (Ensure Correct Paths)
 app = Flask(__name__, 
@@ -86,7 +94,7 @@ def sales_dashboard():
 def self_service_insights():
     return render_template('self_service_insights.html')
 
-# ✅ Register Route
+# ✅ Register Route (Signup with Supabase)
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -94,42 +102,39 @@ def register():
         password = request.form['password']
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
 
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        # ✅ Create user in Supabase Auth
+        try:
+            response = supabase.auth.sign_up({"email": email, "password": password})
+            if response.user:
+                # ✅ Insert user into 'users' table with 'free' tier
+                supabase.table("users").insert({"email": email, "password_hash": hashed_password, "tier": "free"}).execute()
 
-        # Check if user already exists
-        cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
-        existing_user = cursor.fetchone()
-
-        if existing_user:
-            return "User already exists. Please <a href='/login'>login</a>."
-
-        # Insert new user as "Free Tier"
-        cursor.execute("INSERT INTO users (email, password, tier) VALUES (?, ?, ?)", (email, hashed_password, "free"))
-        conn.commit()
-        conn.close()
-
-        session['user'] = email  # Log in user after sign-up
-        return redirect(url_for('dashboard'))  # Redirect to dashboard
+                session['user'] = email  # Log in user after sign-up
+                return redirect(url_for('dashboard'))
+            else:
+                return "Error: Unable to create user."
+        except Exception as e:
+            return f"Error: {str(e)}"
 
     return render_template('register.html')
 
-# ✅ Login Route
+# ✅ Login Route (Sign in with Supabase)
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
 
-        conn = get_db_connection()
-        user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
-        conn.close()
-
-        if user and check_password_hash(user['password'], password):
-            session['user'] = email
-            return redirect(url_for('dashboard'))
-
-        return "Invalid login. <a href='/login'>Try again</a>."
+        # ✅ Authenticate user with Supabase
+        try:
+            response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+            if response.user:
+                session['user'] = email
+                return redirect(url_for('dashboard'))
+            else:
+                return "Invalid login. <a href='/login'>Try again</a>."
+        except Exception as e:
+            return f"Error: {str(e)}"
 
     return render_template('login.html')
 
