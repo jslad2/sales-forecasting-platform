@@ -3,10 +3,13 @@ import sqlite3
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
+from dotenv import load_dotenv
 
-# ✅ Supabase Configuration (Set these as environment variables or replace them)
-SUPABASE_URL = "https://ewdilyhplzrxyrbtkmjy.supabase.co"  # Replace with your Supabase URL
-SUPABASE_KEY = ""  # Replace with your Supabase API Key
+load_dotenv()  # Load environment variables from .env file
+
+# ✅ Supabase Configuration
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 # ✅ Initialize Supabase Client
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
