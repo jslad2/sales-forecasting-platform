@@ -6,3 +6,4 @@ pandas
 werkzeug
 matplotlib
 dotenv
+supabase
