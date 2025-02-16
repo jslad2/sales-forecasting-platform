@@ -5,5 +5,4 @@ scipy
 pandas
 werkzeug
 matplotlib
-dotenv
-supabase
+python-dotenv
