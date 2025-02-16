@@ -2,16 +2,6 @@ import os
 import sqlite3
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
-from dotenv import load_dotenv
-import subprocess
-
-installed_packages = subprocess.run(["pip", "freeze"], capture_output=True, text=True)
-print(installed_packages.stdout)
-
-
-load_dotenv()  # Load environment variables from .env file
-
-
 
 # ✅ Initialize Flask App (Ensure Correct Paths)
 app = Flask(__name__, 
