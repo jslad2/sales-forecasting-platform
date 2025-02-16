@@ -2,7 +2,18 @@ import os
 import sqlite3
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
-import dotenv
+import subprocess
+
+def log_installed_packages():
+    try:
+        installed_packages = subprocess.run(["pip", "list"], capture_output=True, text=True)
+        print("\n=== Installed Packages in Vercel ===")
+        print(installed_packages.stdout)
+        print("\n====================================\n")
+    except Exception as e:
+        print(f"Error fetching installed packages: {e}")
+
+log_installed_packages()
 
 
 
