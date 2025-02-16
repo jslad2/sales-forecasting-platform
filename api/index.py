@@ -2,7 +2,6 @@ import os
 import sqlite3
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
-from supabase import create_client, Client
 from dotenv import load_dotenv
 import subprocess
 
