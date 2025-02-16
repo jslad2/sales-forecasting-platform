@@ -10,5 +10,5 @@
   "routes": [
     { "src": "/(.*)", "dest": "api/index.py" }
   ],
-  "buildCommand": "pip install --no-cache-dir -r requirements-vercel.txt && pip install supabase"
+  "buildCommand": "pip install --no-cache-dir supabase && pip install --no-cache-dir -r requirements-vercel.txt"
 }
