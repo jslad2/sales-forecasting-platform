@@ -10,5 +10,5 @@
   "routes": [
     { "src": "/(.*)", "dest": "api/index.py" }
   ],
-  "outputDirectory": ".vercel/output"
+  "buildCommand": "pip install -r requirements-vercel.txt"
 }
