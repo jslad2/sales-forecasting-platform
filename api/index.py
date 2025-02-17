@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 import dotenv
 import subprocess
@@ -151,11 +151,6 @@ def page_not_found(e):
 @app.errorhandler(500)
 def internal_server_error(e):
     return render_template('500.html'), 500
-
-@app.route("/debug-packages")
-def debug_packages():
-    result = subprocess.run(["pip", "list"], capture_output=True, text=True)
-    return jsonify({"installed_packages": result.stdout})
 
 # ✅ Run App Locally (For Debugging)
 if __name__ == "__main__":
