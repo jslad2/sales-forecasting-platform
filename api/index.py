@@ -3,7 +3,7 @@ import sqlite3
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 import subprocess
-from supabase import create_client, Client
+import matplotlib
 
 def installed_packages():
     result = subprocess.run(["pip", "list"], capture_output=True, text=True)
