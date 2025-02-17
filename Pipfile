@@ -10,7 +10,7 @@ supabase = "*"
 werkzeug = "*"
 requests = "*"
 numpy = "*"
-matplotlib = "*"
+python-dotenv = "*"  # ✅ Required for loading .env variables
 
 [requires]
 python_version = "3.12"
