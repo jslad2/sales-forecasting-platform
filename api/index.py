@@ -1,7 +1,16 @@
 import os
 import sqlite3
-from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
+import subprocess
+
+def installed_packages():
+    result = subprocess.run(["pip", "list"], capture_output=True, text=True)
+    return result.stdout
+
+print("=== INSTALLED PACKAGES ===")
+print(installed_packages())
+
 
 # ✅ Initialize Flask App (Ensure Correct Paths)
 app = Flask(__name__, 
@@ -86,52 +95,7 @@ def sales_dashboard():
 def self_service_insights():
     return render_template('self_service_insights.html')
 
-# ✅ Register Route
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
-        hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
 
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # Check if user already exists
-        cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
-        existing_user = cursor.fetchone()
-
-        if existing_user:
-            return "User already exists. Please <a href='/login'>login</a>."
-
-        # Insert new user as "Free Tier"
-        cursor.execute("INSERT INTO users (email, password, tier) VALUES (?, ?, ?)", (email, hashed_password, "free"))
-        conn.commit()
-        conn.close()
-
-        session['user'] = email  # Log in user after sign-up
-        return redirect(url_for('dashboard'))  # Redirect to dashboard
-
-    return render_template('register.html')
-
-# ✅ Login Route
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
-
-        conn = get_db_connection()
-        user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
-        conn.close()
-
-        if user and check_password_hash(user['password'], password):
-            session['user'] = email
-            return redirect(url_for('dashboard'))
-
-        return "Invalid login. <a href='/login'>Try again</a>."
-
-    return render_template('login.html')
 
 # ✅ Dashboard Route (Checks Free vs. Pro)
 @app.route('/dashboard')
@@ -186,6 +150,11 @@ def page_not_found(e):
 @app.errorhandler(500)
 def internal_server_error(e):
     return render_template('500.html'), 500
+
+@app.route("/debug-packages")
+def debug_packages():
+    result = subprocess.run(["pip", "list"], capture_output=True, text=True)
+    return jsonify({"installed_packages": result.stdout})
 
 # ✅ Run App Locally (For Debugging)
 if __name__ == "__main__":
