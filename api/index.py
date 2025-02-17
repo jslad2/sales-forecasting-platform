@@ -1,15 +1,17 @@
 import os
-import sqlite3
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-import subprocess
+from supabase import create_client, Client
+from dotenv import load_dotenv
 
-def installed_packages():
-    result = subprocess.run(["pip", "list"], capture_output=True, text=True)
-    return result.stdout
+# ✅ Load environment variables from .env
+load_dotenv()
 
-print("=== INSTALLED PACKAGES ===")
-print(installed_packages())
+# ✅ Initialize Supabase Client
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 # ✅ Initialize Flask App (Ensure Correct Paths)
@@ -18,12 +20,6 @@ app = Flask(__name__,
             static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../static")))
 
 app.secret_key = "your_secret_key"  # Change this for security
-
-# ✅ Database Connection
-def get_db_connection():
-    conn = sqlite3.connect('database.db')
-    conn.row_factory = sqlite3.Row
-    return conn
 
 # ✅ Home Page
 @app.route('/')
@@ -112,26 +108,52 @@ def dashboard():
     else:
         return render_template('dashboard.html', pro_user=False)
     
+# ✅ Register Route (Uses Supabase Auth)
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
-        hashed_password = generate_password_hash(password)
-        
-        conn = get_db_connection()
-        conn.execute("INSERT INTO users (email, password) VALUES (?, ?)", (email, hashed_password))
-        conn.commit()
-        conn.close()
-        
-        session['user'] = email
-        return redirect(url_for('dashboard'))
-    
+
+        if not email or not password:
+            return "Missing email or password", 400  # Handle missing input
+
+        try:
+            # Use Supabase Auth to Register
+            response = supabase.auth.sign_up({"email": email, "password": password})
+
+            if response.get("error"):
+                return f"Error: {response['error']['message']}", 400  # Show Supabase error
+
+            session['user'] = email
+            return redirect(url_for('dashboard'))
+
+        except Exception as e:
+            print(f"Error registering user: {e}")
+            return "Registration failed", 500
+
     return render_template('register.html')
 
-# ✅ Login Route
-@app.route('/login')
+# ✅ Login Route (Uses Supabase Auth)
+@app.route('/login', methods=['GET', 'POST'])
 def login():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+
+        try:
+            response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+
+            if response.get("error"):
+                return f"Error: {response['error']['message']}", 400  # Show Supabase error
+
+            session['user'] = email
+            return redirect(url_for('dashboard'))
+
+        except Exception as e:
+            print(f"Error logging in: {e}")
+            return "Login failed", 500
+
     return render_template('login.html')
 
 # ✅ Logout Route
@@ -170,11 +192,6 @@ def page_not_found(e):
 @app.errorhandler(500)
 def internal_server_error(e):
     return render_template('500.html'), 500
-
-@app.route("/debug-packages")
-def debug_packages():
-    result = subprocess.run(["pip", "list"], capture_output=True, text=True)
-    return jsonify({"installed_packages": result.stdout})
 
 # ✅ Run App Locally (For Debugging)
 if __name__ == "__main__":
