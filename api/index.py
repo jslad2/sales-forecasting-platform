@@ -50,11 +50,6 @@ def pricing():
 def success():
     return render_template('success.html')
 
-# ✅ Success Page
-@app.route('/register')
-def success():
-    return render_template('register.html')
-
 # ✅ Contact Page
 @app.route('/contact')
 def contact():
@@ -117,6 +112,23 @@ def dashboard():
     else:
         return render_template('dashboard.html', pro_user=False)
     
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        hashed_password = generate_password_hash(password)
+        
+        conn = get_db_connection()
+        conn.execute("INSERT INTO users (email, password) VALUES (?, ?)", (email, hashed_password))
+        conn.commit()
+        conn.close()
+        
+        session['user'] = email
+        return redirect(url_for('dashboard'))
+    
+    return render_template('register.html')
+
 # ✅ Logout Route
 @app.route('/logout')
 def logout():
