@@ -10,5 +10,5 @@
   "routes": [
     { "src": "/(.*)", "dest": "api/index.py" }
   ],
-  "buildCommand": "pip install --no-cache-dir -r requirements.txt && pip list"
+  "outputDirectory": ".vercel/output"
 }
