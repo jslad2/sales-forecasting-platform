@@ -119,11 +119,6 @@ def register():
         password = request.form.get('password')
         hashed_password = generate_password_hash(password)
         
-        conn = get_db_connection()
-        conn.execute("INSERT INTO users (email, password) VALUES (?, ?)", (email, hashed_password))
-        conn.commit()
-        conn.close()
-        
         session['user'] = email
         return redirect(url_for('dashboard'))
     
