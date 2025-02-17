@@ -10,5 +10,5 @@
   "routes": [
     { "src": "/(.*)", "dest": "api/index.py" }
   ],
-  "buildCommand": "pip install -r requirements-vercel.txt"
+  "buildCommand": "pip install -r requirements-vercel.txt && gunicorn -b 0.0.0.0:8080 api.index:app"
 }

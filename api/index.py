@@ -2,15 +2,6 @@ import os
 import sqlite3
 from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-import subprocess
-
-def installed_packages():
-    result = subprocess.run(["pip", "list"], capture_output=True, text=True)
-    return result.stdout
-
-print("=== INSTALLED PACKAGES ===")
-print(installed_packages())
-
 
 # ✅ Initialize Flask App (Ensure Correct Paths)
 app = Flask(__name__, 
@@ -18,12 +9,6 @@ app = Flask(__name__,
             static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../static")))
 
 app.secret_key = "your_secret_key"  # Change this for security
-
-# ✅ Database Connection
-def get_db_connection():
-    conn = sqlite3.connect('database.db')
-    conn.row_factory = sqlite3.Row
-    return conn
 
 # ✅ Home Page
 @app.route('/')
@@ -150,11 +135,6 @@ def page_not_found(e):
 @app.errorhandler(500)
 def internal_server_error(e):
     return render_template('500.html'), 500
-
-@app.route("/debug-packages")
-def debug_packages():
-    result = subprocess.run(["pip", "list"], capture_output=True, text=True)
-    return jsonify({"installed_packages": result.stdout})
 
 # ✅ Run App Locally (For Debugging)
 if __name__ == "__main__":
