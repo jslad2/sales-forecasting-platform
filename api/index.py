@@ -127,7 +127,12 @@ def register():
         session['user'] = email
         return redirect(url_for('dashboard'))
     
-    return render_template('data_services.html')
+    return render_template('register.html')
+
+# ✅ Login Route
+@app.route('/login')
+def login():
+    return render_template('login.html')
 
 # ✅ Logout Route
 @app.route('/logout')
