@@ -4,5 +4,4 @@ numpy
 scipy
 pandas
 werkzeug
-matplotlib
 python-dotenv

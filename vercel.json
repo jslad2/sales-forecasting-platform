@@ -9,6 +9,5 @@
   ],
   "routes": [
     { "src": "/(.*)", "dest": "api/index.py" }
-  ],
-  "buildCommand": "pip install --no-cache-dir -r requirements-vercel.txt"
+  ]
 }
