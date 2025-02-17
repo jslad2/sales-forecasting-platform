@@ -1,14 +1,9 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/index.py",
-      "use": "@vercel/python",
-      "config": { "runtime": "python3.12" }
-    }
-  ],
   "routes": [
     { "src": "/(.*)", "dest": "api/index.py" }
   ],
-  "buildCommand": "pip install -r requirements-vercel.txt && gunicorn -b 0.0.0.0:8080 api.index:app"
+  "buildCommand": "pip install -r requirements-vercel.txt && mkdir -p .vercel/output && cp -r api templates static .vercel/output/",
+  "outputDirectory": ".vercel/output",
+  "includeFiles": ["templates/**", "static/**"]
 }
