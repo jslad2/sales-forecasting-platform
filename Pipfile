@@ -5,6 +5,13 @@ name = "pypi"
 
 [packages]
 flask = "*"
+gunicorn = "*"  # Needed for production
+supabase = "*"
+werkzeug = "*"
+sqlite3 = "*"
+requests = "*"
+numpy = "*"
+matplotlib = "*"
 
 [requires]
 python_version = "3.12"
