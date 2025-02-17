@@ -15,5 +15,9 @@ node_modules/
 *.sqlite
 *.db
 
+# Ignore build directories
+vercel/output/
+.vercel/output/
+
 !templates/
 !static/
