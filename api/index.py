@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, jsonify, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -115,22 +115,16 @@ def register():
         email = request.form.get('email')
         password = request.form.get('password')
 
-        if not email or not password:
-            return "Missing email or password", 400  # Handle missing input
-
         try:
-            # Use Supabase Auth to Register
             response = supabase.auth.sign_up({"email": email, "password": password})
-
-            if response.get("error"):
-                return f"Error: {response['error']['message']}", 400  # Show Supabase error
-
-            session['user'] = email
-            return redirect(url_for('dashboard'))
-
+            if "error" in response:
+                flash("Registration failed: " + response["error"]["message"])
+                return redirect(url_for("register"))
+            flash("Check your email to confirm your account.")
+            return redirect(url_for("login"))
         except Exception as e:
-            print(f"Error registering user: {e}")
-            return "Registration failed", 500
+            flash(f"Error: {str(e)}")
+            return redirect(url_for("register"))
 
     return render_template('register.html')
 
