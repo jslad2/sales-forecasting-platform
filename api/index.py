@@ -3,6 +3,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, s
 from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
 from dotenv import load_dotenv
+import re
 
 # ✅ Load environment variables from .env
 load_dotenv()
@@ -115,22 +116,78 @@ def register():
         email = request.form.get('email')
         password = request.form.get('password')
 
+        # ✅ Password validation rules
+        if len(password) < 8:  # Minimum length
+            flash("Password must be at least 8 characters long.")
+            return redirect(url_for("register"))
+
+        if not re.search(r"\d", password):  # At least one digit
+            flash("Password must contain at least one number.")
+            return redirect(url_for("register"))
+
+        if not re.search(r"[A-Z]", password):  # At least one uppercase letter
+            flash("Password must contain at least one uppercase letter.")
+            return redirect(url_for("register"))
+
+        if not re.search(r"[!@#$%^&*]", password):  # At least one special character
+            flash("Password must contain at least one special character (!@#$%^&*).")
+            return redirect(url_for("register"))
+
+        # ✅ Attempt to register the user
         try:
             response = supabase.auth.sign_up({"email": email, "password": password})
-
-            # 🔹 Fix: Use .user instead of .get()
             if response.user is None:
-                flash("Registration failed: " + (response.error.message if response.error else "Unknown error"), "error")
+                flash("Registration failed.")
                 return redirect(url_for("register"))
 
-            flash("Check your email to confirm your account.", "success")
+            flash("Check your email to confirm your account.")
             return redirect(url_for("login"))
 
         except Exception as e:
-            flash(f"Error: {str(e)}", "error")
+            flash(f"Error: {str(e)}")
             return redirect(url_for("register"))
 
     return render_template('register.html')
+
+@app.route('/update-password', methods=['GET', 'POST'])
+def update_password():
+    if request.method == 'POST':
+        password = request.form.get('password')
+        access_token = request.args.get('token')  # Supabase sends this in URL
+
+        if not access_token:
+            flash("Invalid request. Please try again.")
+            return redirect(url_for("login"))
+
+        # ✅ Check password strength again
+        if len(password) < 8 or not re.search(r"\d", password) or not re.search(r"[A-Z]", password):
+            flash("Password must meet complexity requirements.")
+            return redirect(url_for("update_password", token=access_token))
+
+        try:
+            response = supabase.auth.update_user({"password": password}, access_token)
+            flash("Password updated successfully. Please login.")
+            return redirect(url_for("login"))
+        except Exception as e:
+            flash(f"Error: {str(e)}")
+            return redirect(url_for("update_password", token=access_token))
+
+    return render_template("update_password.html")
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email')
+
+        try:
+            response = supabase.auth.reset_password_for_email(email)
+            flash("Check your email for password reset instructions.")
+            return redirect(url_for("login"))
+        except Exception as e:
+            flash(f"Error: {str(e)}")
+            return redirect(url_for("forgot_password"))
+
+    return render_template('forgot_password.html')
 
 # ✅ Login Route (Uses Supabase Auth)
 @app.route('/login', methods=['GET', 'POST'])
