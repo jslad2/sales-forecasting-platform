@@ -117,13 +117,16 @@ def register():
 
         try:
             response = supabase.auth.sign_up({"email": email, "password": password})
-            if "error" in response:
-                flash("Registration failed: " + response["error"]["message"])
+
+            if response.get("error"):  # If there is an error in the response
+                flash("Registration failed: " + response["error"]["message"], "error")
                 return redirect(url_for("register"))
-            flash("Check your email to confirm your account.")
+
+            flash("Check your email to confirm your account.", "success")
             return redirect(url_for("login"))
+
         except Exception as e:
-            flash(f"Error: {str(e)}")
+            flash(f"Error: {str(e)}", "error")
             return redirect(url_for("register"))
 
     return render_template('register.html')
