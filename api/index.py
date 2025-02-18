@@ -149,28 +149,6 @@ def register():
 
     return render_template('register.html')
 
-import re
-from flask import flash, redirect, url_for, request, render_template
-from supabase import create_client
-
-# ✅ Ensure Supabase Client is initialized correctly
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-import re
-from flask import Flask, render_template, request, redirect, url_for, flash, session
-from supabase import create_client
-import os
-
-# ✅ Load environment variables (Make sure .env is set up)
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY")
-
 @app.route('/update-password', methods=['GET', 'POST'])
 def update_password():
     """Handles password reset with Supabase"""
@@ -217,22 +195,6 @@ def update_password():
             return redirect(url_for("update_password", token=access_token))
 
     return render_template("update_password.html", token=access_token)
-
-
-@app.route('/forgot-password', methods=['GET', 'POST'])
-def forgot_password():
-    if request.method == 'POST':
-        email = request.form.get('email')
-
-        try:
-            response = supabase.auth.reset_password_for_email(email)
-            flash("Check your email for password reset instructions.")
-            return redirect(url_for("login"))
-        except Exception as e:
-            flash(f"Error: {str(e)}")
-            return redirect(url_for("forgot_password"))
-
-    return render_template('forgot_password.html')
 
 # ✅ Login Route (Uses Supabase Auth)
 @app.route('/login', methods=['GET', 'POST'])
