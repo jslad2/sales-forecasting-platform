@@ -158,12 +158,27 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+import re
+from flask import Flask, render_template, request, redirect, url_for, flash, session
+from supabase import create_client
+import os
+
+# ✅ Load environment variables (Make sure .env is set up)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY")
+
 @app.route('/update-password', methods=['GET', 'POST'])
 def update_password():
-    access_token = request.args.get('token')  # Get token from URL
+    """Handles password reset with Supabase"""
+
+    access_token = request.args.get('token')  # Capture the token from the URL
 
     if not access_token:
-        flash("Invalid or missing token. Please request a new password reset.")
+        flash("Invalid or missing token. Please request a new password reset.", "error")
         return redirect(url_for("login"))
 
     if request.method == 'POST':
@@ -171,32 +186,38 @@ def update_password():
 
         # ✅ Validate password complexity
         if not password or len(password) < 8:
-            flash("Password must be at least 8 characters long.")
+            flash("Password must be at least 8 characters long.", "error")
             return redirect(url_for("update_password", token=access_token))
         if not re.search(r"\d", password):
-            flash("Password must contain at least one digit.")
+            flash("Password must contain at least one digit.", "error")
             return redirect(url_for("update_password", token=access_token))
         if not re.search(r"[A-Z]", password):
-            flash("Password must contain at least one uppercase letter.")
+            flash("Password must contain at least one uppercase letter.", "error")
             return redirect(url_for("update_password", token=access_token))
 
         try:
-            # ✅ Attempt to update the password in Supabase
-            response = supabase.auth.update_user(
-                {"password": password}, access_token=access_token
-            )
+            # ✅ Log the user in first using the reset token
+            session_response = supabase.auth.sign_in_with_oauth({"provider": "email", "token": access_token})
 
-            if "error" in response:
-                flash(f"Error: {response['error']['message']}")
+            if session_response.user is None:
+                flash("Invalid or expired reset token. Please request a new one.", "error")
+                return redirect(url_for("login"))
+
+            # ✅ Update password
+            response = supabase.auth.update_user({"password": password})
+
+            if hasattr(response, "error") and response.error:
+                flash(f"Error: {response.error.message}", "error")
                 return redirect(url_for("update_password", token=access_token))
 
-            flash("Password updated successfully! You can now log in.")
+            flash("Password updated successfully! You can now log in.", "success")
             return redirect(url_for("login"))
         except Exception as e:
-            flash(f"Error updating password: {str(e)}")
+            flash(f"Error updating password: {str(e)}", "error")
             return redirect(url_for("update_password", token=access_token))
 
     return render_template("update_password.html", token=access_token)
+
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
