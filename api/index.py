@@ -206,15 +206,17 @@ def login():
         try:
             response = supabase.auth.sign_in_with_password({"email": email, "password": password})
 
-            if response.get("error"):
-                return f"Error: {response['error']['message']}", 400  # Show Supabase error
+            if not response.user:
+                flash("Invalid email or password. Please try again.", "error")
+                return redirect(url_for("login"))
 
             session['user'] = email
+            flash("Login successful!", "success")
             return redirect(url_for('dashboard'))
 
         except Exception as e:
-            print(f"Error logging in: {e}")
-            return "Login failed", 500
+            flash(f"Login failed: {str(e)}", "error")
+            return redirect(url_for("login"))
 
     return render_template('login.html')
 
