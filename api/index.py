@@ -152,7 +152,7 @@ def register():
 @app.route('/update-password', methods=['GET', 'POST'])
 def update_password():
     """Handles password reset with Supabase"""
-    
+
     access_token = request.args.get('token')  # Capture the token from the URL
 
     if not access_token:
@@ -174,8 +174,8 @@ def update_password():
             return redirect(url_for("update_password", token=access_token))
 
         try:
-            # ✅ Authenticate the session using the reset token
-            session_response = supabase.auth.exchange_code_for_session(access_token)
+            # ✅ Set the session manually
+            session_response = supabase.auth.set_session(access_token, refresh_token=None)
 
             if not session_response or "user" not in session_response:
                 flash("Invalid or expired reset token.", "error")
@@ -183,7 +183,7 @@ def update_password():
 
             user_email = session_response["user"]["email"]  # ✅ Extract the email
 
-            # ✅ Update the password (Pass both email & password)
+            # ✅ Update the password (Include the email)
             user_update_response = supabase.auth.update_user({
                 "email": user_email,  # 🔹 REQUIRED FIELD
                 "password": password
@@ -201,7 +201,6 @@ def update_password():
             return redirect(url_for("update_password", token=access_token))
 
     return render_template("update_password.html", token=access_token)
-
 
 # ✅ Login Route (Uses Supabase Auth)
 @app.route('/login', methods=['GET', 'POST'])
