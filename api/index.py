@@ -220,6 +220,24 @@ def login():
 
     return render_template('login.html')
 
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email')
+
+        try:
+            # ✅ Supabase Password Reset Request
+            response = supabase.auth.reset_password_for_email(email)
+
+            flash("Check your email for a password reset link.", "success")
+            return redirect(url_for('login'))
+
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+            return redirect(url_for("forgot_password"))
+
+    return render_template('forgot_password.html')
+
 # ✅ Logout Route
 @app.route('/logout')
 def logout():
