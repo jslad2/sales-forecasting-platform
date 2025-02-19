@@ -174,12 +174,18 @@ def update_password():
             return redirect(url_for("update_password", token=access_token))
 
         try:
-            # ✅ Correctly updating the password using the access_token
+            # ✅ Log the user in using the reset token
+            session_response = supabase.auth.set_session({"access_token": access_token, "refresh_token": access_token})
+
+            if "error" in session_response:
+                flash(f"Error: {session_response['error']['message']}", "error")
+                return redirect(url_for("update_password", token=access_token))
+
+            # ✅ Now update the password
             response = supabase.auth.update_user({"password": password})
 
-            # Check for an error in response
-            if hasattr(response, "error") and response.error:
-                flash(f"Error: {response.error.message}", "error")
+            if "error" in response:
+                flash(f"Error: {response['error']['message']}", "error")
                 return redirect(url_for("update_password", token=access_token))
 
             flash("Password updated successfully! You can now log in.", "success")
