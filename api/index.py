@@ -174,8 +174,8 @@ def update_password():
             return redirect(url_for("update_password", token=access_token))
 
         try:
-            # ✅ Log the user in using the reset token
-            session_response = supabase.auth.set_session({"access_token": access_token, "refresh_token": access_token})
+            # ✅ Exchange the reset token for a session (returns access + refresh token)
+            session_response = supabase.auth.exchange_code_for_session(access_token)
 
             if "error" in session_response:
                 flash(f"Error: {session_response['error']['message']}", "error")
