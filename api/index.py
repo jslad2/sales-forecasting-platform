@@ -174,11 +174,10 @@ def update_password():
             return redirect(url_for("update_password", token=access_token))
 
         try:
-            # ✅ Exchange the token for a valid session
+            # ✅ Authenticate the session using the reset token
             session_response = supabase.auth.exchange_code_for_session(access_token)
 
-            # ✅ Ensure session_response is a dictionary before accessing keys
-            if not isinstance(session_response, dict):
+            if isinstance(session_response, str):
                 flash(f"Unexpected response from Supabase: {session_response}", "error")
                 return redirect(url_for("update_password", token=access_token))
 
@@ -186,16 +185,15 @@ def update_password():
                 flash(f"Error: {session_response['error']['message']}", "error")
                 return redirect(url_for("update_password", token=access_token))
 
-            # ✅ Now update the password
-            response = supabase.auth.update_user({"password": password})
+            # ✅ Update the password
+            user_update_response = supabase.auth.update_user({"password": password})
 
-            # ✅ Ensure response is a dictionary before accessing keys
-            if not isinstance(response, dict):
-                flash(f"Unexpected response from Supabase: {response}", "error")
+            if isinstance(user_update_response, str):
+                flash(f"Unexpected response from Supabase: {user_update_response}", "error")
                 return redirect(url_for("update_password", token=access_token))
 
-            if "error" in response:
-                flash(f"Error: {response['error']['message']}", "error")
+            if "error" in user_update_response:
+                flash(f"Error: {user_update_response['error']['message']}", "error")
                 return redirect(url_for("update_password", token=access_token))
 
             flash("Password updated successfully! You can now log in.", "success")
