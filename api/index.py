@@ -174,8 +174,13 @@ def update_password():
             return redirect(url_for("update_password", token=access_token))
 
         try:
-            # ✅ Exchange the reset token for a session (returns access + refresh token)
+            # ✅ Exchange the token for a valid session
             session_response = supabase.auth.exchange_code_for_session(access_token)
+
+            # ✅ Ensure session_response is a dictionary before accessing keys
+            if not isinstance(session_response, dict):
+                flash(f"Unexpected response from Supabase: {session_response}", "error")
+                return redirect(url_for("update_password", token=access_token))
 
             if "error" in session_response:
                 flash(f"Error: {session_response['error']['message']}", "error")
@@ -184,17 +189,24 @@ def update_password():
             # ✅ Now update the password
             response = supabase.auth.update_user({"password": password})
 
+            # ✅ Ensure response is a dictionary before accessing keys
+            if not isinstance(response, dict):
+                flash(f"Unexpected response from Supabase: {response}", "error")
+                return redirect(url_for("update_password", token=access_token))
+
             if "error" in response:
                 flash(f"Error: {response['error']['message']}", "error")
                 return redirect(url_for("update_password", token=access_token))
 
             flash("Password updated successfully! You can now log in.", "success")
             return redirect(url_for("login"))
+
         except Exception as e:
             flash(f"Error updating password: {str(e)}", "error")
             return redirect(url_for("update_password", token=access_token))
 
     return render_template("update_password.html", token=access_token)
+
 
 # ✅ Login Route (Uses Supabase Auth)
 @app.route('/login', methods=['GET', 'POST'])
