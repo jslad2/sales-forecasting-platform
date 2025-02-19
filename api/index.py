@@ -154,8 +154,9 @@ def update_password():
     """Handles password reset with Supabase"""
 
     access_token = request.args.get('token')  # Capture the token from the URL
+    email = request.args.get('email')  # Supabase requires email too
 
-    if not access_token:
+    if not access_token or not email:
         flash("Invalid or missing token. Please request a new password reset.", "error")
         return redirect(url_for("login"))
 
@@ -165,46 +166,49 @@ def update_password():
         # ✅ Validate password complexity
         if not password or len(password) < 8:
             flash("Password must be at least 8 characters long.", "error")
-            return redirect(url_for("update_password", token=access_token))
+            return redirect(url_for("update_password", token=access_token, email=email))
         if not re.search(r"\d", password):
             flash("Password must contain at least one digit.", "error")
-            return redirect(url_for("update_password", token=access_token))
+            return redirect(url_for("update_password", token=access_token, email=email))
         if not re.search(r"[A-Z]", password):
             flash("Password must contain at least one uppercase letter.", "error")
-            return redirect(url_for("update_password", token=access_token))
+            return redirect(url_for("update_password", token=access_token, email=email))
 
         try:
-            # ✅ Authenticate the session using the reset token
-            session_response = supabase.auth.sign_in_with_otp({"token": access_token, "type": "recovery"})
+            # ✅ Authenticate the session using the reset token + email
+            session_response = supabase.auth.sign_in_with_otp({
+                "email": email,
+                "token": access_token,
+                "type": "recovery"
+            })
 
             if not isinstance(session_response, dict):  
                 flash(f"Unexpected response from Supabase: {session_response}", "error")
-                return redirect(url_for("update_password", token=access_token))
+                return redirect(url_for("update_password", token=access_token, email=email))
 
             if "error" in session_response and session_response["error"]:
                 flash(f"Error: {session_response['error']['message']}", "error")
-                return redirect(url_for("update_password", token=access_token))
+                return redirect(url_for("update_password", token=access_token, email=email))
 
             # ✅ Update the password
             user_update_response = supabase.auth.update_user({"password": password})
 
-            # ✅ Ensure the response is a dictionary
             if not isinstance(user_update_response, dict):  
                 flash(f"Unexpected response from Supabase: {user_update_response}", "error")
-                return redirect(url_for("update_password", token=access_token))
+                return redirect(url_for("update_password", token=access_token, email=email))
 
             if "error" in user_update_response and user_update_response["error"]:
                 flash(f"Error: {user_update_response['error']['message']}", "error")
-                return redirect(url_for("update_password", token=access_token))
+                return redirect(url_for("update_password", token=access_token, email=email))
 
             flash("Password updated successfully! You can now log in.", "success")
             return redirect(url_for("login"))
 
         except Exception as e:
             flash(f"Error updating password: {str(e)}", "error")
-            return redirect(url_for("update_password", token=access_token))
+            return redirect(url_for("update_password", token=access_token, email=email))
 
-    return render_template("update_password.html", token=access_token)
+    return render_template("update_password.html", token=access_token, email=email)
 
 # ✅ Login Route (Uses Supabase Auth)
 @app.route('/login', methods=['GET', 'POST'])
