@@ -175,7 +175,7 @@ def update_password():
 
         try:
             # ✅ Authenticate the session using the reset token
-            session_response = supabase.auth.exchange_code_for_session(access_token)
+            session_response = supabase.auth.sign_in_with_otp({"token": access_token, "type": "recovery"})
 
             if not isinstance(session_response, dict):  
                 flash(f"Unexpected response from Supabase: {session_response}", "error")
@@ -205,8 +205,6 @@ def update_password():
             return redirect(url_for("update_password", token=access_token))
 
     return render_template("update_password.html", token=access_token)
-
-
 
 # ✅ Login Route (Uses Supabase Auth)
 @app.route('/login', methods=['GET', 'POST'])
