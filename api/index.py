@@ -174,16 +174,10 @@ def update_password():
             return redirect(url_for("update_password", token=access_token))
 
         try:
-            # ✅ Log the user in first using the reset token
-            session_response = supabase.auth.sign_in_with_oauth({"provider": "email", "token": access_token})
-
-            if session_response.user is None:
-                flash("Invalid or expired reset token. Please request a new one.", "error")
-                return redirect(url_for("login"))
-
-            # ✅ Update password
+            # ✅ Correctly updating the password using the access_token
             response = supabase.auth.update_user({"password": password})
 
+            # Check for an error in response
             if hasattr(response, "error") and response.error:
                 flash(f"Error: {response.error.message}", "error")
                 return redirect(url_for("update_password", token=access_token))
