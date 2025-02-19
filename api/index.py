@@ -174,23 +174,18 @@ def update_password():
             return redirect(url_for("update_password", token=access_token))
 
         try:
-            # ✅ Authenticate user session using the recovery token
-            session_response = supabase.auth.sign_in_with_otp({
-                "token": access_token, 
-                "type": "recovery"
-            })
+            # ✅ Authenticate the session using the reset token
+            session_response = supabase.auth.exchange_code_for_session(access_token)
 
-            # ✅ Extract the user email from the session
-            user_data = session_response.get("user")
-            if not user_data or "email" not in user_data:
-                flash("Failed to authenticate user session.", "error")
+            if not session_response or "user" not in session_response:
+                flash("Invalid or expired reset token.", "error")
                 return redirect(url_for("update_password", token=access_token))
 
-            user_email = user_data["email"]
+            user_email = session_response["user"]["email"]  # ✅ Extract the email
 
-            # ✅ Update the password (Include the email)
+            # ✅ Update the password (Pass both email & password)
             user_update_response = supabase.auth.update_user({
-                "email": user_email,  # Required to identify the user
+                "email": user_email,  # 🔹 REQUIRED FIELD
                 "password": password
             })
 
