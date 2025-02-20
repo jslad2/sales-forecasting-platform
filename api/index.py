@@ -174,21 +174,22 @@ def update_password():
             return redirect(url_for("update_password", token=access_token))
 
         try:
-            # ✅ Exchange token for session
+            # ✅ Authenticate the session using the reset token
             session_response = supabase.auth.exchange_code_for_session(access_token)
 
-            # ✅ Handle empty response safely
+            # ✅ Ensure response is a dictionary
             if not isinstance(session_response, dict):
-                flash("Unexpected response from Supabase: Unable to fetch session.", "error")
+                flash(f"Unexpected response from Supabase: {session_response}", "error")
                 return redirect(url_for("update_password", token=access_token))
 
+            # ✅ Check if there was an error
             if "error" in session_response and session_response["error"]:
                 flash(f"Session error: {session_response['error']['message']}", "error")
                 return redirect(url_for("update_password", token=access_token))
 
             # ✅ Ensure user data exists
             user = session_response.get("user")
-            if not user:
+            if not user or not isinstance(user, dict):
                 flash("User session could not be established.", "error")
                 return redirect(url_for("update_password", token=access_token))
 
@@ -204,10 +205,12 @@ def update_password():
                 "password": password
             })
 
-            if not isinstance(user_update_response, dict):  
+            # ✅ Ensure response is a dictionary
+            if not isinstance(user_update_response, dict):
                 flash(f"Unexpected response from Supabase: {user_update_response}", "error")
                 return redirect(url_for("update_password", token=access_token))
 
+            # ✅ Check for errors
             if "error" in user_update_response and user_update_response["error"]:
                 flash(f"Error: {user_update_response['error']['message']}", "error")
                 return redirect(url_for("update_password", token=access_token))
@@ -220,6 +223,7 @@ def update_password():
             return redirect(url_for("update_password", token=access_token))
 
     return render_template("update_password.html", token=access_token)
+
 
 
 # ✅ Login Route (Uses Supabase Auth)
