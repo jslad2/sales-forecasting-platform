@@ -174,38 +174,34 @@ def update_password():
             return redirect(url_for("update_password", token=access_token))
 
         try:
-            # ✅ Authenticate the session using the reset token
+            # ✅ DEBUG: Print the response to check its type
             session_response = supabase.auth.exchange_code_for_session(access_token)
+            print("DEBUG: session_response =", session_response)  # Debugging output
 
             # ✅ Ensure response is a dictionary
             if not isinstance(session_response, dict):
                 flash(f"Unexpected response from Supabase: {session_response}", "error")
                 return redirect(url_for("update_password", token=access_token))
 
-            # ✅ Check if there was an error
-            if "error" in session_response and session_response["error"]:
-                flash(f"Session error: {session_response['error']['message']}", "error")
-                return redirect(url_for("update_password", token=access_token))
-
-            # ✅ Ensure user data exists
-            user = session_response.get("user")
-            if not user or not isinstance(user, dict):
+            # ✅ Extract user data safely
+            user = session_response.get("user", {})
+            if not isinstance(user, dict):
                 flash("User session could not be established.", "error")
                 return redirect(url_for("update_password", token=access_token))
 
-            # ✅ Ensure email exists
+            # ✅ Extract email safely
             user_email = user.get("email")
             if not user_email:
                 flash("User email not found in session response.", "error")
                 return redirect(url_for("update_password", token=access_token))
 
-            # ✅ Update password (Pass Email)
+            # ✅ Update password (Include Email)
             user_update_response = supabase.auth.update_user({
                 "email": user_email,  # 🔹 REQUIRED FIELD
                 "password": password
             })
 
-            # ✅ Ensure response is a dictionary
+            # ✅ Ensure user update response is a dictionary
             if not isinstance(user_update_response, dict):
                 flash(f"Unexpected response from Supabase: {user_update_response}", "error")
                 return redirect(url_for("update_password", token=access_token))
@@ -223,7 +219,6 @@ def update_password():
             return redirect(url_for("update_password", token=access_token))
 
     return render_template("update_password.html", token=access_token)
-
 
 
 # ✅ Login Route (Uses Supabase Auth)
