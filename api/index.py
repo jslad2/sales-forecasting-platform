@@ -181,21 +181,24 @@ def update_password():
 
         try:
             # ✅ Authenticate the session using the reset token
-            session_response = supabase.auth.sign_in_with_otp({"token": access_token, "type": "recovery"})
-            print(f"🔍 Session Response: {json.dumps(session_response, indent=2)}")  # Debug log
+            session_response = supabase.auth.sign_in_with_otp({
+                "token": access_token,
+                "type": "recovery"
+            })
 
-            if not isinstance(session_response, dict):  
-                flash(f"Unexpected response from Supabase: {session_response}", "error")
+            # Extract the user's email from the session response
+            user_email = session_response.get("user", {}).get("email")  
+
+            if not user_email:
+                flash("Session authentication failed. Please request a new password reset.", "error")
                 return redirect(url_for("update_password", token=access_token))
 
-            if "error" in session_response and session_response["error"]:
-                flash(f"Error: {session_response['error']['message']}", "error")
-                return redirect(url_for("update_password", token=access_token))
-
-            # ✅ Update the password
-            user_update_response = supabase.auth.update_user({"password": password})
-            print(f"🔍 User Update Response: {json.dumps(user_update_response, indent=2)}")  # Debug log
-
+            # ✅ Update the password with the email
+            user_update_response = supabase.auth.update_user({
+                "email": user_email,  # 🔥 Include email here
+                "password": password
+            })
+            
             if not isinstance(user_update_response, dict):  
                 flash(f"Unexpected response from Supabase: {user_update_response}", "error")
                 return redirect(url_for("update_password", token=access_token))
