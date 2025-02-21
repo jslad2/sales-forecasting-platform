@@ -153,6 +153,8 @@ import json
 
 import json
 
+import json  # Add this at the top
+
 @app.route('/update-password', methods=['GET', 'POST'])
 def update_password():
     """Handles password reset with Supabase"""
@@ -179,59 +181,25 @@ def update_password():
 
         try:
             # ✅ Authenticate the session using the reset token
-            session_response = supabase.auth.exchange_code_for_session(access_token)
+            session_response = supabase.auth.sign_in_with_otp({"token": access_token, "type": "recovery"})
+            print(f"🔍 Session Response: {json.dumps(session_response, indent=2)}")  # Debug log
 
-            # 🔹 Debugging: Log the exact response from Supabase
-            print("🔍 Supabase Session Response:", session_response)
-
-            # ✅ Convert to dictionary if it's a string
-            if isinstance(session_response, str):
-                try:
-                    session_response = json.loads(session_response)  # Convert to dict
-                except json.JSONDecodeError:
-                    flash(f"Supabase response is not JSON: {session_response}", "error")
-                    return redirect(url_for("update_password", token=access_token))
-
-            # ✅ Ensure response is a dictionary
-            if not isinstance(session_response, dict):
+            if not isinstance(session_response, dict):  
                 flash(f"Unexpected response from Supabase: {session_response}", "error")
                 return redirect(url_for("update_password", token=access_token))
 
-            # ✅ Extract the user from session response
-            user = session_response.get("user")
-            if not user or not isinstance(user, dict):
-                flash("User session could not be established.", "error")
+            if "error" in session_response and session_response["error"]:
+                flash(f"Error: {session_response['error']['message']}", "error")
                 return redirect(url_for("update_password", token=access_token))
 
-            # ✅ Extract email (Mandatory for Supabase)
-            user_email = user.get("email")
-            if not user_email:
-                flash("User email not found in session response.", "error")
-                return redirect(url_for("update_password", token=access_token))
+            # ✅ Update the password
+            user_update_response = supabase.auth.update_user({"password": password})
+            print(f"🔍 User Update Response: {json.dumps(user_update_response, indent=2)}")  # Debug log
 
-            # ✅ Update password (Pass Email)
-            user_update_response = supabase.auth.update_user({
-                "email": user_email,  # 🔹 REQUIRED FIELD
-                "password": password
-            })
-
-            # 🔹 Debugging: Log the exact response from Supabase
-            print("🔍 Supabase Password Update Response:", user_update_response)
-
-            # ✅ Convert to dictionary if it's a string
-            if isinstance(user_update_response, str):
-                try:
-                    user_update_response = json.loads(user_update_response)  # Convert to dict
-                except json.JSONDecodeError:
-                    flash(f"Supabase response is not JSON: {user_update_response}", "error")
-                    return redirect(url_for("update_password", token=access_token))
-
-            # ✅ Ensure response is a dictionary
-            if not isinstance(user_update_response, dict):
+            if not isinstance(user_update_response, dict):  
                 flash(f"Unexpected response from Supabase: {user_update_response}", "error")
                 return redirect(url_for("update_password", token=access_token))
 
-            # ✅ Check for errors in the response
             if "error" in user_update_response and user_update_response["error"]:
                 flash(f"Error: {user_update_response['error']['message']}", "error")
                 return redirect(url_for("update_password", token=access_token))
@@ -240,8 +208,6 @@ def update_password():
             return redirect(url_for("login"))
 
         except Exception as e:
-            # 🔹 Debugging: Print error details
-            print(f"❌ Error in password reset: {e}")
             flash(f"Error updating password: {str(e)}", "error")
             return redirect(url_for("update_password", token=access_token))
 
