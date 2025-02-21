@@ -149,21 +149,6 @@ def register():
 
     return render_template('register.html')
 
-import json
-
-import json
-
-import json  # Add this at the top
-
-import re
-from flask import request, render_template, redirect, url_for, flash
-from supabase import create_client
-
-# Initialize Supabase client (replace with your URL and Key)
-SUPABASE_URL = "https://your-supabase-url.supabase.co"
-SUPABASE_KEY = "your-supabase-anon-key"
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
 @app.route('/update-password', methods=['GET', 'POST'])
 def update_password():
     """Handles password reset with Supabase"""
