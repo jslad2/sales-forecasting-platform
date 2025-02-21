@@ -175,8 +175,10 @@ def update_password():
             return redirect(url_for("update_password", token=access_token))
 
         try:
-            # ✅ Authenticate the session using the reset token
+            print(f"🔍 Attempting sign-in with token: {access_token}")
+            
             session_response = supabase.auth.sign_in_with_otp({
+                "email": "user_email@example.com",  # Replace with actual email from request
                 "token": access_token,
                 "type": "recovery"
             })
