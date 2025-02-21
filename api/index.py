@@ -176,9 +176,17 @@ def update_password():
 
         try:
             print(f"🔍 Attempting sign-in with token: {access_token}")
-            
+
+            # Extract user email from session or request parameters
+            user_email = request.args.get("email") or session.get("email")
+            if not user_email:
+                flash("Email is required for password reset.", "error")
+                return redirect(url_for("update_password", token=access_token))
+
+            print("🔍 Using Email:", user_email)
+
             session_response = supabase.auth.sign_in_with_otp({
-                "email": "user_email@example.com",  # Replace with actual email from request
+                "email": user_email,
                 "token": access_token,
                 "type": "recovery"
             })
