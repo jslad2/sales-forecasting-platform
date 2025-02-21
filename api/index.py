@@ -155,11 +155,21 @@ import json
 
 import json  # Add this at the top
 
+import re
+from flask import request, render_template, redirect, url_for, flash
+from supabase import create_client
+
+# Initialize Supabase client (replace with your URL and Key)
+SUPABASE_URL = "https://your-supabase-url.supabase.co"
+SUPABASE_KEY = "your-supabase-anon-key"
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 @app.route('/update-password', methods=['GET', 'POST'])
 def update_password():
     """Handles password reset with Supabase"""
-
+    
     access_token = request.args.get('token')  # Capture the token from the URL
+    print(f"🔍 Received Token: {access_token}")  # Debugging
 
     if not access_token:
         flash("Invalid or missing token. Please request a new password reset.", "error")
@@ -185,22 +195,35 @@ def update_password():
                 "token": access_token,
                 "type": "recovery"
             })
+            
+            # 🔍 Debugging: Print the full session response
+            print("🔍 Session Response:", session_response)
 
-            # Extract the user's email from the session response
-            user_email = session_response.get("user", {}).get("email")  
+            # Ensure session_response is a dictionary
+            if not isinstance(session_response, dict):
+                flash("Invalid response from Supabase. Please try again.", "error")
+                return redirect(url_for("update_password", token=access_token))
+
+            # Extract the user's email
+            user_email = session_response.get("user", {}).get("email", None)
+            print("🔍 Extracted User Email:", user_email)  # Debugging
 
             if not user_email:
                 flash("Session authentication failed. Please request a new password reset.", "error")
                 return redirect(url_for("update_password", token=access_token))
 
-            # ✅ Update the password with the email
+            # ✅ Update the password using Supabase
             user_update_response = supabase.auth.update_user({
-                "email": user_email,  # 🔥 Include email here
+                "email": user_email,
                 "password": password
             })
-            
-            if not isinstance(user_update_response, dict):  
-                flash(f"Unexpected response from Supabase: {user_update_response}", "error")
+
+            # 🔍 Debugging: Print the response from password update
+            print("🔍 User Update Response:", user_update_response)
+
+            # Ensure user_update_response is a dictionary
+            if not isinstance(user_update_response, dict):
+                flash("Unexpected response from Supabase. Please try again.", "error")
                 return redirect(url_for("update_password", token=access_token))
 
             if "error" in user_update_response and user_update_response["error"]:
@@ -211,11 +234,11 @@ def update_password():
             return redirect(url_for("login"))
 
         except Exception as e:
+            print("🔥 Exception Occurred:", str(e))  # Debugging
             flash(f"Error updating password: {str(e)}", "error")
             return redirect(url_for("update_password", token=access_token))
 
     return render_template("update_password.html", token=access_token)
-
 
 # ✅ Login Route (Uses Supabase Auth)
 @app.route('/login', methods=['GET', 'POST'])
