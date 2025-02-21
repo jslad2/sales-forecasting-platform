@@ -153,18 +153,18 @@ def register():
 @app.route('/update-password', methods=['GET', 'POST'])
 def update_password():
     """Handles password reset with Supabase"""
-    
+
     access_token = request.args.get('token')  # Capture the token from the URL
-    user_email = request.args.get("email") or session.get("email")  # Retrieve email
-    
+    user_email = request.args.get("email") or session.get("reset_email")  # ✅ Retrieve email from session if missing
+
     print(f"🔍 Received Token: {access_token}")  # Debugging
     print("🔍 Request Arguments:", request.args)
     print("🔍 Session Data:", session)
 
-    # ⚠️ Redirect to forgot password if email is missing
+    # ⚠️ Show error instead of redirecting infinitely
     if not user_email:
         flash("Email is required for password reset.", "error")
-        return redirect(url_for("forgot_password"))
+        return render_template("forgot_password.html")  
 
     if request.method == 'POST':
         password = request.form.get('password')
@@ -225,7 +225,7 @@ def update_password():
         except Exception as e:
             print("🔥 Exception Occurred:", str(e))  # Debugging
             flash(f"Error updating password: {str(e)}", "error")
-            return render_template("update_password.html", token=access_token)  # Ensure the template renders on error
+            return render_template("update_password.html", token=access_token)  
 
     return render_template("update_password.html", token=access_token)
 
@@ -259,6 +259,9 @@ def forgot_password():
         email = request.form.get('email')
 
         try:
+            # ✅ Store email in session for later retrieval
+            session["reset_email"] = email  
+
             # ✅ Supabase Password Reset Request
             response = supabase.auth.reset_password_for_email(email)
 
