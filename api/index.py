@@ -151,6 +151,8 @@ def register():
 
 import json
 
+import json
+
 @app.route('/update-password', methods=['GET', 'POST'])
 def update_password():
     """Handles password reset with Supabase"""
