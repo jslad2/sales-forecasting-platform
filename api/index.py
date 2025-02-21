@@ -156,9 +156,22 @@ def update_password():
     access_token = request.args.get('token')  # Capture the token from the URL
     print(f"🔍 Received Token: {access_token}")  # Debugging
 
+    # ✅ Debugging: Print the request arguments to check if email is included
+    print("🔍 Request Arguments:", request.args)
+    print("🔍 Session Data:", session)
+
+    # Extract user email from session or request parameters
+    user_email = request.args.get("email") or session.get("email")
+
     if not access_token:
         flash("Invalid or missing token. Please request a new password reset.", "error")
         return redirect(url_for("login"))
+
+    if not user_email:
+        flash("Email is required for password reset.", "error")
+        return redirect(url_for("update_password", token=access_token))
+
+    print("🔍 Using Email:", user_email)
 
     if request.method == 'POST':
         password = request.form.get('password')
@@ -177,20 +190,12 @@ def update_password():
         try:
             print(f"🔍 Attempting sign-in with token: {access_token}")
 
-            # Extract user email from session or request parameters
-            user_email = request.args.get("email") or session.get("email")
-            if not user_email:
-                flash("Email is required for password reset.", "error")
-                return redirect(url_for("update_password", token=access_token))
-
-            print("🔍 Using Email:", user_email)
-
             session_response = supabase.auth.sign_in_with_otp({
                 "email": user_email,
                 "token": access_token,
                 "type": "recovery"
             })
-            
+
             # 🔍 Debugging: Print the full session response
             print("🔍 Session Response:", session_response)
 
@@ -234,6 +239,7 @@ def update_password():
             return redirect(url_for("update_password", token=access_token))
 
     return render_template("update_password.html", token=access_token)
+
 
 # ✅ Login Route (Uses Supabase Auth)
 @app.route('/login', methods=['GET', 'POST'])
