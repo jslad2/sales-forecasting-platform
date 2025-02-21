@@ -136,15 +136,16 @@ def register():
         # ✅ Attempt to register the user
         try:
             response = supabase.auth.sign_up({"email": email, "password": password})
-            if response.user is None:
-                flash("Registration failed.")
+
+            if "error" in response and response["error"]:
+                flash(f"Registration failed: {response['error']['message']}", "error")
                 return redirect(url_for("register"))
 
-            flash("Check your email to confirm your account.")
+            flash("Check your email to confirm your account.", "success")
             return redirect(url_for("login"))
 
         except Exception as e:
-            flash(f"Error: {str(e)}")
+            flash(f"Error: {str(e)}", "error")
             return redirect(url_for("register"))
 
     return render_template('register.html')
@@ -160,9 +161,10 @@ def update_password():
     print("🔍 Request Arguments:", request.args)
     print("🔍 Session Data:", session)
 
-    # ⚠️ Instead of redirecting, show an error message in the template
+    # ⚠️ Redirect to forgot password if email is missing
     if not user_email:
-        return render_template("update_password.html", token=access_token, error="Email is required for password reset.")
+        flash("Email is required for password reset.", "error")
+        return redirect(url_for("forgot_password"))
 
     if request.method == 'POST':
         password = request.form.get('password')
@@ -181,6 +183,7 @@ def update_password():
         try:
             print(f"🔍 Attempting sign-in with token: {access_token}")
 
+            # ✅ Authenticate user with Supabase using recovery token
             session_response = supabase.auth.sign_in_with_otp({
                 "email": user_email,
                 "token": access_token,
@@ -190,23 +193,30 @@ def update_password():
             # 🔍 Debugging: Print the full session response
             print("🔍 Session Response:", session_response)
 
-            # Extract the user's email
-            user_email = session_response.get("user", {}).get("email", None)
+            # ✅ Ensure response is valid and extract user email
+            if not isinstance(session_response, dict) or "user" not in session_response:
+                flash("Invalid response from authentication. Please try again.", "error")
+                return render_template("update_password.html", token=access_token)
 
-            if not user_email:
+            authenticated_user = session_response.get("user")
+            
+            if not authenticated_user or "email" not in authenticated_user:
                 flash("Session authentication failed. Please request a new password reset.", "error")
                 return render_template("update_password.html", token=access_token)
 
-            # ✅ Update the password using Supabase
-            user_update_response = supabase.auth.update_user({
-                "email": user_email,
-                "password": password
-            })
+            user_email = authenticated_user["email"]  # ✅ Keep the validated email
 
+            print(f"✅ Authenticated User Email: {user_email}")
+
+            # ✅ Update password after successful authentication
+            user_update_response = supabase.auth.update_user({"password": password})
+
+            # 🔍 Debugging: Print the response from the password update
             print("🔍 User Update Response:", user_update_response)
 
-            if "error" in user_update_response and user_update_response["error"]:
-                flash(f"Error: {user_update_response['error']['message']}", "error")
+            if not isinstance(user_update_response, dict) or "error" in user_update_response:
+                error_message = user_update_response.get("error", {}).get("message", "Unknown error")
+                flash(f"Password update failed: {error_message}", "error")
                 return render_template("update_password.html", token=access_token)
 
             flash("Password updated successfully! You can now log in.", "success")
@@ -215,11 +225,9 @@ def update_password():
         except Exception as e:
             print("🔥 Exception Occurred:", str(e))  # Debugging
             flash(f"Error updating password: {str(e)}", "error")
-            return render_template("update_password.html", token=access_token)
+            return render_template("update_password.html", token=access_token)  # Ensure the template renders on error
 
     return render_template("update_password.html", token=access_token)
-
-
 
 # ✅ Login Route (Uses Supabase Auth)
 @app.route('/login', methods=['GET', 'POST'])
