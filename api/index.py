@@ -164,7 +164,7 @@ def update_password():
     # ⚠️ Show error instead of redirecting infinitely
     if not user_email:
         flash("Email is required for password reset.", "error")
-        return render_template("forgot_password.html")  
+        return redirect(url_for("forgot_password"))  # Redirect to forgot password instead of rendering the page
 
     if request.method == 'POST':
         password = request.form.get('password')
@@ -181,28 +181,32 @@ def update_password():
             return render_template("update_password.html", token=access_token)
 
         try:
-            print(f"🔍 Attempting sign-in with token: {access_token}")
+            print(f"🔍 Attempting sign-in with recovery token: {access_token}")
 
             # ✅ Authenticate user with Supabase using recovery token
             session_response = supabase.auth.sign_in_with_otp({
                 "email": user_email,
                 "token": access_token,
-                "type": "recovery"
+                "type": "recovery"  # ✅ Explicitly define type to ensure correct authentication
             })
 
             # 🔍 Debugging: Print the full session response
-            print("🔍 Session Response:", session_response)
+            print("🔍 Full Session Response:", session_response)
 
             # ✅ Ensure response is valid and extract user email
-            if not isinstance(session_response, dict) or "user" not in session_response:
-                flash("Invalid response from authentication. Please try again.", "error")
-                return render_template("update_password.html", token=access_token)
+            if not isinstance(session_response, dict):
+                flash("Invalid response format from authentication. Please try again.", "error")
+                return redirect(url_for("forgot_password"))  # Redirect if response format is incorrect
 
-            authenticated_user = session_response.get("user")
-            
-            if not authenticated_user or "email" not in authenticated_user:
+            if "user" not in session_response or session_response["user"] is None:
+                flash("Authentication failed. Your reset token may be invalid or expired.", "error")
+                return redirect(url_for("forgot_password"))  # Redirect to request a new token
+
+            authenticated_user = session_response["user"]
+
+            if "email" not in authenticated_user:
                 flash("Session authentication failed. Please request a new password reset.", "error")
-                return render_template("update_password.html", token=access_token)
+                return redirect(url_for("forgot_password"))
 
             user_email = authenticated_user["email"]  # ✅ Keep the validated email
 
@@ -225,7 +229,7 @@ def update_password():
         except Exception as e:
             print("🔥 Exception Occurred:", str(e))  # Debugging
             flash(f"Error updating password: {str(e)}", "error")
-            return render_template("update_password.html", token=access_token)  
+            return redirect(url_for("forgot_password"))  # Redirect to forgot password on failure
 
     return render_template("update_password.html", token=access_token)
 
