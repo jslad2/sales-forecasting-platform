@@ -4,13 +4,20 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-flask = "*"
-gunicorn = "*"  # Needed for production
-supabase = "*"
-werkzeug = "*"
-requests = "*"
+streamlit = "*"
+pandas = "*"
 numpy = "*"
-python-dotenv = "*"  # ✅ Required for loading .env variables
+prophet = "*"
+pmdarima = "*"
+xgboost = "*"
+flaml = "*"
+scikit-learn = "*"
+matplotlib = "*"
+plotly = "*"
+statsmodels = "*"
+optuna = "*"
+
+[dev-packages]
 
 [requires]
-python_version = "3.12"
+python_version = "3.9"
