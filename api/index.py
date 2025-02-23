@@ -155,16 +155,16 @@ def update_password():
     """Handles password reset with Supabase"""
 
     access_token = request.args.get('token')  # Capture the token from the URL
-    user_email = request.args.get("email") or session.get("reset_email")  # ✅ Retrieve email from session if missing
+    user_email = request.args.get("email") or session.get("reset_email")  # Retrieve email from session if missing
 
     print(f"🔍 Received Token: {access_token}")  # Debugging
     print("🔍 Request Arguments:", request.args)
     print("🔍 Session Data:", session)
 
-    # ⚠️ Show error instead of redirecting infinitely
+    # ⚠️ Handle missing email properly instead of redirecting infinitely
     if not user_email:
         flash("Email is required for password reset.", "error")
-        return redirect(url_for("forgot_password"))  # Redirect to forgot password instead of rendering the page
+        return redirect(url_for("forgot_password"))
 
     if request.method == 'POST':
         password = request.form.get('password')
@@ -196,11 +196,11 @@ def update_password():
             # ✅ Ensure response is valid and extract user email
             if not isinstance(session_response, dict):
                 flash("Invalid response format from authentication. Please try again.", "error")
-                return redirect(url_for("forgot_password"))  # Redirect if response format is incorrect
+                return redirect(url_for("forgot_password"))
 
-            if "user" not in session_response or session_response["user"] is None:
+            if "user" not in session_response or not session_response["user"]:
                 flash("Authentication failed. Your reset token may be invalid or expired.", "error")
-                return redirect(url_for("forgot_password"))  # Redirect to request a new token
+                return redirect(url_for("forgot_password"))
 
             authenticated_user = session_response["user"]
 
@@ -218,6 +218,7 @@ def update_password():
             # 🔍 Debugging: Print the response from the password update
             print("🔍 User Update Response:", user_update_response)
 
+            # ✅ Ensure the update was successful
             if not isinstance(user_update_response, dict) or "error" in user_update_response:
                 error_message = user_update_response.get("error", {}).get("message", "Unknown error")
                 flash(f"Password update failed: {error_message}", "error")
