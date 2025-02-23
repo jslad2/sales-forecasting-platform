@@ -21,3 +21,6 @@ vercel/output/
 
 !templates/
 !static/
+
+Pipfile
+Pipfile.lock

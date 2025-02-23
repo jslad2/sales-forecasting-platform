@@ -1,9 +1,8 @@
-matplotlib
 flask
-gunicorn
-numpy
-scipy
-pandas
+gunicorn  # Needed for production
+supabase
 werkzeug
-python-dotenv
-
+requests
+numpy
+python-dotenv  # ✅ Required for .env variables
+prophet  # ✅ Include if needed
