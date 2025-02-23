@@ -279,8 +279,9 @@ def forgot_password():
 # ✅ Logout Route
 @app.route('/logout')
 def logout():
-    session.pop('user', None)
-    return redirect(url_for('home'))
+    session.clear()
+    flash("You have been logged out.", "info")
+    return redirect(url_for('login'))
 
 # ✅ Stripe Payment Route
 @app.route('/checkout/pro')
