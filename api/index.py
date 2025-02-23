@@ -240,18 +240,19 @@ def login():
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
-        
+
         try:
             user = supabase.auth.sign_in_with_password({"email": email, "password": password})
 
             if user and "user" in user:
                 session["user_email"] = email
-                session["user_plan"] = user["user"]["app_metadata"].get("plan", "free")  # Defaults to free plan
-                flash("Login successful!", "success")
-                return redirect(url_for("forecasting_tool"))  # Redirect to forecasting tool after login
+                session["user_plan"] = user["user"]["app_metadata"].get("plan", "free")  # Default to free plan
+
+                flash("✅ Login successful! Redirecting...", "success")
+                return redirect(url_for("forecasting_tool"))
 
         except Exception as e:
-            flash("Invalid login credentials. Please try again.", "danger")
+            flash("❌ Invalid login credentials. Please try again.", "danger")
 
     return render_template("login.html")
 
