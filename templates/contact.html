@@ -19,10 +19,10 @@
     <header>
         <nav>
             <ul>
-                <li><a href="{{ url_for('home') }}" aria-label="Home">Home</a></li>
-                <li><a href="{{ url_for('data_services') }}">Data Services</a></li>
-                <li><a href="{{ url_for('pricing') }}">Pricing</a></li>
-                <li><a href="{{ url_for('contact') }}">Contact</a></li>
+                <li><a href="{{ url_for('home') }}" class="nav-link" aria-label="Home">Home</a></li>
+                <li><a href="{{ url_for('data_services') }}" class="nav-link">Data Services</a></li>
+                <li><a href="{{ url_for('pricing') }}" class="nav-link">Pricing</a></li>
+                <li><a href="{{ url_for('contact') }}" class="nav-link">Contact</a></li>
             </ul>
         </nav>
         <div class="logo">SYNOVAAI</div>
@@ -79,41 +79,39 @@
         <p>&copy; 2025 SynovaAI. All rights reserved.</p>
     </footer>
 
-    <!-- JavaScript for Form Validation & Smooth Scroll -->
+    <!-- JavaScript to Ensure Cards Show Properly -->
     <script>
-        // Smooth Scroll to Top
-        function scrollToTop() {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+        document.addEventListener("DOMContentLoaded", function() {
+            const navLinks = document.querySelectorAll(".nav-link");
+            const currentPage = window.location.pathname;
 
-        // Show "Back to Top" Button on Scroll
-        window.addEventListener("scroll", function() {
-            let backToTop = document.querySelector(".top-button");
-            if (window.scrollY > 100) {
-                backToTop.style.display = "block";
-            } else {
-                backToTop.style.display = "none";
-            }
+            navLinks.forEach(link => {
+                if (link.getAttribute("href") === currentPage) {
+                    link.classList.add("active");
+                } else {
+                    link.classList.remove("active");
+                }
+            });
+
+            // Reveal Service Cards on Load
+            document.querySelectorAll(".service-card").forEach(card => {
+                card.classList.add("show");
+            });
+
+            // Scroll to Top Button Logic
+            window.onscroll = function() {
+                const topButton = document.querySelector(".top-button");
+                if (document.body.scrollTop > 300 || document.documentElement.scrollTop > 300) {
+                    topButton.style.opacity = "1";
+                } else {
+                    topButton.style.opacity = "0";
+                }
+            };
         });
 
-        // Basic Form Validation
-        function validateForm() {
-            let name = document.getElementById("name").value.trim();
-            let email = document.getElementById("email").value.trim();
-            let message = document.getElementById("message").value.trim();
-
-            if (name === "" || email === "" || message === "") {
-                alert("Please fill in all required fields.");
-                return false;
-            }
-            return true;
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: "smooth" });
         }
-
-        // Google Analytics (Replace UA-XXXXXX-X with your tracking ID)
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'UA-XXXXXX-X');
     </script>
 
 </body>
