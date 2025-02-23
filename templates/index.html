@@ -21,11 +21,19 @@
     <header>
         <nav>
             <ul>
-                <li><a href="{{ url_for('home') }}" class="nav-link" aria-label="Home">Home</a></li>
+                <li><a href="{{ url_for('home') }}" class="nav-link">Home</a></li>
                 <li><a href="{{ url_for('data_services') }}" class="nav-link">Data Services</a></li>
                 <li><a href="{{ url_for('pricing') }}" class="nav-link">Pricing</a></li>
                 <li><a href="{{ url_for('contact') }}" class="nav-link">Contact</a></li>
+                
+                {% if 'user_email' in session %}
+                    <li><a href="{{ url_for('forecasting_tool') }}" class="nav-link">Forecast Tool</a></li>
+                    <li><a href="{{ url_for('logout') }}" class="nav-link">Logout</a></li>
+                {% else %}
+                    <li><a href="{{ url_for('login') }}" class="nav-link">Login</a></li>
+                {% endif %}
             </ul>
+            
         </nav>
         <div class="logo">SYNOVAAI</div>
     </header>
