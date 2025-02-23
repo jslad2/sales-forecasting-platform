@@ -776,3 +776,32 @@ footer {
     background: #2B3A42;
     color: white;
 }
+
+@media (max-width: 768px) {
+    nav {
+        display: flex;
+        flex-direction: column;  /* Stack items */
+        align-items: center;
+    }
+
+    nav ul {
+        flex-direction: column;  /* Stack menu items */
+        text-align: center;
+        padding: 0;
+    }
+
+    nav ul li {
+        margin-bottom: 10px;  /* Add spacing */
+    }
+
+    .logo {
+        max-width: 80%;  /* Prevent logo from overflowing */
+    }
+}
+
+@media (max-width: 768px) {
+    .logo {
+        max-width: 150px; /* Adjust width */
+        height: auto; /* Maintain aspect ratio */
+    }
+}
