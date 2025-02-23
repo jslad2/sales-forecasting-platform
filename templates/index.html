@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SynovaAI - AI-Powered Sales Forecasting & Insights</title>
     <meta name="description" content="Turn raw data into AI-powered sales forecasts and insights—instantly!">
-    
+
     <!-- Open Graph Meta Tags for SEO -->
     <meta property="og:title" content="SynovaAI - AI-Powered Sales Forecasting & Insights">
     <meta property="og:description" content="Turn raw data into AI-powered sales forecasts and insights—instantly!">
     <meta property="og:image" content="static/images/og-image.png">
     <meta property="og:url" content="https://www.synovaai.com">
-    
+
     <!-- Stylesheet -->
     <link rel="stylesheet" href="static/css/style.css">
 </head>
@@ -21,9 +21,9 @@
     <header>
         <nav>
             <ul>
-                <li><a href="{{ url_for('data_services') }}">Data Services</a></li>
-                <li><a href="{{ url_for('pricing') }}">Pricing</a></li>
-                <li><a href="{{ url_for('contact') }}">Contact</a></li>
+                <li><a href="{{ url_for('data_services') }}" class="nav-link">Data Services</a></li>
+                <li><a href="{{ url_for('pricing') }}" class="nav-link">Pricing</a></li>
+                <li><a href="{{ url_for('contact') }}" class="nav-link">Contact</a></li>
             </ul>
         </nav>
         <div class="logo">SYNOVAAI</div>
@@ -86,10 +86,35 @@
     <!-- JavaScript to Ensure Cards Show Properly -->
     <script>
         document.addEventListener("DOMContentLoaded", function() {
+            // Highlight the current page in the navigation menu
+            const navLinks = document.querySelectorAll(".nav-link");
+            const currentPage = window.location.pathname.split("/").pop();
+
+            navLinks.forEach(link => {
+                if (link.getAttribute("href").includes(currentPage)) {
+                    link.classList.add("active");
+                }
+            });
+
+            // Reveal Service Cards on Load
             document.querySelectorAll(".service-card").forEach(card => {
                 card.classList.add("show");
             });
+
+            // Scroll to Top Button Logic
+            window.onscroll = function() {
+                const topButton = document.querySelector(".top-button");
+                if (document.body.scrollTop > 300 || document.documentElement.scrollTop > 300) {
+                    topButton.style.opacity = "1";
+                } else {
+                    topButton.style.opacity = "0";
+                }
+            };
         });
+
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
     </script>
 
 </body>
