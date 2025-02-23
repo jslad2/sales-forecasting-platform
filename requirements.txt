@@ -3,6 +3,4 @@ gunicorn  # Needed for production
 supabase
 werkzeug
 requests
-numpy
 python-dotenv  # ✅ Required for .env variables
-prophet  # ✅ Include if needed
