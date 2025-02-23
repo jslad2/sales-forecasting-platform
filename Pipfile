@@ -6,7 +6,7 @@ name = "pypi"
 [packages]
 streamlit = "*"
 pandas = "*"
-numpy = "*"
+numpy = "==1.23.5"  # Ensures compatibility with Prophet & pmdarima
 prophet = "*"
 pmdarima = "*"
 xgboost = "*"
