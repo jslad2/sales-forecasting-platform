@@ -5,13 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Data Services - SynovaAI</title>
     <meta name="description" content="Transform your business with AI-driven insights and analytics from SynovaAI.">
-    
     <!-- Open Graph Meta Tags for SEO -->
     <meta property="og:title" content="Data Services - SynovaAI">
     <meta property="og:description" content="Transform your business with AI-driven insights and analytics from SynovaAI.">
     <meta property="og:image" content="{{ url_for('static', filename='images/og-image.png') }}">
     <meta property="og:url" content="https://www.synovaai.com/data-services">
-    
     <!-- Stylesheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
@@ -21,10 +19,10 @@
     <header>
         <nav>
             <ul>
-                <li><a href="{{ url_for('home') }}" class="nav-link" id="home-link">Home</a></li>
-                <li><a href="{{ url_for('data_services') }}" class="nav-link" id="data-services-link">Data Services</a></li>
-                <li><a href="{{ url_for('pricing') }}" class="nav-link" id="pricing-link">Pricing</a></li>
-                <li><a href="{{ url_for('contact') }}" class="nav-link" id="contact-link">Contact</a></li>
+                <li><a href="{{ url_for('home') }}" class="nav-link" aria-label="Home">Home</a></li>
+                <li><a href="{{ url_for('data_services') }}" class="nav-link">Data Services</a></li>
+                <li><a href="{{ url_for('pricing') }}" class="nav-link">Pricing</a></li>
+                <li><a href="{{ url_for('contact') }}" class="nav-link">Contact</a></li>
             </ul>
         </nav>
         <div class="logo">SYNOVAAI</div>
@@ -38,11 +36,12 @@
         </article>
     </section>
 
-    <!-- What We Offer Section -->
+    <!-- What We Offer Section (Now at the Top) -->
     <section id="data-services" class="data-services">
         <h2>What We Offer</h2>
         <p>At SynovaAI, we provide cutting-edge AI-driven solutions to help you make better business decisions.</p>
         <div class="service-grid">
+            <!-- Forecasting -->
             <a href="#forecasting" class="service-card-link">
                 <div class="service-card">
                     <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="Forecasting Icon" loading="lazy">
@@ -50,6 +49,8 @@
                     <p>Predict trends, optimize inventory, and maximize revenue.</p>
                 </div>
             </a>
+
+            <!-- Interactive Dashboards -->
             <a href="#dashboards" class="service-card-link">
                 <div class="service-card">
                     <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Dashboard Icon" loading="lazy">
@@ -57,6 +58,8 @@
                     <p>Gain real-time insights with fully customizable dashboards.</p>
                 </div>
             </a>
+
+            <!-- Support & Consulting -->
             <a href="#consulting" class="service-card-link">
                 <div class="service-card">
                     <img src="{{ url_for('static', filename='images/support-icon.png') }}" alt="Support & Consulting Icon" loading="lazy">
@@ -67,7 +70,65 @@
         </div>
     </section>
 
-    <!-- Call to Action -->
+    <!-- AI-Powered Forecasting -->
+    <section id="forecasting" class="service-detail">
+        <div class="service-detail-container">
+            <div class="service-detail-image">
+                <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="AI Forecasting">
+            </div>
+            <div class="service-detail-content">
+                <h2>AI-Powered Forecasting</h2>
+                <p>Our AI forecasting tool helps businesses predict trends, optimize inventory, and maximize revenue. 
+                Using machine learning models, we analyze historical data to provide highly accurate demand forecasts.</p>
+                <ul>
+                    <li>✅ <strong>Sales & Demand Forecasting</strong> - Predict future trends based on data patterns.</li>
+                    <li>✅ <strong>Inventory Optimization</strong> - Avoid overstocking or shortages.</li>
+                    <li>✅ <strong>AI-Powered Trend Analysis</strong> - Identify hidden patterns in customer behavior.</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Interactive Dashboards -->
+    <section id="dashboards" class="service-detail">
+        <div class="service-detail-container reverse">
+            <div class="service-detail-image">
+                <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Interactive Dashboards">
+            </div>
+            <div class="service-detail-content">
+                <h2>Interactive Dashboards</h2>
+                <p>Gain real-time insights with fully customizable dashboards designed to track key performance indicators.
+                Our dashboards integrate data from multiple sources, providing you with a seamless data visualization experience.</p>
+                <ul>
+                    <li>📊 <strong>Real-Time Data Insights</strong> - Stay updated with live reports.</li>
+                    <li>📈 <strong>KPI Tracking & Reporting</strong> - Monitor essential business metrics.</li>
+                    <li>🔗 <strong>Power BI & SQL Integration</strong> - Seamlessly connect your data sources.</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Support & Consulting -->
+    <section id="consulting" class="service-detail">
+        <div class="service-detail-container">
+            <div class="service-detail-image">
+                <img src="{{ url_for('static', filename='images/support-icon.png') }}" alt="Support & Consulting">
+            </div>
+            <div class="service-detail-content">
+                <h2>Support & Consulting</h2>
+                <p>We provide expert consulting services to help you set up, manage, and optimize your data analytics pipeline.
+                Whether it’s Power BI dashboards or advanced SQL queries, we offer tailored solutions to meet your needs.</p>
+                <ul>
+                    <li>🎯 <strong>Power BI & SQL Optimization</strong> - Get the most out of your reporting tools.</li>
+                    <li>📊 <strong>Data Strategy Consulting</strong> - Improve your data-driven decision-making.</li>
+                    <li>🚀 <strong>AI & Predictive Modeling Support</strong> - Implement cutting-edge AI insights.</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+    
+
+    <!-- Call to Action Section -->
     <section class="cta">
         <div class="cta-container">
             <h2>Let's Get Started</h2>
@@ -75,6 +136,7 @@
             <a href="{{ url_for('contact') }}" class="cta-button">Contact Us</a>
         </div>
     </section>
+
 
     <!-- Back to Top Button -->
     <button onclick="scrollToTop()" class="top-button" aria-label="Back to Top">⬆ Back to Top</button>
@@ -84,12 +146,26 @@
         <p>&copy; 2025 SynovaAI. All rights reserved.</p>
     </footer>
 
-    <!-- JavaScript -->
-    <script>
+<!-- JavaScript -->
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Highlight Active Page in Navigation
+        const navLinks = document.querySelectorAll(".nav-link");
+        const currentPage = window.location.pathname;
+
+        navLinks.forEach(link => {
+            if (link.getAttribute("href") === currentPage) {
+                link.classList.add("active");
+            } else {
+                link.classList.remove("active");
+            }
+        });
+
         // Smooth Scroll to Top
         function scrollToTop() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
+        document.querySelector(".top-button").addEventListener("click", scrollToTop);
 
         // Show "Back to Top" Button on Scroll
         window.addEventListener("scroll", function() {
@@ -101,45 +177,25 @@
             }
         });
 
-        // Highlight active page in navigation
-        document.addEventListener("DOMContentLoaded", function() {
-            const currentPage = window.location.pathname;
-            const navLinks = {
-                "/": "home-link",
-                "/data-services": "data-services-link",
-                "/pricing": "pricing-link",
-                "/contact": "contact-link"
-            };
-
-            for (let path in navLinks) {
-                if (currentPage.includes(path)) {
-                    document.getElementById(navLinks[path]).classList.add("active");
-                } else {
-                    document.getElementById(navLinks[path]).classList.remove("active");
-                }
-            }
-        });
-
         // Animate Service Cards on Scroll
-        document.addEventListener("DOMContentLoaded", function() {
-            let cards = document.querySelectorAll(".service-card");
-            let observer = new IntersectionObserver(entries => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add("show");
-                    }
-                });
-            }, { threshold: 0.2 });
+        let cards = document.querySelectorAll(".service-card");
+        let observer = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add("show");
+                }
+            });
+        }, { threshold: 0.2 });
 
-            cards.forEach(card => observer.observe(card));
+        cards.forEach(card => observer.observe(card));
 
-            // Fallback for browsers that don't support IntersectionObserver
-            if (!('IntersectionObserver' in window)) {
-                console.warn("IntersectionObserver not supported!");
-                document.querySelectorAll(".service-card").forEach(card => card.classList.add("show"));
-            }
-        });
-    </script>
+        // Fallback for browsers that don't support IntersectionObserver
+        if (!('IntersectionObserver' in window)) {
+            console.warn("IntersectionObserver not supported!");
+            document.querySelectorAll(".service-card").forEach(card => card.classList.add("show"));
+        }
+    });
+</script>
 
 </body>
 </html>
