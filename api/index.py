@@ -238,25 +238,22 @@ def update_password():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
-
+        email = request.form['email']
+        password = request.form['password']
+        
         try:
-            response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+            user = supabase.auth.sign_in_with_password({"email": email, "password": password})
 
-            if not response.user:
-                flash("Invalid email or password. Please try again.", "error")
-                return redirect(url_for("login"))
-
-            session['user'] = email
-            flash("Login successful!", "success")
-            return redirect(url_for('dashboard'))
+            if user and "user" in user:
+                session["user_email"] = email
+                session["user_plan"] = user["user"]["app_metadata"].get("plan", "free")  # Defaults to free plan
+                flash("Login successful!", "success")
+                return redirect(url_for("forecasting_tool"))  # Redirect to forecasting tool after login
 
         except Exception as e:
-            flash(f"Login failed: {str(e)}", "error")
-            return redirect(url_for("login"))
+            flash("Invalid login credentials. Please try again.", "danger")
 
-    return render_template('login.html')
+    return render_template("login.html")
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
