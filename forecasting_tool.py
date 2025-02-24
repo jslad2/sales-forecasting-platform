@@ -426,6 +426,17 @@ def main():
                         "Importance": final_model.feature_importances_
                     }).sort_values(by="Importance", ascending=False)
 
+                    # Initialize future_df with the latest available values
+                    future_df = pd.DataFrame({f"lag_{lag}": [train["y"].iloc[-lag]] for lag in range(1, max_lag + 1)})
+
+                    for window in rolling_windows:
+                        future_df[f"rolling_mean_{window}"] = train["y"].rolling(window=window).mean().iloc[-1]
+                        future_df[f"rolling_std_{window}"] = train["y"].rolling(window=window).std().iloc[-1]
+
+                    future_df["month"] = train["ds"].iloc[-1].month
+                    future_df["quarter"] = train["ds"].iloc[-1].quarter
+                    future_df["year"] = train["ds"].iloc[-1].year
+
                     # Identify high and low points in the forecast
                     xgb_forecast = [final_model.predict(pd.DataFrame(future_df[selected_features]))[0] for _ in range(forecast_period)]
                     forecast_df = pd.DataFrame({
@@ -464,7 +475,7 @@ def main():
                     st.plotly_chart(fig, use_container_width=True)
 
                     return {
-                        "RMSE": mean_squared_error(test["y"], xgb_forecast[:len(test)], squared=False),
+                        "RMSE": mean_squared_error(test["y"].iloc[:len(xgb_forecast)], xgb_forecast, squared=False),
                         "MAPE": mean_absolute_percentage_error(test["y"], xgb_forecast[:len(test)]),
                         "Forecast": forecast_df
                     }
