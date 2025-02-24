@@ -243,7 +243,7 @@ def main():
                     prophet_forecast = prophet_model.predict(future)
 
                     # Step 3: Evaluate Performance
-                    prophet_rmse = mean_squared_error(test["y"], prophet_forecast["yhat"][-len(test):], squared=False)
+                    prophet_rmse = mean_squared_error(test["y"], prophet_forecast["yhat"][-len(test):]) ** 0.5
                     prophet_mape = mean_absolute_percentage_error(test["y"], prophet_forecast["yhat"][-len(test):])
 
                     st.write(f"Final Prophet RMSE: {prophet_rmse}")
