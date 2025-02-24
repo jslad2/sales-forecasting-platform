@@ -364,7 +364,6 @@ def main():
 
                     st.plotly_chart(fig, use_container_width=True)
 
-                    return results
                 except Exception as e:
                     st.warning(f"ARIMA Model failed: {e}")
 
