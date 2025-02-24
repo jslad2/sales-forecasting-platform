@@ -241,9 +241,15 @@ def main():
                     prophet_rmse = mean_squared_error(test["y"], prophet_forecast["yhat"].iloc[-len(test):]) ** 0.5
                     prophet_mape = mean_absolute_percentage_error(test["y"], prophet_forecast["yhat"].iloc[-len(test):])
 
+                    # Identify high and low points in the forecast
+                    highest_point = prophet_forecast.loc[prophet_forecast['yhat'].idxmax()]
+                    lowest_point = prophet_forecast.loc[prophet_forecast['yhat'].idxmin()]
+
                     summary_text = (
                         f"### Key Insights\n"
                         f"- **Projected Growth:** Sales are expected to {'increase' if prophet_forecast['yhat'].iloc[-1] > test['y'].iloc[-1] else 'decrease'} by {abs(((prophet_forecast['yhat'].iloc[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100):.2f}% in the next period.\n"
+                        f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
+                        f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
                         f"- **Best Model Parameters:** {best_params}\n"
                         f"- **Performance Metrics:**\n"
                         f"  - RMSE: {prophet_rmse:.2f}\n"
@@ -279,6 +285,7 @@ def main():
                 except Exception as e:
                     st.warning(f"Failed to train Prophet model: {e}")
                     return None
+
 
                 # ARIMA Model
                 st.write("Training ARIMA Model...")
