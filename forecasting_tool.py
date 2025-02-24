@@ -281,7 +281,7 @@ def main():
 
                     st.plotly_chart(fig, use_container_width=True)
 
-                    return results
+                    # return results
                 except Exception as e:
                     st.warning(f"Failed to train Prophet model: {e}")
                     
