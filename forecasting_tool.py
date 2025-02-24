@@ -364,6 +364,7 @@ def main():
 
                     st.plotly_chart(fig, use_container_width=True)
 
+                    return results
                 except Exception as e:
                     st.warning(f"ARIMA Model failed: {e}")
 
@@ -467,6 +468,7 @@ def main():
                         "MAPE": mean_absolute_percentage_error(test["y"], xgb_forecast[:len(test)]),
                         "Forecast": forecast_df
                     }
+                
                 except Exception as e:
                     st.warning(f"XGBoost Model failed: {e}")
                     return None
