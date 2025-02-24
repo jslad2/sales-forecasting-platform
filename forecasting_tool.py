@@ -453,7 +453,7 @@ def main():
                         f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
                         f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
                         f"- **Performance Metrics:**\n"
-                        f"  - RMSE: {mean_squared_error(test["y"], xgb_forecast[:len(test)], squared=False):.2f}\n"
+                        f"  - RMSE: {mean_squared_error(test['y'], xgb_forecast[:len(test)], squared=False):.2f}\n"
                         f"  - MAPE: {mean_absolute_percentage_error(test["y"], xgb_forecast[:len(test)]):.2f}\n"
                     )
 
@@ -475,7 +475,7 @@ def main():
                     st.plotly_chart(fig, use_container_width=True)
 
                     return {
-                        "RMSE": mean_squared_error(test["y"].iloc[:len(xgb_forecast)], xgb_forecast, squared=False),
+                        "RMSE": mean_squared_error(test['y'].iloc[:len(xgb_forecast)], xgb_forecast),
                         "MAPE": mean_absolute_percentage_error(test["y"], xgb_forecast[:len(test)]),
                         "Forecast": forecast_df
                     }
