@@ -454,7 +454,7 @@ def main():
                         f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
                         f"- **Performance Metrics:**\n"
                         f"  - RMSE: {mean_squared_error(test['y'], xgb_forecast[:len(test)], squared=False):.2f}\n"
-                        f"  - MAPE: {mean_absolute_percentage_error(test["y"], xgb_forecast[:len(test)]):.2f}\n"
+                        f"  - MAPE: {mean_absolute_percentage_error(test['y'], xgb_forecast[:len(test)]):.2f}\n"
                     )
 
                     with st.expander("📊 XGBoost Model Summary"):
