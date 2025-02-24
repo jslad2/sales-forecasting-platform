@@ -476,7 +476,7 @@ def main():
 
                     return {
                         "RMSE": mean_squared_error(test['y'].iloc[:len(xgb_forecast)], xgb_forecast),
-                        "MAPE": mean_absolute_percentage_error(test["y"], xgb_forecast[:len(test)]),
+                        "MAPE": mean_absolute_percentage_error(test['y'], xgb_forecast[:len(test)]),
                         "Forecast": forecast_df
                     }
                 
