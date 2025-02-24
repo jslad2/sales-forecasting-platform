@@ -284,10 +284,9 @@ def main():
                     return results
                 except Exception as e:
                     st.warning(f"Failed to train Prophet model: {e}")
-                    return None
+                    
 
 
-                # ARIMA Model
                 st.write("Training ARIMA Model...")
                 try:
                     # Analyze seasonality dynamically
@@ -296,7 +295,7 @@ def main():
                         seasonal = False
                     else:
                         st.write("Analyzing seasonality in the data...")
-                        decomposition = seasonal_decompose(train["y"], model="additive", period=12)  # Assuming monthly data
+                        decomposition = seasonal_decompose(train["y"], model="additive", period=12)
                         seasonality_present = np.any(np.abs(decomposition.seasonal) > 0.01)
 
                         if seasonality_present:
@@ -311,8 +310,8 @@ def main():
                         train["y"],
                         seasonal=seasonal,
                         m=12 if seasonal else 1,
-                        d=1,  # Differencing
-                        D=1 if seasonal else 0,  # Seasonal differencing
+                        d=1,
+                        D=1 if seasonal else 0,
                         trace=True,
                         suppress_warnings=True,
                         error_action="ignore",
@@ -321,17 +320,54 @@ def main():
 
                     # Generate future forecast
                     arima_forecast = arima_model.predict(n_periods=forecast_period)
-                    results["ARIMA"] = {
-                        "RMSE": mean_squared_error(test["y"], arima_forecast[:len(test)], squared=False),
-                        "MAPE": mean_absolute_percentage_error(test["y"], arima_forecast[:len(test)]),
-                        "Forecast": pd.DataFrame({
-                            "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
-                            "yhat": arima_forecast
-                        })
+                    forecast_dates = pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M")
+                    forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": arima_forecast})
+
+                    # Evaluate performance
+                    arima_rmse = mean_squared_error(test["y"], arima_forecast[:len(test)], squared=False)
+                    arima_mape = mean_absolute_percentage_error(test["y"], arima_forecast[:len(test)])
+
+                    # Identify high and low points
+                    highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
+                    lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
+
+                    summary_text = (
+                        f"### Key Insights\n"
+                        f"- **Projected Growth:** Sales are expected to {'increase' if forecast_df['yhat'].iloc[-1] > test['y'].iloc[-1] else 'decrease'} by {abs(((forecast_df['yhat'].iloc[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100):.2f}% in the next period.\n"
+                        f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
+                        f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
+                        f"- **Performance Metrics:**\n"
+                        f"  - RMSE: {arima_rmse:.2f}\n"
+                        f"  - MAPE: {arima_mape:.2f}\n"
+                    )
+
+                    results = {
+                        "RMSE": arima_rmse,
+                        "MAPE": arima_mape,
+                        "Forecast": forecast_df
                     }
 
+                    with st.expander("📊 ARIMA Model Summary"):
+                        st.markdown(summary_text)
+
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
+                    fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"], mode="lines", name="Forecast", line=dict(color="green", width=2)))
+
+                    fig.update_layout(
+                        title="ARIMA Forecast",
+                        xaxis_title="Date",
+                        yaxis_title="Sales",
+                        legend_title="Legend",
+                        template="plotly_white"
+                    )
+
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    return results
                 except Exception as e:
                     st.warning(f"ARIMA Model failed: {e}")
+                    return None
 
 
                 # XGBoost Model with Improved Feature Engineering and RFE
