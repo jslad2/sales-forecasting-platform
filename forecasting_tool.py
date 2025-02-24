@@ -324,7 +324,7 @@ def main():
                     forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": arima_forecast})
 
                     # Evaluate performance
-                    arima_rmse = mean_squared_error(test["y"], arima_forecast[:len(test)], squared=False)
+                    arima_rmse = mean_squared_error(test["y"], arima_forecast["yhat"].iloc[-len(test):]) ** 0.5
                     arima_mape = mean_absolute_percentage_error(test["y"], arima_forecast[:len(test)])
 
                     # Identify high and low points
