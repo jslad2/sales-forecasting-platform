@@ -22,198 +22,198 @@ from sklearn.model_selection import train_test_split, TimeSeriesSplit
 import plotly.graph_objects as go
 import time
 
-# Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
-st.set_page_config(layout="wide")
+# # Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
+# st.set_page_config(layout="wide")
 
-# --- Custom Styling for Streamlit ---
-st.markdown("""
-    <style>
-        .stApp {
-            background-color: #F4F4F6;
-            color: #333333;
-        }
-        h1, h3 {
-            color: #2B3A42;
-            text-align: center;
-        }
-        .stButton>button {
-            background-color: #2B3A42;
-            color: white;
-            border-radius: 6px;
-            padding: 10px 20px;
-            font-size: 16px;
-        }
-        .stButton>button:hover {
-            background-color: #56BBAF;
-        }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+# # --- Custom Styling for Streamlit ---
+# st.markdown("""
+#     <style>
+#         .stApp {
+#             background-color: #F4F4F6;
+#             color: #333333;
+#         }
+#         h1, h3 {
+#             color: #2B3A42;
+#             text-align: center;
+#         }
+#         .stButton>button {
+#             background-color: #2B3A42;
+#             color: white;
+#             border-radius: 6px;
+#             padding: 10px 20px;
+#             font-size: 16px;
+#         }
+#         .stButton>button:hover {
+#             background-color: #56BBAF;
+#         }
+#     </style>
+#     """,
+#     unsafe_allow_html=True
+# )
 
-# --- Header ---
-st.markdown(
-    """
-    <header style="background-color: #2B3A42; padding: 20px; text-align: center; color: white; border-radius: 12px;">
-        <h1 style="margin: 0; font-size: 2.5rem;">Sales Dashboard</h1>
-        <p style="margin: 0; font-size: 1.2rem;">Empowering Your Business with Data-Driven Insights</p>
-    </header>
-    """,
-    unsafe_allow_html=True,
-)
+# # --- Header ---
+# st.markdown(
+#     """
+#     <header style="background-color: #2B3A42; padding: 20px; text-align: center; color: white; border-radius: 12px;">
+#         <h1 style="margin: 0; font-size: 2.5rem;">Sales Dashboard</h1>
+#         <p style="margin: 0; font-size: 1.2rem;">Empowering Your Business with Data-Driven Insights</p>
+#     </header>
+#     """,
+#     unsafe_allow_html=True,
+# )
 
-@st.cache_data
-def check_stationarity(series):
-    """
-    Perform the Augmented Dickey-Fuller test to check stationarity.
-    """
-    result = adfuller(series, autolag="AIC")
-    p_value = result[1]
-    return "Stationary" if p_value < 0.05 else "Non-Stationary"
+# @st.cache_data
+# def check_stationarity(series):
+#     """
+#     Perform the Augmented Dickey-Fuller test to check stationarity.
+#     """
+#     result = adfuller(series, autolag="AIC")
+#     p_value = result[1]
+#     return "Stationary" if p_value < 0.05 else "Non-Stationary"
 
-@st.cache_data
-def preprocess_data(data, date_column, sales_column):
-    """
-    Preprocess the uploaded data and check stationarity.
-    """
-    try:
-        data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
-        data = data.dropna(subset=[date_column, sales_column])
+# @st.cache_data
+# def preprocess_data(data, date_column, sales_column):
+#     """
+#     Preprocess the uploaded data and check stationarity.
+#     """
+#     try:
+#         data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
+#         data = data.dropna(subset=[date_column, sales_column])
 
-        # Aggregate to Monthly
-        data = data[[date_column, sales_column]].rename(columns={date_column: "ds", sales_column: "y"})
-        data["ds"] = pd.to_datetime(data["ds"], errors="coerce")
-        data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
-        data["ds"] = data["ds"].dt.to_timestamp()
+#         # Aggregate to Monthly
+#         data = data[[date_column, sales_column]].rename(columns={date_column: "ds", sales_column: "y"})
+#         data["ds"] = pd.to_datetime(data["ds"], errors="coerce")
+#         data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
+#         data["ds"] = data["ds"].dt.to_timestamp()
 
-        # Check stationarity
-        stationarity_result = check_stationarity(data["y"])
-        st.subheader("Stationarity Test")
-        st.write(f"Conclusion: The series is **{stationarity_result}**.")
+#         # Check stationarity
+#         stationarity_result = check_stationarity(data["y"])
+#         st.subheader("Stationarity Test")
+#         st.write(f"Conclusion: The series is **{stationarity_result}**.")
 
-        if stationarity_result == "Non-Stationary":
-            st.warning("Applying differencing to stabilize the series.")
-            data["y"] = data["y"].diff().dropna()
+#         if stationarity_result == "Non-Stationary":
+#             st.warning("Applying differencing to stabilize the series.")
+#             data["y"] = data["y"].diff().dropna()
 
-        return data
-    except Exception as e:
-        st.error(f"Error during data preprocessing: {e}")
-        return None
+#         return data
+#     except Exception as e:
+#         st.error(f"Error during data preprocessing: {e}")
+#         return None
 
-def detect_and_add_seasonalities(model, data):
-    """
-    Detect seasonalities dynamically and add them to the Prophet model.
-    """
-    data_frequency = pd.infer_freq(data["ds"])
-    if data_frequency == "D":  # Daily data
-        model.add_seasonality(name="daily", period=1, fourier_order=3)
-    elif data_frequency == "W":  # Weekly data
-        model.add_seasonality(name="weekly", period=7, fourier_order=3)
-    elif data_frequency == "M":  # Monthly data
-        model.add_seasonality(name="monthly", period=30.5, fourier_order=5)
-    elif data_frequency == "Q":  # Quarterly data
-        model.add_seasonality(name="quarterly", period=91.25, fourier_order=5)
-    elif data_frequency == "Y":  # Yearly data
-        model.add_seasonality(name="yearly", period=365.25, fourier_order=10)
-    return model
+# def detect_and_add_seasonalities(model, data):
+#     """
+#     Detect seasonalities dynamically and add them to the Prophet model.
+#     """
+#     data_frequency = pd.infer_freq(data["ds"])
+#     if data_frequency == "D":  # Daily data
+#         model.add_seasonality(name="daily", period=1, fourier_order=3)
+#     elif data_frequency == "W":  # Weekly data
+#         model.add_seasonality(name="weekly", period=7, fourier_order=3)
+#     elif data_frequency == "M":  # Monthly data
+#         model.add_seasonality(name="monthly", period=30.5, fourier_order=5)
+#     elif data_frequency == "Q":  # Quarterly data
+#         model.add_seasonality(name="quarterly", period=91.25, fourier_order=5)
+#     elif data_frequency == "Y":  # Yearly data
+#         model.add_seasonality(name="yearly", period=365.25, fourier_order=10)
+#     return model
 
-def find_best_prophet_params(train):
-    """
-    Automates the selection of the best Prophet hyperparameters using cross-validation.
-    Dynamically adjusts horizon and initial based on the dataset size.
-    """
-    from prophet.diagnostics import cross_validation, performance_metrics
-    from sklearn.model_selection import ParameterGrid
+# def find_best_prophet_params(train):
+#     """
+#     Automates the selection of the best Prophet hyperparameters using cross-validation.
+#     Dynamically adjusts horizon and initial based on the dataset size.
+#     """
+#     from prophet.diagnostics import cross_validation, performance_metrics
+#     from sklearn.model_selection import ParameterGrid
 
-    param_grid = {
-        "changepoint_prior_scale": [0.01, 0.05, 0.1, 0.2, 0.3],
-        "seasonality_mode": ["additive", "multiplicative"]
-    }
+#     param_grid = {
+#         "changepoint_prior_scale": [0.01, 0.05, 0.1, 0.2, 0.3],
+#         "seasonality_mode": ["additive", "multiplicative"]
+#     }
 
-    best_params = None
-    best_rmse = float("inf")
+#     best_params = None
+#     best_rmse = float("inf")
 
-    # Determine dynamic horizon and initial window
-    dataset_length = len(train)
-    horizon_days = min(30, max(7, dataset_length // 5))  # Dynamic horizon: 20% of dataset length, capped at 30 days
-    initial_days = max(90, dataset_length // 2)  # Dynamic initial window: 50% of dataset length, min 90 days
+#     # Determine dynamic horizon and initial window
+#     dataset_length = len(train)
+#     horizon_days = min(30, max(7, dataset_length // 5))  # Dynamic horizon: 20% of dataset length, capped at 30 days
+#     initial_days = max(90, dataset_length // 2)  # Dynamic initial window: 50% of dataset length, min 90 days
 
-    horizon = f"{horizon_days} days"
-    initial = f"{initial_days} days"
+#     horizon = f"{horizon_days} days"
+#     initial = f"{initial_days} days"
 
-    for params in ParameterGrid(param_grid):
-        try:
-            # Initialize Prophet model with current parameters
-            prophet_model = Prophet(
-                seasonality_mode=params["seasonality_mode"],
-                changepoint_prior_scale=params["changepoint_prior_scale"]
-            )
+#     for params in ParameterGrid(param_grid):
+#         try:
+#             # Initialize Prophet model with current parameters
+#             prophet_model = Prophet(
+#                 seasonality_mode=params["seasonality_mode"],
+#                 changepoint_prior_scale=params["changepoint_prior_scale"]
+#             )
 
-            # Dynamically detect and add seasonalities
-            prophet_model = detect_and_add_seasonalities(prophet_model, train)
+#             # Dynamically detect and add seasonalities
+#             prophet_model = detect_and_add_seasonalities(prophet_model, train)
 
-            # Fit the model
-            prophet_model.fit(train)
+#             # Fit the model
+#             prophet_model.fit(train)
 
-            # Perform cross-validation
-            cv_results = cross_validation(
-                prophet_model,
-                initial=initial,
-                horizon=horizon,
-                period=f"{horizon_days // 2} days"  # Test every half-horizon period
-            )
-            metrics = performance_metrics(cv_results)
+#             # Perform cross-validation
+#             cv_results = cross_validation(
+#                 prophet_model,
+#                 initial=initial,
+#                 horizon=horizon,
+#                 period=f"{horizon_days // 2} days"  # Test every half-horizon period
+#             )
+#             metrics = performance_metrics(cv_results)
 
-            # Extract RMSE
-            rmse = metrics["rmse"].mean()
+#             # Extract RMSE
+#             rmse = metrics["rmse"].mean()
 
-            # Update best parameters
-            if rmse < best_rmse:
-                best_rmse = rmse
-                best_params = params
+#             # Update best parameters
+#             if rmse < best_rmse:
+#                 best_rmse = rmse
+#                 best_params = params
 
-        except Exception as e:
-            # Log and skip invalid configurations
-            st.write(f"Failed with params {params}: {e}")
-            continue
+#         except Exception as e:
+#             # Log and skip invalid configurations
+#             st.write(f"Failed with params {params}: {e}")
+#             continue
 
-    return best_params, best_rmse
+#     return best_params, best_rmse
 
-def main():
-    st.title("Sales Forecasting Platform")
+# def main():
+#     st.title("Sales Forecasting Platform")
 
-    # File Upload
-    uploaded_file = st.file_uploader("Upload your sales data file", type=["csv"])
+#     # File Upload
+#     uploaded_file = st.file_uploader("Upload your sales data file", type=["csv"])
 
-    if uploaded_file:
-        try:
-            data = pd.read_csv(uploaded_file)
-            st.write("Uploaded Data:")
-            st.dataframe(data)
+#     if uploaded_file:
+#         try:
+#             data = pd.read_csv(uploaded_file)
+#             st.write("Uploaded Data:")
+#             st.dataframe(data)
 
-            # Column Mapping
-            st.subheader("Map Your Columns")
-            date_column = st.selectbox("Select the Date Column:", data.columns)
-            sales_column = st.selectbox("Select the Sales Column:", data.columns)
+#             # Column Mapping
+#             st.subheader("Map Your Columns")
+#             date_column = st.selectbox("Select the Date Column:", data.columns)
+#             sales_column = st.selectbox("Select the Sales Column:", data.columns)
 
-            if st.button("Start Forecast"):
-                # Preprocess Data
-                data = preprocess_data(data, date_column, sales_column)
-                if data is None:
-                    return
+#             if st.button("Start Forecast"):
+#                 # Preprocess Data
+#                 data = preprocess_data(data, date_column, sales_column)
+#                 if data is None:
+#                     return
 
-                st.write("Preprocessed Monthly Data:")
-                st.dataframe(data)
+#                 st.write("Preprocessed Monthly Data:")
+#                 st.dataframe(data)
 
-                # Determine Testing Period Dynamically
-                testing_period = int(len(data) * 0.2)
-                train = data.iloc[:-testing_period]
-                test = data.iloc[-testing_period:]
+#                 # Determine Testing Period Dynamically
+#                 testing_period = int(len(data) * 0.2)
+#                 train = data.iloc[:-testing_period]
+#                 test = data.iloc[-testing_period:]
 
-                forecast_period = 12  # Fixed to 12 months forecast
+#                 forecast_period = 12  # Fixed to 12 months forecast
 
-                # Forecasting Models
-                results = {}
+#                 # Forecasting Models
+#                 results = {}
 
                 # # Prophet Model
                 # st.write("Finding the best Prophet hyperparameters...")
@@ -479,217 +479,246 @@ def main():
                 #     st.warning(f"XGBoost Model failed: {e}")
 
 
-                st.write("Training AutoML Model...")
-                try:
-                    # Step 1: Feature Engineering
-                    max_lag = min(12, len(train) - 1)  # Limit maximum lags to avoid excessive feature loss
-                    automl_data = train.copy()
-                    st.write(f"Lags: {max_lag}")
+                # st.write("Training AutoML Model...")
+                # try:
+                #     # Step 1: Feature Engineering
+                #     max_lag = min(12, len(train) - 1)  # Limit maximum lags to avoid excessive feature loss
+                #     automl_data = train.copy()
+                #     st.write(f"Lags: {max_lag}")
 
-                    # Add lag features
-                    for lag in range(1, max_lag + 1):
-                        automl_data[f"lag_{lag}"] = automl_data["y"].shift(lag)
+                #     # Add lag features
+                #     for lag in range(1, max_lag + 1):
+                #         automl_data[f"lag_{lag}"] = automl_data["y"].shift(lag)
 
-                    # Add rolling statistics (only if sufficient data exists)
-                    if len(train) > max_lag + 3:
-                        automl_data["rolling_mean_3"] = automl_data["y"].rolling(window=3).mean()
-                        automl_data["rolling_std_3"] = automl_data["y"].rolling(window=3).std()
+                #     # Add rolling statistics (only if sufficient data exists)
+                #     if len(train) > max_lag + 3:
+                #         automl_data["rolling_mean_3"] = automl_data["y"].rolling(window=3).mean()
+                #         automl_data["rolling_std_3"] = automl_data["y"].rolling(window=3).std()
 
-                    # Add seasonal features
-                    automl_data["sin_month"] = np.sin(2 * np.pi * automl_data["ds"].dt.month / 12)
-                    automl_data["cos_month"] = np.cos(2 * np.pi * automl_data["ds"].dt.month / 12)
+                #     # Add seasonal features
+                #     automl_data["sin_month"] = np.sin(2 * np.pi * automl_data["ds"].dt.month / 12)
+                #     automl_data["cos_month"] = np.cos(2 * np.pi * automl_data["ds"].dt.month / 12)
 
-                    # Apply log transformation to stabilize variance
-                    if (automl_data["y"] < 0).any():
-                        st.warning("Negative values detected in target variable. Skipping AutoML.")
-                        return None
-                    automl_data["y_log"] = np.log1p(automl_data["y"])  # log1p to handle zero values
-                    automl_data.dropna(inplace=True)  # Drop rows with NA values after feature engineering
+                #     # Apply log transformation to stabilize variance
+                #     if (automl_data["y"] < 0).any():
+                #         st.warning("Negative values detected in target variable. Skipping AutoML.")
+                #         return None
+                #     automl_data["y_log"] = np.log1p(automl_data["y"])  # log1p to handle zero values
+                #     automl_data.dropna(inplace=True)  # Drop rows with NA values after feature engineering
 
-                    # Prepare training data
-                    x_train = automl_data.drop(columns=["y", "y_log", "ds"])  # Exclude target and date column
-                    y_train = automl_data["y_log"]  # Use log-transformed target
+                #     # Prepare training data
+                #     x_train = automl_data.drop(columns=["y", "y_log", "ds"])  # Exclude target and date column
+                #     y_train = automl_data["y_log"]  # Use log-transformed target
 
-                    # Check for insufficient data
-                    if len(x_train) <= 5:
-                        st.warning("Insufficient data to train AutoML. Skipping AutoML.")
-                        return None
+                #     # Check for insufficient data
+                #     if len(x_train) <= 5:
+                #         st.warning("Insufficient data to train AutoML. Skipping AutoML.")
+                #         return None
 
-                    # Check for invalid data
-                    if x_train.isnull().any().any() or np.isinf(x_train).any().any():
-                        st.warning("Invalid data detected in x_train. Skipping AutoML.")
-                        return None
-                    if y_train.isnull().any() or np.isinf(y_train).any():
-                        st.warning("Invalid data detected in y_train. Skipping AutoML.")
-                        return None
+                #     # Check for invalid data
+                #     if x_train.isnull().any().any() or np.isinf(x_train).any().any():
+                #         st.warning("Invalid data detected in x_train. Skipping AutoML.")
+                #         return None
+                #     if y_train.isnull().any() or np.isinf(y_train).any():
+                #         st.warning("Invalid data detected in y_train. Skipping AutoML.")
+                #         return None
 
-                    # Debug: Print shapes of x_train and y_train
-                    st.write(f"x_train shape: {x_train.shape}")
-                    st.write(f"y_train shape: {y_train.shape}")
+                #     # Debug: Print shapes of x_train and y_train
+                #     st.write(f"x_train shape: {x_train.shape}")
+                #     st.write(f"y_train shape: {y_train.shape}")
 
-                    # Initialize AutoML model
-                    automl_model = AutoML()
-                    st.write("AutoML model initialized successfully.")
+                #     # Initialize AutoML model
+                #     automl_model = AutoML()
+                #     st.write("AutoML model initialized successfully.")
 
-                    # Debug: Print AutoML configuration
-                    st.write("AutoML configuration:")
-                    st.write(f"Task: regression")
-                    st.write(f"Time Budget: 600 seconds")
-                    st.write(f"Evaluation Method: {'cv' if len(x_train) > 5 else 'holdout'}")
-                    st.write(f"Estimators: ['xgboost', 'lgbm', 'rf']")
+                #     # Debug: Print AutoML configuration
+                #     st.write("AutoML configuration:")
+                #     st.write(f"Task: regression")
+                #     st.write(f"Time Budget: 600 seconds")
+                #     st.write(f"Evaluation Method: {'cv' if len(x_train) > 5 else 'holdout'}")
+                #     st.write(f"Estimators: ['xgboost', 'lgbm', 'rf']")
 
-                    # Train AutoML Model
-                    automl_model.fit(
-                        X_train=x_train,
-                        y_train=y_train,
-                        task="regression",
-                        time_budget=600,
-                        eval_method="cv" if len(x_train) > 5 else "holdout",
-                        estimator_list=["xgboost", "lgbm", "rf"]
-                    )
-                    st.write("AutoML training completed successfully.")
+                #     # Train AutoML Model
+                #     automl_model.fit(
+                #         X_train=x_train,
+                #         y_train=y_train,
+                #         task="regression",
+                #         time_budget=600,
+                #         eval_method="cv" if len(x_train) > 5 else "holdout",
+                #         estimator_list=["xgboost", "lgbm", "rf"]
+                #     )
+                #     st.write("AutoML training completed successfully.")
 
-                    # Generate future forecasts using the trained AutoML model
-                    st.write("Generating forecasts with AutoML...")
-                    future_features = []
-                    for i in range(forecast_period):
-                        future_row = {
-                            f"lag_{lag}": train["y"].iloc[-lag] if lag <= len(train) else np.nan
-                            for lag in range(1, max_lag + 1)
-                        }
-                        future_row["rolling_mean_3"] = train["y"].rolling(window=min(3, len(train))).mean().iloc[-1] if len(train) > 1 else np.nan
-                        future_row["sin_month"] = np.sin(2 * np.pi * (train["ds"].iloc[-1].month + i + 1) / 12)
-                        future_row["cos_month"] = np.cos(2 * np.pi * (train["ds"].iloc[-1].month + i + 1) / 12)
-                        future_features.append(future_row)
+                #     # Generate future forecasts using the trained AutoML model
+                #     st.write("Generating forecasts with AutoML...")
+                #     future_features = []
+                #     for i in range(forecast_period):
+                #         future_row = {
+                #             f"lag_{lag}": train["y"].iloc[-lag] if lag <= len(train) else np.nan
+                #             for lag in range(1, max_lag + 1)
+                #         }
+                #         future_row["rolling_mean_3"] = train["y"].rolling(window=min(3, len(train))).mean().iloc[-1] if len(train) > 1 else np.nan
+                #         future_row["sin_month"] = np.sin(2 * np.pi * (train["ds"].iloc[-1].month + i + 1) / 12)
+                #         future_row["cos_month"] = np.cos(2 * np.pi * (train["ds"].iloc[-1].month + i + 1) / 12)
+                #         future_features.append(future_row)
 
-                    future_df = pd.DataFrame(future_features)
-                    future_df.fillna(method="ffill", inplace=True)  # Forward fill missing values
-                    automl_forecast_log = automl_model.predict(future_df)
-                    automl_forecast = np.expm1(automl_forecast_log)  # Reverse log transformation
+                #     future_df = pd.DataFrame(future_features)
+                #     future_df.fillna(method="ffill", inplace=True)  # Forward fill missing values
+                #     automl_forecast_log = automl_model.predict(future_df)
+                #     automl_forecast = np.expm1(automl_forecast_log)  # Reverse log transformation
 
-                    # Ensure test['y'] length matches automl_forecast
-                    matching_length = min(len(test["y"]), len(automl_forecast))
-                    test_y_trimmed = test["y"].iloc[:matching_length]
-                    automl_forecast_trimmed = automl_forecast[:matching_length]
+                #     # Ensure test['y'] length matches automl_forecast
+                #     matching_length = min(len(test["y"]), len(automl_forecast))
+                #     test_y_trimmed = test["y"].iloc[:matching_length]
+                #     automl_forecast_trimmed = automl_forecast[:matching_length]
 
-                    # Calculate RMSE and MAPE with matched lengths
-                    rmse = mean_squared_error(test_y_trimmed, automl_forecast_trimmed) ** 0.5  # RMSE = sqrt(MSE)
-                    mape = mean_absolute_percentage_error(test_y_trimmed, automl_forecast_trimmed)
+                #     # Calculate RMSE and MAPE with matched lengths
+                #     rmse = mean_squared_error(test_y_trimmed, automl_forecast_trimmed) ** 0.5  # RMSE = sqrt(MSE)
+                #     mape = mean_absolute_percentage_error(test_y_trimmed, automl_forecast_trimmed)
 
-                    # Save Results
-                    forecast_df = pd.DataFrame({
-                        "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
-                        "yhat": automl_forecast
-                    })
+                #     # Save Results
+                #     forecast_df = pd.DataFrame({
+                #         "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
+                #         "yhat": automl_forecast
+                #     })
 
-                    highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
-                    lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
+                #     highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
+                #     lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
 
-                    summary_text = (
-                        f"### Key Insights\n"
-                        f"- **Projected Growth:** Sales are expected to {'increase' if automl_forecast[-1] > test['y'].iloc[-1] else 'decrease'} "
-                        f"by {abs((automl_forecast[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100:.2f}% in the next period.\n"
-                        f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
-                        f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
-                        f"- **Performance Metrics:**\n"
-                        f"  - RMSE: {rmse:.2f}\n"
-                        f"  - MAPE: {mape:.2f}\n"
-                    )
+                #     summary_text = (
+                #         f"### Key Insights\n"
+                #         f"- **Projected Growth:** Sales are expected to {'increase' if automl_forecast[-1] > test['y'].iloc[-1] else 'decrease'} "
+                #         f"by {abs((automl_forecast[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100:.2f}% in the next period.\n"
+                #         f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
+                #         f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
+                #         f"- **Performance Metrics:**\n"
+                #         f"  - RMSE: {rmse:.2f}\n"
+                #         f"  - MAPE: {mape:.2f}\n"
+                #     )
 
-                    with st.expander("📊 AutoML Model Summary"):
-                        st.markdown(summary_text)
+                #     with st.expander("📊 AutoML Model Summary"):
+                #         st.markdown(summary_text)
 
-                    return {
-                        "RMSE": rmse,
-                        "MAPE": mape,
-                        "Forecast": forecast_df
-                    }
-                except Exception as e:
-                    st.error(f"AutoML failed: {e}")
-                    return None
+                #     return {
+                #         "RMSE": rmse,
+                #         "MAPE": mape,
+                #         "Forecast": forecast_df
+                #     }
+                # except Exception as e:
+                #     st.error(f"AutoML failed: {e}")
+                #     return None
 
                 # Check if AutoML training occurred successfully
-                if automl_model is None:
-                    st.warning("AutoML was not trained due to insufficient data.")
-                else:
-                    st.success("AutoML training and forecasting completed successfully!")
+#                 if automl_model is None:
+#                     st.warning("AutoML was not trained due to insufficient data.")
+#                 else:
+#                     st.success("AutoML training and forecasting completed successfully!")
 
-                # Model Performance Table
-                st.subheader("Model Performance Comparison")
-                comparison = pd.DataFrame([
-                    {"Model": model, "RMSE": result["RMSE"], "MAPE": result["MAPE"]}
-                    for model, result in results.items()
-                ])
-                st.dataframe(comparison)
+#                 # Model Performance Table
+#                 st.subheader("Model Performance Comparison")
+#                 comparison = pd.DataFrame([
+#                     {"Model": model, "RMSE": result["RMSE"], "MAPE": result["MAPE"]}
+#                     for model, result in results.items()
+#                 ])
+#                 st.dataframe(comparison)
 
-                # Select Best Model Based on RMSE
-                best_model = comparison.loc[comparison["RMSE"].idxmin(), "Model"]
-                st.write(f"Best Model: {best_model}")
+#                 # Select Best Model Based on RMSE
+#                 best_model = comparison.loc[comparison["RMSE"].idxmin(), "Model"]
+#                 st.write(f"Best Model: {best_model}")
 
-                # Ensure forecast data exists for the best model
-                if best_model in results and "Forecast" in results[best_model] and not results[best_model]["Forecast"].empty:
-                    forecast_data = results[best_model]["Forecast"]
-                else:
-                    forecast_data = None  # Handle missing forecast case
+#                 # Ensure forecast data exists for the best model
+#                 if best_model in results and "Forecast" in results[best_model] and not results[best_model]["Forecast"].empty:
+#                     forecast_data = results[best_model]["Forecast"]
+#                 else:
+#                     forecast_data = None  # Handle missing forecast case
 
-                # Prepare Data for Comparison Chart
-                historical_data = train[["ds", "y"]].rename(columns={"y": "yhat"})
-                historical_data["Model"] = "Historical"
+#                 # Prepare Data for Comparison Chart
+#                 historical_data = train[["ds", "y"]].rename(columns={"y": "yhat"})
+#                 historical_data["Model"] = "Historical"
 
-                # Define colors for different models
-                model_colors = {
-                    "Prophet": "blue",
-                    "ARIMA": "green",
-                    "XGBoost": "red",
-                    "AutoML": "purple"
-                }
+#                 # Define colors for different models
+#                 model_colors = {
+#                     "Prophet": "blue",
+#                     "ARIMA": "green",
+#                     "XGBoost": "red",
+#                     "AutoML": "purple"
+#                 }
 
-                # Create Plotly Figure
-                fig = go.Figure()
+#                 # Create Plotly Figure
+#                 fig = go.Figure()
 
-                # Add Historical Data
-                fig.add_trace(go.Scatter(
-                    x=historical_data["ds"],
-                    y=historical_data["yhat"],
-                    mode="lines",
-                    name="Historical",
-                    line=dict(color="black", width=2)
-                ))
+#                 # Add Historical Data
+#                 fig.add_trace(go.Scatter(
+#                     x=historical_data["ds"],
+#                     y=historical_data["yhat"],
+#                     mode="lines",
+#                     name="Historical",
+#                     line=dict(color="black", width=2)
+#                 ))
 
-                # Add Forecasts for Each Model (Only 12-month Forecast)
-                for model, result in results.items():
-                    if "Forecast" in result and result["Forecast"] is not None and not result["Forecast"].empty:
-                        forecast_df = result["Forecast"]
+#                 # Add Forecasts for Each Model (Only 12-month Forecast)
+#                 for model, result in results.items():
+#                     if "Forecast" in result and result["Forecast"] is not None and not result["Forecast"].empty:
+#                         forecast_df = result["Forecast"]
                         
-                        fig.add_trace(go.Scatter(
-                            x=forecast_df["ds"],
-                            y=forecast_df["yhat"],
-                            mode="lines",
-                            name=model,
-                            line=dict(width=2, color=model_colors.get(model, "gray"))
-                        ))
+#                         fig.add_trace(go.Scatter(
+#                             x=forecast_df["ds"],
+#                             y=forecast_df["yhat"],
+#                             mode="lines",
+#                             name=model,
+#                             line=dict(width=2, color=model_colors.get(model, "gray"))
+#                         ))
 
-                # Final Plot Formatting
-                fig.update_layout(
-                    title="Sales Forecast Comparison Across Models",
-                    xaxis_title="Date",
-                    yaxis_title="Sales",
-                    legend_title="Models",
-                    template="plotly_white"
-                )
+#                 # Final Plot Formatting
+#                 fig.update_layout(
+#                     title="Sales Forecast Comparison Across Models",
+#                     xaxis_title="Date",
+#                     yaxis_title="Sales",
+#                     legend_title="Models",
+#                     template="plotly_white"
+#                 )
 
-                # Show the Chart
-                st.plotly_chart(fig, use_container_width=True)
+#                 # Show the Chart
+#                 st.plotly_chart(fig, use_container_width=True)
 
-                # Download Forecast
-                st.subheader("Download Forecast")
-                if forecast_data is not None:
-                    st.download_button("Download Forecast Data (CSV)", forecast_data.to_csv(index=False), "forecast.csv", "text/csv")
-                else:
-                    st.warning("No forecast data available for download.")
+#                 # Download Forecast
+#                 st.subheader("Download Forecast")
+#                 if forecast_data is not None:
+#                     st.download_button("Download Forecast Data (CSV)", forecast_data.to_csv(index=False), "forecast.csv", "text/csv")
+#                 else:
+#                     st.warning("No forecast data available for download.")
 
-        except Exception as e:
-            st.error(f"Error processing file: {e}")
+#         except Exception as e:
+#             st.error(f"Error processing file: {e}")
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
+
+# Title
+st.title("AutoML Minimal Test")
+
+# Create dummy data
+x_train = pd.DataFrame(np.random.rand(12, 16))  # 12 samples, 16 features
+y_train = pd.Series(np.random.rand(12))        # 12 target values
+
+# Display data
+st.write("x_train:")
+st.write(x_train)
+st.write("y_train:")
+st.write(y_train)
+
+# Initialize AutoML model
+automl_model = AutoML()
+
+# Train AutoML Model
+if st.button("Train AutoML"):
+    try:
+        automl_model.fit(
+            X_train=x_train,
+            y_train=y_train,
+            task="regression",
+            time_budget=60  # 60 seconds for training
+        )
+        st.success("AutoML training completed successfully!")
+    except Exception as e:
+        st.error(f"AutoML failed: {e}")
