@@ -4,18 +4,18 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-streamlit = "*"
-pandas = "*"
-numpy = "==1.23.5"  # Ensures compatibility with Prophet & pmdarima
-prophet = "*"
-pmdarima = "*"
-xgboost = "*"
-flaml = "*"
-scikit-learn = "*"
-matplotlib = "*"
-plotly = "*"
-statsmodels = "*"
-optuna = "*"
+streamlit = "==1.26.0"  # Pinned to a stable version
+pandas = "==2.0.3"      # Pinned to a stable version
+numpy = "==1.23.5"      # Ensures compatibility with Prophet & pmdarima
+prophet = "==1.1.4"     # Pinned to a stable version
+pmdarima = "==2.0.3"    # Pinned to a stable version
+xgboost = "==1.7.6"     # Pinned to a stable version
+flaml = "==2.0.0"       # Pinned to a stable version
+scikit-learn = "==1.2.2" # Pinned to a stable version
+matplotlib = "==3.7.1"  # Pinned to a stable version
+plotly = "==5.15.0"     # Pinned to a stable version
+statsmodels = "==0.14.0" # Pinned to a stable version
+optuna = "==3.2.0"      # Pinned to a stable version
 
 [dev-packages]
 
