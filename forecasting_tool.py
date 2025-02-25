@@ -446,9 +446,13 @@ def main():
                     highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
                     lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
 
-                    # Calculate RMSE and MAPE
-                    rmse = mean_squared_error(test['y'].iloc[:len(xgb_forecast)], xgb_forecast) ** 0.5  # Manually take the square root
-                    mape = mean_absolute_percentage_error(test['y'], xgb_forecast[:len(test)])
+                    # Ensure test['y'] length matches xgb_forecast
+                    test_y_trimmed = test['y'].iloc[:len(xgb_forecast)]
+
+                    # Calculate RMSE and MAPE with matched lengths
+                    rmse = mean_squared_error(test_y_trimmed, xgb_forecast) ** 0.5  # RMSE = sqrt(MSE)
+                    mape = mean_absolute_percentage_error(test_y_trimmed, xgb_forecast)
+
 
                     summary_text = (
                         f"### Key Insights\n"
