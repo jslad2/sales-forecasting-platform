@@ -424,7 +424,7 @@ def main():
 
                     # Save Results
                     results["XGBoost"] = {
-                        "RMSE": mean_squared_error(test["y"], xgb_forecast[:len(test)], squared=False),
+                        "RMSE": mean_squared_error(test["y"], xgb_forecast[:len(test)]) ** 0.5,
                         "MAPE": mean_absolute_percentage_error(test["y"], xgb_forecast[:len(test)]),
                         "Forecast": pd.DataFrame({
                             "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
@@ -437,6 +437,7 @@ def main():
 
                 except Exception as e:
                     st.warning(f"XGBoost Model failed: {e}")
+                return None
 
                 # AutoML Model with Rolling Features, Log Transformation, and Feature Importance
                 st.write("Training AutoML Model...")
