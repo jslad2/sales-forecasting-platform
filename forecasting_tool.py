@@ -479,9 +479,7 @@ def main():
                     st.warning(f"XGBoost Model failed: {e}")
 
 
-                st.write("Training AutoML Model...")
-                start_time = time.time()  # Start timing
-                
+                st.write("Training AutoML Model...")               
                 try:
                     # Step 1: Feature Engineering
                     max_lag = min(12, len(train) - 1)  # Limit maximum lags to avoid excessive feature loss
@@ -552,11 +550,6 @@ def main():
                     # Calculate RMSE and MAPE with matched lengths
                     rmse = mean_squared_error(test_y_trimmed, automl_forecast_trimmed) ** 0.5  # RMSE = sqrt(MSE)
                     mape = mean_absolute_percentage_error(test_y_trimmed, automl_forecast_trimmed)
-
-                    # Measure execution time
-                    end_time = time.time()
-                    elapsed_time = end_time - start_time
-                    st.write(f"AutoML Model Training Time: {elapsed_time:.2f} seconds")
 
                     # Save Results
                     forecast_df = pd.DataFrame({
