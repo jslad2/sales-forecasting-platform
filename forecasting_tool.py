@@ -517,7 +517,10 @@ def main():
 
                     # Check for invalid data
                     if x_train.isnull().any().any() or np.isinf(x_train).any().any():
-                        st.warning("Invalid data detected in feature matrix. Skipping AutoML.")
+                        st.warning("Invalid data detected in x_train. Skipping AutoML.")
+                        return None
+                    if y_train.isnull().any() or np.isinf(y_train).any():
+                        st.warning("Invalid data detected in y_train. Skipping AutoML.")
                         return None
 
                     # Debug: Print shapes of x_train and y_train
@@ -528,16 +531,23 @@ def main():
                     automl_model = AutoML()
                     st.write("AutoML model initialized successfully.")
 
+                    # Debug: Print AutoML configuration
+                    st.write("AutoML configuration:")
+                    st.write(f"Task: regression")
+                    st.write(f"Time Budget: 600 seconds")
+                    st.write(f"Evaluation Method: {'cv' if len(x_train) > 5 else 'holdout'}")
+                    st.write(f"Estimators: ['xgboost', 'lgbm', 'rf']")
+
                     # Train AutoML Model
                     automl_model.fit(
                         X_train=x_train,
                         y_train=y_train,
                         task="regression",
-                        time_budget=600,  # Increase time budget to 600 seconds
-                        eval_method="cv" if len(x_train) > 5 else "holdout",  # Dynamically chosen evaluation method
-                        estimator_list=["xgboost", "lgbm", "rf"]  # Focus on tree-based models
+                        time_budget=600,
+                        eval_method="cv" if len(x_train) > 5 else "holdout",
+                        estimator_list=["xgboost", "lgbm", "rf"]
                     )
-                    st.write(f"AutoML Training Completed: Best Estimator - {automl_model.best_estimator}")
+                    st.write("AutoML training completed successfully.")
 
                     # Generate future forecasts using the trained AutoML model
                     st.write("Generating forecasts with AutoML...")
