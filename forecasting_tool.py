@@ -474,7 +474,7 @@ def main():
                     st.plotly_chart(fig, use_container_width=True)
 
                     return {
-                        "RMSE": mean_squared_error(test['y'].iloc[:len(xgb_forecast)], xgb_forecast),
+                        "RMSE": mean_squared_error(test['y'].iloc[:len(xgb_forecast)], xgb_forecast) ** 0.5,
                         "MAPE": mean_absolute_percentage_error(test['y'], xgb_forecast[:len(test)]),
                         "Forecast": forecast_df
                     }
