@@ -693,32 +693,35 @@ import time
 
 # if __name__ == "__main__":
 #     main()
-
+def main():
 # Title
-st.title("AutoML Minimal Test")
+    st.title("AutoML Minimal Test")
 
-# Create dummy data
-x_train = pd.DataFrame(np.random.rand(12, 16))  # 12 samples, 16 features
-y_train = pd.Series(np.random.rand(12))        # 12 target values
+    # Create dummy data
+    x_train = pd.DataFrame(np.random.rand(12, 16))  # 12 samples, 16 features
+    y_train = pd.Series(np.random.rand(12))        # 12 target values
 
-# Display data
-st.write("x_train:")
-st.write(x_train)
-st.write("y_train:")
-st.write(y_train)
+    # Display data
+    st.write("x_train:")
+    st.write(x_train)
+    st.write("y_train:")
+    st.write(y_train)
 
-# Initialize AutoML model
-automl_model = AutoML()
+    # Initialize AutoML model
+    automl_model = AutoML()
 
-# Train AutoML Model
-if st.button("Train AutoML"):
-    try:
-        automl_model.fit(
-            X_train=x_train,
-            y_train=y_train,
-            task="regression",
-            time_budget=60  # 60 seconds for training
-        )
-        st.success("AutoML training completed successfully!")
-    except Exception as e:
-        st.error(f"AutoML failed: {e}")
+    # Train AutoML Model
+    if st.button("Train AutoML"):
+        try:
+            automl_model.fit(
+                X_train=x_train,
+                y_train=y_train,
+                task="regression",
+                time_budget=60  # 60 seconds for training
+            )
+            st.success("AutoML training completed successfully!")
+        except Exception as e:
+            st.error(f"AutoML failed: {e}")
+
+if __name__ == "__main__":
+     main()
