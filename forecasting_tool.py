@@ -392,9 +392,16 @@ def main():
 
                     xgb_data.dropna(inplace=True)
 
+                    # Debug: Check shape after dropping NaNs
+                    st.write(f"Shape of xgb_data after dropping NaNs: {xgb_data.shape}")
+
                     # Prepare training data
                     x_train = xgb_data.drop(columns=["y", "ds"])
                     y_train = xgb_data["y"]
+
+                    # Debug: Check shapes of x_train and y_train
+                    st.write(f"Shape of x_train: {x_train.shape}")
+                    st.write(f"Shape of y_train: {y_train.shape}")
 
                     # Step 2: Recursive Feature Elimination (RFE)
                     st.write("Performing Recursive Feature Elimination...")
@@ -407,6 +414,9 @@ def main():
                     st.dataframe(selected_features)
 
                     x_train_selected = x_train[selected_features]
+
+                    # Debug: Check shape of x_train_selected
+                    st.write(f"Shape of x_train_selected: {x_train_selected.shape}")
 
                     # Train Final Model
                     st.write("Training Final XGBoost Model...")
@@ -436,23 +446,31 @@ def main():
                     future_df["quarter"] = train["ds"].iloc[-1].quarter
                     future_df["year"] = train["ds"].iloc[-1].year
 
-                    # Identify high and low points in the forecast
+                    # Debug: Check future_df
+                    st.write("Future DataFrame for Forecasting:")
+                    st.dataframe(future_df)
+
+                    # Generate forecast
                     xgb_forecast = [final_model.predict(pd.DataFrame(future_df[selected_features]))[0] for _ in range(forecast_period)]
                     forecast_df = pd.DataFrame({
                         "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
                         "yhat": xgb_forecast
                     })
 
-                    highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
-                    lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
+                    # Debug: Check forecast length
+                    st.write(f"Length of xgb_forecast: {len(xgb_forecast)}")
+                    st.write(f"Length of test['y']: {len(test['y'])}")
 
-                    # Ensure test['y'] length matches xgb_forecast
+                    # Trim test['y'] to match forecast length
                     test_y_trimmed = test['y'].iloc[:len(xgb_forecast)]
 
-                    # Calculate RMSE and MAPE with matched lengths
-                    rmse = mean_squared_error(test_y_trimmed, xgb_forecast) ** 0.5  # RMSE = sqrt(MSE)
+                    # Calculate RMSE and MAPE
+                    rmse = mean_squared_error(test_y_trimmed, xgb_forecast) ** 0.5
                     mape = mean_absolute_percentage_error(test_y_trimmed, xgb_forecast)
 
+                    # Identify high and low points
+                    highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
+                    lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
 
                     summary_text = (
                         f"### Key Insights\n"
