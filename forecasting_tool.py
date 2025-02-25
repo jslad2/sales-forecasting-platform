@@ -21,8 +21,8 @@ from xgboost import XGBRegressor
 from sklearn.model_selection import train_test_split, TimeSeriesSplit
 import plotly.graph_objects as go
 
-# Enable Wide Mode
-# st.set_page_config(layout="wide")
+# Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
+st.set_page_config(layout="wide")
 
 # --- Custom Styling for Streamlit ---
 st.markdown("""
