@@ -410,10 +410,10 @@ def main():
                     future_features = []
                     for i in range(forecast_period):
                         future_row = {
-                            f"lag_{lag}": train["y"].iloc[-lag] if lag <= len(train) else np.nan
+                            f"lag_{lag}": train["y"].iloc[-lag + i] if lag > i else np.nan
                             for lag in range(1, max_lag + 1)
                         }
-                        future_row["rolling_mean_3"] = train["y"].rolling(window=3).mean().iloc[-1] if len(train) >= 3 else np.nan
+                        future_row["rolling_mean_3"] = train["y"].rolling(window=3).mean().iloc[-1 + i] if i < 3 else np.nan
                         future_row["month"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).month
                         future_row["quarter"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).quarter
                         future_row["year"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).year
@@ -422,58 +422,22 @@ def main():
                     future_df = pd.DataFrame(future_features).fillna(0)  # Fill NaNs with 0
                     xgb_forecast = final_model.predict(future_df)
 
-                    # Ensure test['y'] length matches xgb_forecast
-                    test_y_trimmed = test['y'].iloc[:len(xgb_forecast)]
-
-                    # Calculate RMSE and MAPE with matched lengths
-                    rmse = mean_squared_error(test_y_trimmed, xgb_forecast) ** 0.5  # RMSE = sqrt(MSE)
-                    mape = mean_absolute_percentage_error(test_y_trimmed, xgb_forecast)
-
                     # Save Results
-                    forecast_df = pd.DataFrame({
-                        "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
-                        "yhat": xgb_forecast
-                    })
-
-                    highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
-                    lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
-
-                    summary_text = (
-                        f"### Key Insights\n"
-                        f"- **Projected Growth:** Sales are expected to {'increase' if xgb_forecast[-1] > test['y'].iloc[-1] else 'decrease'} "
-                        f"by {abs((xgb_forecast[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100:.2f}% in the next period.\n"
-                        f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
-                        f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
-                        f"- **Performance Metrics:**\n"
-                        f"  - RMSE: {rmse:.2f}\n"
-                        f"  - MAPE: {mape:.2f}\n"
-                    )
-
-                    with st.expander("📊 XGBoost Model Summary"):
-                        st.markdown(summary_text)
-
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
-                    fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"], mode="lines", name="Forecast", line=dict(color="red", width=2)))
-
-                    fig.update_layout(
-                        title="XGBoost Forecast",
-                        xaxis_title="Date",
-                        yaxis_title="Sales",
-                        legend_title="Legend",
-                        template="plotly_white"
-                    )
-
-                    st.plotly_chart(fig, use_container_width=True)
-
-                    return {
-                        "RMSE": rmse,
-                        "MAPE": mape,
-                        "Forecast": forecast_df
+                    results["XGBoost"] = {
+                        "RMSE": mean_squared_error(test["y"], xgb_forecast[:len(test)]) ** 0.5,
+                        "MAPE": mean_absolute_percentage_error(test["y"], xgb_forecast[:len(test)]),
+                        "Forecast": pd.DataFrame({
+                            "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
+                            "yhat": xgb_forecast
+                        })
                     }
+
+                    st.write(f"Final XGBoost RMSE: {results['XGBoost']['RMSE']}")
+                    st.write(f"Final XGBoost MAPE: {results['XGBoost']['MAPE']}")
+
                 except Exception as e:
                     st.warning(f"XGBoost Model failed: {e}")
-                    return None
+                return None
 
                 # AutoML Model with Rolling Features, Log Transformation, and Feature Importance
                 st.write("Training AutoML Model...")
