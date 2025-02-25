@@ -476,13 +476,13 @@ def main():
                     }
                 except Exception as e:
                     st.warning(f"XGBoost Model failed: {e}")
-                    return None
 
 
-                # AutoML Model with Rolling Features, Log Transformation, and Feature Importance
                 st.write("Training AutoML Model...")
+                #start_time = time.time()  # Start timing
+                
                 try:
-                    # Determine the maximum number of lags based on the dataset size
+                    # Step 1: Feature Engineering
                     max_lag = min(12, len(train) - 1)  # Limit maximum lags to avoid excessive feature loss
                     automl_data = train.copy()
                     st.write(f"Lags: {max_lag}")
@@ -511,73 +511,83 @@ def main():
                     # Check for insufficient data
                     if len(x_train) <= 1:
                         st.error("Insufficient data to train AutoML. Please provide more samples.")
-                        automl_model = None  # Set automl_model to None if training is skipped
-                    else:
-                        # Dynamically choose evaluation method
-                        eval_method = "cv" if len(x_train) > 5 else "holdout"
+                        return None
 
-                        # Train AutoML Model
-                        automl_model = AutoML()
-                        automl_model.fit(
-                            X_train=x_train,
-                            y_train=y_train,
-                            task="regression",
-                            time_budget=300,  # Time budget for AutoML
-                            eval_method=eval_method,  # Dynamically chosen evaluation method
-                            estimator_list=["xgboost", "lgbm", "rf"]  # Focus on tree-based models
-                        )
-                        st.write(f"AutoML Training Completed: Best Estimator - {automl_model.best_estimator}")
+                    # Train AutoML Model
+                    automl_model = AutoML()
+                    automl_model.fit(
+                        X_train=x_train,
+                        y_train=y_train,
+                        task="regression",
+                        time_budget=300,  # Time budget for AutoML
+                        eval_method="cv" if len(x_train) > 5 else "holdout",  # Dynamically chosen evaluation method
+                        estimator_list=["xgboost", "lgbm", "rf"]  # Focus on tree-based models
+                    )
+                    st.write(f"AutoML Training Completed: Best Estimator - {automl_model.best_estimator}")
 
-                        # Feature Importance (if XGBoost is the best estimator)
-                        if automl_model.best_estimator == "xgboost":
-                            xgb_model = automl_model.best_model_for_estimator("xgboost")
-                            importance = pd.DataFrame({
-                                "Feature": x_train.columns,
-                                "Importance": xgb_model.feature_importances_
-                            }).sort_values(by="Importance", ascending=False)
-                            st.write("Feature Importance:")
-                            st.dataframe(importance)
-
-                        # Generate future forecasts using the trained AutoML model
-                        st.write("Generating forecasts with AutoML...")
-                        test_lags = {f"lag_{lag}": [train["y"].iloc[-lag]] for lag in range(1, max_lag + 1)}
-                        test_lags["rolling_mean_3"] = train["y"].rolling(window=3).mean().iloc[-1]
-                        test_lags["rolling_std_3"] = train["y"].rolling(window=3).std().iloc[-1]
-                        test_lags["sin_month"] = np.sin(2 * np.pi * train["ds"].iloc[-1].month / 12)
-                        test_lags["cos_month"] = np.cos(2 * np.pi * train["ds"].iloc[-1].month / 12)
-                        future_df = pd.DataFrame(test_lags)  # Start with lag features
-
-                        automl_forecast = []
-                        for _ in range(forecast_period):
-                            next_forecast_log = automl_model.predict(future_df)[0]  # Predict log-transformed target
-                            next_forecast = np.expm1(next_forecast_log)  # Reverse log transformation
-                            automl_forecast.append(next_forecast)
-
-                            # Update future lagged features
-                            for lag in range(max_lag, 1, -1):
-                                future_df[f"lag_{lag}"] = future_df[f"lag_{lag - 1}"]
-                            future_df["lag_1"] = next_forecast
-
-                            # Update rolling statistics
-                            future_df["rolling_mean_3"] = np.mean(automl_forecast[-3:])
-                            future_df["rolling_std_3"] = np.std(automl_forecast[-3:])
-
-                        # Save AutoML results
-                        automl_rmse = mean_squared_error(test["y"], automl_forecast[:len(test)], squared=False)
-                        automl_mape = mean_absolute_percentage_error(test["y"], automl_forecast[:len(test)])
-                        results["AutoML"] = {
-                            "RMSE": automl_rmse,
-                            "MAPE": automl_mape,
-                            "Forecast": pd.DataFrame({
-                                "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
-                                "yhat": automl_forecast
-                            })
+                    # Generate future forecasts using the trained AutoML model
+                    st.write("Generating forecasts with AutoML...")
+                    future_features = []
+                    for i in range(forecast_period):
+                        future_row = {
+                            f"lag_{lag}": train["y"].iloc[-lag] if lag <= len(train) else np.nan
+                            for lag in range(1, max_lag + 1)
                         }
-                        st.write(f"AutoML RMSE: {automl_rmse}")
-                        st.write(f"AutoML MAPE: {automl_mape}")
+                        future_row["rolling_mean_3"] = train["y"].rolling(window=min(3, len(train))).mean().iloc[-1] if len(train) > 1 else np.nan
+                        future_row["sin_month"] = np.sin(2 * np.pi * (train["ds"].iloc[-1].month + i + 1) / 12)
+                        future_row["cos_month"] = np.cos(2 * np.pi * (train["ds"].iloc[-1].month + i + 1) / 12)
+                        future_features.append(future_row)
 
+                    future_df = pd.DataFrame(future_features)
+                    future_df.fillna(method="ffill", inplace=True)  # Forward fill missing values
+                    automl_forecast_log = automl_model.predict(future_df)
+                    automl_forecast = np.expm1(automl_forecast_log)  # Reverse log transformation
+
+                    # Ensure test['y'] length matches automl_forecast
+                    matching_length = min(len(test["y"]), len(automl_forecast))
+                    test_y_trimmed = test["y"].iloc[:matching_length]
+                    automl_forecast_trimmed = automl_forecast[:matching_length]
+
+                    # Calculate RMSE and MAPE with matched lengths
+                    rmse = mean_squared_error(test_y_trimmed, automl_forecast_trimmed) ** 0.5  # RMSE = sqrt(MSE)
+                    mape = mean_absolute_percentage_error(test_y_trimmed, automl_forecast_trimmed)
+
+                    # Measure execution time
+                    end_time = time.time()
+                    elapsed_time = end_time - start_time
+                    st.write(f"AutoML Model Training Time: {elapsed_time:.2f} seconds")
+
+                    # Save Results
+                    forecast_df = pd.DataFrame({
+                        "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
+                        "yhat": automl_forecast
+                    })
+
+                    highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
+                    lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
+
+                    summary_text = (
+                        f"### Key Insights\n"
+                        f"- **Projected Growth:** Sales are expected to {'increase' if automl_forecast[-1] > test['y'].iloc[-1] else 'decrease'} "
+                        f"by {abs((automl_forecast[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100:.2f}% in the next period.\n"
+                        f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
+                        f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
+                        f"- **Performance Metrics:**\n"
+                        f"  - RMSE: {rmse:.2f}\n"
+                        f"  - MAPE: {mape:.2f}\n"
+                    )
+
+                    with st.expander("📊 AutoML Model Summary"):
+                        st.markdown(summary_text)
+
+                    return {
+                        "RMSE": rmse,
+                        "MAPE": mape,
+                        "Forecast": forecast_df
+                    }
                 except Exception as e:
                     st.warning(f"AutoML Model failed: {e}")
+                    return None
 
                 # Check if AutoML training occurred successfully
                 if automl_model is None:
