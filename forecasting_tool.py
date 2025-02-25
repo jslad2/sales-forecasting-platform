@@ -479,7 +479,7 @@ def main():
                     st.warning(f"XGBoost Model failed: {e}")
 
 
-                st.write("Training AutoML Model...")               
+                st.write("Training AutoML Model...")
                 try:
                     # Step 1: Feature Engineering
                     max_lag = min(12, len(train) - 1)  # Limit maximum lags to avoid excessive feature loss
@@ -500,6 +500,9 @@ def main():
                     automl_data["cos_month"] = np.cos(2 * np.pi * automl_data["ds"].dt.month / 12)
 
                     # Apply log transformation to stabilize variance
+                    if (automl_data["y"] < 0).any():
+                        st.warning("Negative values detected in target variable. Skipping AutoML.")
+                        return None
                     automl_data["y_log"] = np.log1p(automl_data["y"])  # log1p to handle zero values
                     automl_data.dropna(inplace=True)  # Drop rows with NA values after feature engineering
 
@@ -508,8 +511,13 @@ def main():
                     y_train = automl_data["y_log"]  # Use log-transformed target
 
                     # Check for insufficient data
-                    if len(x_train) <= 1:
-                        st.error("Insufficient data to train AutoML. Please provide more samples.")
+                    if len(x_train) <= 5:
+                        st.warning("Insufficient data to train AutoML. Skipping AutoML.")
+                        return None
+
+                    # Check for invalid data
+                    if x_train.isnull().any().any() or np.isinf(x_train).any().any():
+                        st.warning("Invalid data detected in feature matrix. Skipping AutoML.")
                         return None
 
                     # Train AutoML Model
@@ -518,7 +526,7 @@ def main():
                         X_train=x_train,
                         y_train=y_train,
                         task="regression",
-                        time_budget=300,  # Time budget for AutoML
+                        time_budget=600,  # Increase time budget to 600 seconds
                         eval_method="cv" if len(x_train) > 5 else "holdout",  # Dynamically chosen evaluation method
                         estimator_list=["xgboost", "lgbm", "rf"]  # Focus on tree-based models
                     )
@@ -580,7 +588,7 @@ def main():
                         "Forecast": forecast_df
                     }
                 except Exception as e:
-                    st.warning(f"AutoML Model failed: {e}")
+                    st.error(f"AutoML failed: {e}")
                     return None
 
                 # Check if AutoML training occurred successfully
