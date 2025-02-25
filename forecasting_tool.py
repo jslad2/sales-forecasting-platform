@@ -520,8 +520,15 @@ def main():
                         st.warning("Invalid data detected in feature matrix. Skipping AutoML.")
                         return None
 
-                    # Train AutoML Model
+                    # Debug: Print shapes of x_train and y_train
+                    st.write(f"x_train shape: {x_train.shape}")
+                    st.write(f"y_train shape: {y_train.shape}")
+
+                    # Initialize AutoML model
                     automl_model = AutoML()
+                    st.write("AutoML model initialized successfully.")
+
+                    # Train AutoML Model
                     automl_model.fit(
                         X_train=x_train,
                         y_train=y_train,
