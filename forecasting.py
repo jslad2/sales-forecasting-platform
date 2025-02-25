@@ -7,7 +7,7 @@ import streamlit as st
 from forecasting_tool import main
 
 # Enable Wide Mode
-st.set_page_config(layout="wide")
+#st.set_page_config(layout="wide")
 
 # Apply SynovaAI Website Styles
 def apply_synova_styles():
