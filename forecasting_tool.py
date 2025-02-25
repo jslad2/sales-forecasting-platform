@@ -20,6 +20,7 @@ from sklearn.feature_selection import RFE
 from xgboost import XGBRegressor
 from sklearn.model_selection import train_test_split, TimeSeriesSplit
 import plotly.graph_objects as go
+import time
 
 # Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
 st.set_page_config(layout="wide")
@@ -479,7 +480,7 @@ def main():
 
 
                 st.write("Training AutoML Model...")
-                #start_time = time.time()  # Start timing
+                start_time = time.time()  # Start timing
                 
                 try:
                     # Step 1: Feature Engineering
