@@ -446,14 +446,19 @@ def main():
                     highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
                     lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
 
+                    # Calculate RMSE and MAPE
+                    rmse = mean_squared_error(test['y'].iloc[:len(xgb_forecast)], xgb_forecast, squared=False)
+                    mape = mean_absolute_percentage_error(test['y'], xgb_forecast[:len(test)])
+
+
                     summary_text = (
                         f"### Key Insights\n"
-                        f"- **Projected Growth:** Sales are expected to {'increase' if forecast_df['yhat'].iloc[-1] > test['y'].iloc[-1] else 'decrease'} by {abs(((forecast_df['yhat'].iloc[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100):.2f}% in the next period.\n"
+                        f"- **Projected Growth:** Sales are expected to {'increase' if forecast_df['yhat'].iloc[-1] > test['y'].iloc[-1] else 'decrease'} by {abs((forecast_df['yhat'].iloc[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100:.2f}% in the next period.\n"
                         f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
                         f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
                         f"- **Performance Metrics:**\n"
-                        f"  - RMSE: {mean_squared_error(test['y'], xgb_forecast[:len(test)], squared=False):.2f}\n"
-                        f"  - MAPE: {mean_absolute_percentage_error(test['y'], xgb_forecast[:len(test)]):.2f}\n"
+                        f"  - RMSE: {rmse:.2f}\n"
+                        f"  - MAPE: {mape:.2f}\n"
                     )
 
                     with st.expander("📊 XGBoost Model Summary"):
@@ -474,11 +479,11 @@ def main():
                     st.plotly_chart(fig, use_container_width=True)
 
                     return {
-                        "RMSE": mean_squared_error(test['y'].iloc[:len(xgb_forecast)], xgb_forecast) ** 0.5,
-                        "MAPE": mean_absolute_percentage_error(test['y'], xgb_forecast[:len(test)]),
+                        "RMSE": rmse,
+                        "MAPE": mape,
                         "Forecast": forecast_df
                     }
-                
+
                 except Exception as e:
                     st.warning(f"XGBoost Model failed: {e}")
                     return None
