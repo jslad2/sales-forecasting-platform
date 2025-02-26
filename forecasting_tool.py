@@ -693,6 +693,26 @@ import time
 
 # if __name__ == "__main__":
 #     main()
+import flaml
+import sys
+
+
+
+def main(): 
+    st.title("🔍 AutoML Debugging Test")
+    st.write(f"🔍 FLAML Version: {flaml.__version__}")
+    st.write(f"🔍 Python Executable: {sys.executable}")
+    st.write(f"🔍 AutoML Fit Method: {getattr(AutoML, 'fit', None)}")
+    st.write(f"🔍 AutoML Instance Fit Method: {getattr(AutoML(), 'fit', None)}")
+
+    # Create dummy data
+    x_train = pd.DataFrame(np.random.rand(12, 16), columns=[f"feature_{i}" for i in range(16)])
+    y_train = pd.Series(np.random.rand(12), name="target")
+
+    st.subheader("Training Data Preview")
+    st.dataframe(x_train)
+    st.dataframe(y_train)
+
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -733,3 +753,9 @@ if st.button("🚀 Train AutoML"):
 
     except Exception as e:
         st.error(f"❌ AutoML failed: {e}")
+
+
+if __name__ == "__main__":
+    main()
+
+
