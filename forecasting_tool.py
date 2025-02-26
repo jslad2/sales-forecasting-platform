@@ -695,7 +695,6 @@ import time
 #     main()
 
 
-
 def main(): 
     st.title("🔍 AutoML Debugging Test")
 
