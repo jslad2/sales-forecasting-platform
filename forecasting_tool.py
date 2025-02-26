@@ -693,73 +693,43 @@ import time
 
 # if __name__ == "__main__":
 #     main()
-import flaml
-import sys
+import pandas as pd
+import numpy as np
+import streamlit as st
+from flaml import AutoML
 
+st.title("🔍 AutoML Debugging Test")
 
+# ✅ Generate Simple Training Data
+x_train = pd.DataFrame(np.random.rand(12, 16), columns=[f"feature_{i}" for i in range(16)])
+y_train = pd.Series(np.random.rand(12), name="target")
 
-def main(): 
-    st.title("🔍 AutoML Debugging Test")
-    st.write(f"🔍 FLAML Version: {flaml.__version__}")
-    st.write(f"🔍 Python Executable: {sys.executable}")
-    st.write(f"🔍 AutoML Fit Method: {getattr(AutoML, 'fit', None)}")
-    st.write(f"🔍 AutoML Instance Fit Method: {getattr(AutoML(), 'fit', None)}")
+st.subheader("Training Data Preview")
+st.dataframe(x_train)
+st.dataframe(y_train)
 
-    # Create dummy data
-    x_train = pd.DataFrame(np.random.rand(12, 16), columns=[f"feature_{i}" for i in range(16)])
-    y_train = pd.Series(np.random.rand(12), name="target")
+# ✅ Initialize AutoML
+automl_model = AutoML()
+st.write(f"🔍 AutoML Instance Type: {type(automl_model)}")
 
-    st.subheader("Training Data Preview")
-    st.dataframe(x_train)
-    st.dataframe(y_train)
+# 🚀 Button to Start Training
+if st.button("🚀 Train AutoML"):
+    try:
+        st.write("🔄 Training AutoML Model...")
+        st.write(f"🔍 AutoML Fit Method: {getattr(automl_model, 'fit', None)}")
 
-    # Initialize AutoML
-    automl_model = AutoML()
-
-    # Check AutoML Instance
-    st.write(f"🔍 AutoML Instance Type: {type(automl_model)}")
-    
-    if automl_model is None:
-        st.error("🚨 AutoML initialization failed! Check FLAML installation.")
-        return
-
-    if not hasattr(automl_model, "fit"):
-        st.error("🚨 Error: `fit` method not found in AutoML instance. Check FLAML installation.")
-        return
-
-    # Check dataset shape
-    st.write(f"📊 x_train shape: {x_train.shape}")
-    st.write(f"📊 y_train shape: {y_train.shape}")
-
-    if x_train.empty or y_train.empty:
-        st.error("🚨 Error: Training data is empty!")
-        return
-
-    # Train AutoML Model
-    if st.button("🚀 Train AutoML"):
-        try:
-            st.write("🔄 Training AutoML Model...")
-            st.write(f"🔍 AutoML fit method: {getattr(automl_model, 'fit', None)}")
-
-            # Explicitly check fit function before calling it
-            if not callable(getattr(automl_model, "fit", None)):
-                st.error("🚨 AutoML.fit() is not callable. FLAML might be broken.")
-                return
-            automl_model = AutoML()
+        # ✅ Explicit Check for Callable Fit Function
+        if not callable(getattr(automl_model, "fit", None)):
+            st.error("🚨 `AutoML.fit()` is not callable. FLAML might be broken.")
+        else:
             automl_model.fit(
                 X_train=x_train,
                 y_train=y_train,
                 task="regression",
-                time_budget=60
+                time_budget=10
             )
-
             st.success("✅ AutoML training completed successfully!")
             st.write(f"🏆 Best Estimator: {automl_model.best_estimator}")
 
-        except Exception as e:
-            st.error(f"❌ AutoML failed: {e}")
-
-if __name__ == "__main__":
-    main()
-
-
+    except Exception as e:
+        st.error(f"❌ AutoML failed: {e}")
