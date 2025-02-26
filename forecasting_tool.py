@@ -693,6 +693,10 @@ import time
 
 # if __name__ == "__main__":
 #     main()
+import flaml
+import sys
+st.write(f"🔍 FLAML Version: {flaml.__version__}")
+st.write(f"🔍 Python Executable: {sys.executable}")
 
 
 def main(): 
