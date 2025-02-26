@@ -708,13 +708,22 @@ def main():
     st.write(f"🔍 FLAML Version: {flaml.__version__}")
     st.write(f"🔍 Python Executable: {sys.executable}")
 
-    # ✅ Generate Simple Training Data
-    x_train = pd.DataFrame(np.random.rand(12, 16), columns=[f"feature_{i}" for i in range(16)])
-    y_train = pd.Series(np.random.rand(12), name="target")
+    # ✅ Generate More Training Data (At Least 20 Samples)
+    num_samples = 20  # Try increasing this from 12 to 20+
+    x_train = pd.DataFrame(np.random.rand(num_samples, 16), columns=[f"feature_{i}" for i in range(16)])
+    y_train = pd.Series(np.random.rand(num_samples), name="target")
 
     st.subheader("Training Data Preview")
     st.dataframe(x_train)
     st.dataframe(y_train)
+
+    # ✅ Check for NaNs or Inf
+    if x_train.isnull().sum().sum() > 0 or np.isinf(x_train).sum().sum() > 0:
+        st.error("🚨 x_train contains NaN or Inf values!")
+        return
+    if y_train.isnull().sum() > 0 or np.isinf(y_train).sum() > 0:
+        st.error("🚨 y_train contains NaN or Inf values!")
+        return
 
     # ✅ Initialize AutoML
     automl_model = AutoML()
@@ -729,24 +738,26 @@ def main():
             # ✅ Explicit Check for Callable Fit Function
             if not callable(getattr(automl_model, "fit", None)):
                 st.error("🚨 `AutoML.fit()` is not callable. FLAML might be broken.")
-            else:
-                st.write("✅ `AutoML.fit()` is callable. Training will start now.")
+                return
 
-                automl_model.fit(
-                    X_train=x_train,
-                    y_train=y_train,
-                    task="regression",
-                    time_budget=10
-                )
+            st.write("✅ `AutoML.fit()` is callable. Training will start now.")
 
-                st.success("✅ AutoML training completed successfully!")
-                st.write(f"🏆 Best Estimator: {automl_model.best_estimator}")
+            automl_model.fit(
+                X_train=x_train,
+                y_train=y_train,
+                task="regression",
+                time_budget=10,
+                eval_method="holdout",  # Force simple train-test split
+                estimator_list=["rf"]  # Only use Random Forest for debugging
+            )
+
+            st.success("✅ AutoML training completed successfully!")
+            st.write(f"🏆 Best Estimator: {automl_model.best_estimator}")
 
         except Exception as e:
             st.error(f"❌ AutoML failed: {e}")
 
 if __name__ == "__main__":
     main()
-
 
 
