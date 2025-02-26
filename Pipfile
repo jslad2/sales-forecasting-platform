@@ -15,7 +15,7 @@ matplotlib = "==3.7.1"  # Pinned to a stable version
 plotly = "==5.15.0"     # Pinned to a stable version
 statsmodels = "==0.14.0" # Pinned to a stable version
 optuna = "==3.2.0"      # Pinned to a stable version
-flaml = "==2.0.0"
+flaml = "==2.3.2"
 
 [dev-packages]
 

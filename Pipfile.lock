@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "59108e218f57d11efedcfbd79193d3646279239bfdbf9f1d0da130326ea3257b"
+            "sha256": "29ae479fa987b0153b285be2488a05f249c0a87c587c2d53dc95092f54cdf913"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -466,12 +466,12 @@
         },
         "flaml": {
             "hashes": [
-                "sha256:51c84342baf6aec07b0546a62dbd5b02813c3db3b190437fd6b35e6a2d0a22b6",
-                "sha256:593feca49748ae395c1576ce25666af1a69bd9f0dac57fdcb92a1c6e8693ebed"
+                "sha256:1ee6e8e76bf1d741b4da41e2a2a8c0638b36d90b0f60aac323b5568f54dcb9e7",
+                "sha256:4a1ec289ddaec36850cfc66f6fb335b8521df49ea31f6adb54ea63a5cebb6865"
             ],
             "index": "pypi",
-            "markers": "python_version >= '3.6'",
-            "version": "==2.0.0"
+            "markers": "python_version >= '3.8'",
+            "version": "==2.3.2"
         },
         "fonttools": {
             "hashes": [
