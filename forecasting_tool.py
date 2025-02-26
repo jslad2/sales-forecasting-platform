@@ -702,6 +702,9 @@ def main():
     st.title("🔍 AutoML Debugging Test")
     st.write(f"🔍 FLAML Version: {flaml.__version__}")
     st.write(f"🔍 Python Executable: {sys.executable}")
+    st.write(f"🔍 AutoML Fit Method: {getattr(AutoML, 'fit', None)}")
+    st.write(f"🔍 AutoML Instance Fit Method: {getattr(AutoML(), 'fit', None)}")
+
     # Create dummy data
     x_train = pd.DataFrame(np.random.rand(12, 16), columns=[f"feature_{i}" for i in range(16)])
     y_train = pd.Series(np.random.rand(12), name="target")
