@@ -738,7 +738,7 @@ def main():
             if not callable(getattr(automl_model, "fit", None)):
                 st.error("🚨 AutoML.fit() is not callable. FLAML might be broken.")
                 return
-
+            automl_model = AutoML()
             automl_model.fit(
                 X_train=x_train,
                 y_train=y_train,
