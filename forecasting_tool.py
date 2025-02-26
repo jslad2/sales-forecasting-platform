@@ -710,8 +710,9 @@ def main():
     # Initialize AutoML
     automl_model = AutoML()
 
-    # Check if AutoML initialized
+    # Check AutoML Instance
     st.write(f"🔍 AutoML Instance Type: {type(automl_model)}")
+    
     if automl_model is None:
         st.error("🚨 AutoML initialization failed! Check FLAML installation.")
         return
@@ -733,6 +734,11 @@ def main():
         try:
             st.write("🔄 Training AutoML Model...")
 
+            # Explicitly check fit function before calling it
+            if not callable(getattr(automl_model, "fit", None)):
+                st.error("🚨 AutoML.fit() is not callable. FLAML might be broken.")
+                return
+
             automl_model.fit(
                 X_train=x_train,
                 y_train=y_train,
@@ -748,4 +754,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
