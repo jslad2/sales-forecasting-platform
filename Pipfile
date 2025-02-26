@@ -10,12 +10,11 @@ numpy = "==1.24.3"       # Updated for FLAML compatibility
 prophet = "==1.1.4"      # Pinned to a stable version
 pmdarima = "==2.0.3"     # Pinned to a stable version
 xgboost = "==2.0.3"      # Updated for better FLAML support
-scikit-learn = "==1.4.1" # Updated for FLAML 2.3.2 compatibility
+scikit-learn = "==1.3.2" # Updated for FLAML 2.3.2 compatibility
 matplotlib = "==3.7.1"   # Pinned to a stable version
 plotly = "==5.15.0"      # Pinned to a stable version
 statsmodels = "==0.14.0" # Pinned to a stable version
 optuna = "==3.4.0"       # Updated for FLAML's tuning compatibility
-flaml = "==2.3.2"        # Ensures correct FLAML version for Streamlit use
 
 [dev-packages]
 
