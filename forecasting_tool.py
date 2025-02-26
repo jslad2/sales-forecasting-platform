@@ -732,6 +732,7 @@ def main():
     if st.button("🚀 Train AutoML"):
         try:
             st.write("🔄 Training AutoML Model...")
+            st.write(f"🔍 AutoML fit method: {getattr(automl_model, 'fit', None)}")
 
             # Explicitly check fit function before calling it
             if not callable(getattr(automl_model, "fit", None)):
