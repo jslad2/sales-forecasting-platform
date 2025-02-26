@@ -612,12 +612,6 @@ def main():
                     st.error(f"❌ AutoML Failed: {e}")
                     return None
 
-                Check if AutoML training occurred successfully
-                if automl_model is None:
-                    st.warning("AutoML was not trained due to insufficient data.")
-                else:
-                    st.success("AutoML training and forecasting completed successfully!")
-
                 # Model Performance Table
                 st.subheader("Model Performance Comparison")
                 comparison = pd.DataFrame([
