@@ -710,6 +710,8 @@ def main():
     # Initialize AutoML model
     automl_model = AutoML()
 
+    st.write(f"AutoML Model Type: {type(automl_model)}")  # Should print <class 'flaml.automl.autolml.AutoML'>
+
     # Train AutoML Model
     if st.button("Train AutoML"):
         try:
