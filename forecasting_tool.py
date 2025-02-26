@@ -693,30 +693,20 @@ import time
 
 # if __name__ == "__main__":
 #     main()
-import flaml
+
+import pandas as pd
+import numpy as np
+import streamlit as st
 import sys
-
-
+import flaml
+from flaml import AutoML
 
 def main(): 
     st.title("🔍 AutoML Debugging Test")
+    
+    # ✅ Debugging Information
     st.write(f"🔍 FLAML Version: {flaml.__version__}")
     st.write(f"🔍 Python Executable: {sys.executable}")
-    
-    # Create dummy data
-    x_train = pd.DataFrame(np.random.rand(12, 16), columns=[f"feature_{i}" for i in range(16)])
-    y_train = pd.Series(np.random.rand(12), name="target")
-
-    st.subheader("Training Data Preview")
-    st.dataframe(x_train)
-    st.dataframe(y_train)
-
-    import pandas as pd
-    import numpy as np
-    import streamlit as st
-    from flaml import AutoML
-
-    st.title("🔍 AutoML Debugging Test")
 
     # ✅ Generate Simple Training Data
     x_train = pd.DataFrame(np.random.rand(12, 16), columns=[f"feature_{i}" for i in range(16)])
@@ -740,12 +730,15 @@ def main():
             if not callable(getattr(automl_model, "fit", None)):
                 st.error("🚨 `AutoML.fit()` is not callable. FLAML might be broken.")
             else:
+                st.write("✅ `AutoML.fit()` is callable. Training will start now.")
+
                 automl_model.fit(
                     X_train=x_train,
                     y_train=y_train,
                     task="regression",
                     time_budget=10
                 )
+
                 st.success("✅ AutoML training completed successfully!")
                 st.write(f"🏆 Best Estimator: {automl_model.best_estimator}")
 
@@ -754,5 +747,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
