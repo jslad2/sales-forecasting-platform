@@ -693,37 +693,54 @@ import time
 
 # if __name__ == "__main__":
 #     main()
-def main():
-# Title
+
+
+def main(): 
+    # Title
     st.title("AutoML Minimal Test")
 
     # Create dummy data
-    x_train = pd.DataFrame(np.random.rand(12, 16))  # 12 samples, 16 features
-    y_train = pd.Series(np.random.rand(12))        # 12 target values
+    x_train = pd.DataFrame(np.random.rand(12, 16), columns=[f"feature_{i}" for i in range(16)])  # 12 samples, 16 features
+    y_train = pd.Series(np.random.rand(12), name="target")  # 12 target values
 
     # Display data
+    st.subheader("Training Data Preview")
     st.write("x_train:")
-    st.write(x_train)
+    st.dataframe(x_train)
     st.write("y_train:")
-    st.write(y_train)
+    st.dataframe(y_train)
 
     # Initialize AutoML model
     automl_model = AutoML()
 
-    st.write(f"AutoML Model Type: {type(automl_model)}")  # Should print <class 'flaml.automl.autolml.AutoML'>
+    # Debugging: Check AutoML model type
+    st.write(f"🔍 AutoML Model Type: {type(automl_model)}")  # Expected: <class 'flaml.automl.autolml.AutoML'>
+
+    # Check if dataset is correctly formatted
+    st.write(f"📊 x_train shape: {x_train.shape}")
+    st.write(f"📊 y_train shape: {y_train.shape}")
+
+    if x_train.empty or y_train.empty:
+        st.error("🚨 Error: Training data is empty! Please check data generation.")
 
     # Train AutoML Model
     if st.button("Train AutoML"):
         try:
+            st.write("🚀 Training AutoML Model...")
+
             automl_model.fit(
                 X_train=x_train,
                 y_train=y_train,
                 task="regression",
-                time_budget=60  # 60 seconds for training
+                time_budget=60,  # 60 seconds for training
+                eval_method="cv"  # Cross-validation
             )
-            st.success("AutoML training completed successfully!")
+
+            st.success("✅ AutoML training completed successfully!")
+            st.write(f"🏆 Best Estimator: {automl_model.best_estimator}")
+
         except Exception as e:
-            st.error(f"AutoML failed: {e}")
+            st.error(f"❌ AutoML failed: {e}")
 
 if __name__ == "__main__":
-     main()
+    main()
