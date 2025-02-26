@@ -695,45 +695,49 @@ import time
 #     main()
 
 
+
 def main(): 
-    # Title
-    st.title("AutoML Minimal Test")
+    st.title("🔍 AutoML Debugging Test")
 
     # Create dummy data
-    x_train = pd.DataFrame(np.random.rand(12, 16), columns=[f"feature_{i}" for i in range(16)])  # 12 samples, 16 features
-    y_train = pd.Series(np.random.rand(12), name="target")  # 12 target values
+    x_train = pd.DataFrame(np.random.rand(12, 16), columns=[f"feature_{i}" for i in range(16)])
+    y_train = pd.Series(np.random.rand(12), name="target")
 
-    # Display data
     st.subheader("Training Data Preview")
-    st.write("x_train:")
     st.dataframe(x_train)
-    st.write("y_train:")
     st.dataframe(y_train)
 
-    # Initialize AutoML model
+    # Initialize AutoML
     automl_model = AutoML()
 
-    # Debugging: Check AutoML model type
-    st.write(f"🔍 AutoML Model Type: {type(automl_model)}")  # Expected: <class 'flaml.automl.autolml.AutoML'>
+    # Check if AutoML initialized
+    st.write(f"🔍 AutoML Instance Type: {type(automl_model)}")
+    if automl_model is None:
+        st.error("🚨 AutoML initialization failed! Check FLAML installation.")
+        return
 
-    # Check if dataset is correctly formatted
+    if not hasattr(automl_model, "fit"):
+        st.error("🚨 Error: `fit` method not found in AutoML instance. Check FLAML installation.")
+        return
+
+    # Check dataset shape
     st.write(f"📊 x_train shape: {x_train.shape}")
     st.write(f"📊 y_train shape: {y_train.shape}")
 
     if x_train.empty or y_train.empty:
-        st.error("🚨 Error: Training data is empty! Please check data generation.")
+        st.error("🚨 Error: Training data is empty!")
+        return
 
     # Train AutoML Model
-    if st.button("Train AutoML"):
+    if st.button("🚀 Train AutoML"):
         try:
-            st.write("🚀 Training AutoML Model...")
+            st.write("🔄 Training AutoML Model...")
 
             automl_model.fit(
                 X_train=x_train,
                 y_train=y_train,
                 task="regression",
-                time_budget=60,  # 60 seconds for training
-                eval_method="cv"  # Cross-validation
+                time_budget=60
             )
 
             st.success("✅ AutoML training completed successfully!")
@@ -744,3 +748,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
