@@ -702,9 +702,7 @@ def main():
     st.title("🔍 AutoML Debugging Test")
     st.write(f"🔍 FLAML Version: {flaml.__version__}")
     st.write(f"🔍 Python Executable: {sys.executable}")
-    st.write(f"🔍 AutoML Fit Method: {getattr(AutoML, 'fit', None)}")
-    st.write(f"🔍 AutoML Instance Fit Method: {getattr(AutoML(), 'fit', None)}")
-
+    
     # Create dummy data
     x_train = pd.DataFrame(np.random.rand(12, 16), columns=[f"feature_{i}" for i in range(16)])
     y_train = pd.Series(np.random.rand(12), name="target")
@@ -713,47 +711,46 @@ def main():
     st.dataframe(x_train)
     st.dataframe(y_train)
 
-import pandas as pd
-import numpy as np
-import streamlit as st
-from flaml import AutoML
+    import pandas as pd
+    import numpy as np
+    import streamlit as st
+    from flaml import AutoML
 
-st.title("🔍 AutoML Debugging Test")
+    st.title("🔍 AutoML Debugging Test")
 
-# ✅ Generate Simple Training Data
-x_train = pd.DataFrame(np.random.rand(12, 16), columns=[f"feature_{i}" for i in range(16)])
-y_train = pd.Series(np.random.rand(12), name="target")
+    # ✅ Generate Simple Training Data
+    x_train = pd.DataFrame(np.random.rand(12, 16), columns=[f"feature_{i}" for i in range(16)])
+    y_train = pd.Series(np.random.rand(12), name="target")
 
-st.subheader("Training Data Preview")
-st.dataframe(x_train)
-st.dataframe(y_train)
+    st.subheader("Training Data Preview")
+    st.dataframe(x_train)
+    st.dataframe(y_train)
 
-# ✅ Initialize AutoML
-automl_model = AutoML()
-st.write(f"🔍 AutoML Instance Type: {type(automl_model)}")
+    # ✅ Initialize AutoML
+    automl_model = AutoML()
+    st.write(f"🔍 AutoML Instance Type: {type(automl_model)}")
 
-# 🚀 Button to Start Training
-if st.button("🚀 Train AutoML"):
-    try:
-        st.write("🔄 Training AutoML Model...")
-        st.write(f"🔍 AutoML Fit Method: {getattr(automl_model, 'fit', None)}")
+    # 🚀 Button to Start Training
+    if st.button("🚀 Train AutoML"):
+        try:
+            st.write("🔄 Training AutoML Model...")
+            st.write(f"🔍 AutoML Fit Method: {getattr(automl_model, 'fit', None)}")
 
-        # ✅ Explicit Check for Callable Fit Function
-        if not callable(getattr(automl_model, "fit", None)):
-            st.error("🚨 `AutoML.fit()` is not callable. FLAML might be broken.")
-        else:
-            automl_model.fit(
-                X_train=x_train,
-                y_train=y_train,
-                task="regression",
-                time_budget=10
-            )
-            st.success("✅ AutoML training completed successfully!")
-            st.write(f"🏆 Best Estimator: {automl_model.best_estimator}")
+            # ✅ Explicit Check for Callable Fit Function
+            if not callable(getattr(automl_model, "fit", None)):
+                st.error("🚨 `AutoML.fit()` is not callable. FLAML might be broken.")
+            else:
+                automl_model.fit(
+                    X_train=x_train,
+                    y_train=y_train,
+                    task="regression",
+                    time_budget=10
+                )
+                st.success("✅ AutoML training completed successfully!")
+                st.write(f"🏆 Best Estimator: {automl_model.best_estimator}")
 
-    except Exception as e:
-        st.error(f"❌ AutoML failed: {e}")
-
+        except Exception as e:
+            st.error(f"❌ AutoML failed: {e}")
 
 if __name__ == "__main__":
     main()
