@@ -695,13 +695,13 @@ import time
 #     main()
 import flaml
 import sys
-st.write(f"🔍 FLAML Version: {flaml.__version__}")
-st.write(f"🔍 Python Executable: {sys.executable}")
+
 
 
 def main(): 
     st.title("🔍 AutoML Debugging Test")
-
+    st.write(f"🔍 FLAML Version: {flaml.__version__}")
+    st.write(f"🔍 Python Executable: {sys.executable}")
     # Create dummy data
     x_train = pd.DataFrame(np.random.rand(12, 16), columns=[f"feature_{i}" for i in range(16)])
     y_train = pd.Series(np.random.rand(12), name="target")
