@@ -478,6 +478,7 @@ def main():
                 except Exception as e:
                     st.warning(f"XGBoost Model failed: {e}")
 
+                st.write("✅ XGBoost Model Finished!")  # 🔍 Debugging check
 
                 st.write("🚀 Training AutoML Model...")
 
@@ -610,7 +611,7 @@ def main():
 
                 except Exception as e:
                     st.error(f"❌ AutoML Model failed: {e}")
-
+                return None
 
                 # Model Performance Table
                 # st.subheader("Model Performance Comparison")
