@@ -532,7 +532,7 @@ def main():
                         raise ValueError("Insufficient samples")
 
                     # ✅ Choose eval method dynamically
-                    eval_method = "cv" if len(x_train) > 20 else "holdout"
+                    eval_method = "cv" if len(x_train) > 5 else "holdout"
                     st.write(f"📊 Using Evaluation Method: {eval_method}")
 
                     # ✅ Initialize AutoML
@@ -549,7 +549,7 @@ def main():
                         X_train=x_train,
                         y_train=y_train,
                         task="regression",
-                        time_budget=300,  # Training time limit
+                        time_budget=30,  # Training time limit
                         eval_method=eval_method,
                         estimator_list=["xgboost",  "rf"]
                     )
