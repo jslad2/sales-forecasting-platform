@@ -551,7 +551,7 @@ def main():
                         task="regression",
                         time_budget=30,  # Training time limit
                         eval_method=eval_method,
-                        estimator_list=["xgboost",  "rf"]
+                        estimator_list=["xgboost", "lgbm", "rf"]
                     )
                     st.write(f"✅ AutoML Training Completed! Best Estimator: {automl_model.best_estimator}")
 
