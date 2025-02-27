@@ -613,78 +613,78 @@ def main():
             return None
 
                 # Model Performance Table
-                st.subheader("Model Performance Comparison")
-                comparison = pd.DataFrame([
-                    {"Model": model, "RMSE": result["RMSE"], "MAPE": result["MAPE"]}
-                    for model, result in results.items()
-                ])
-                st.dataframe(comparison)
+                # st.subheader("Model Performance Comparison")
+                # comparison = pd.DataFrame([
+                #     {"Model": model, "RMSE": result["RMSE"], "MAPE": result["MAPE"]}
+                #     for model, result in results.items()
+                # ])
+                # st.dataframe(comparison)
 
-                # Select Best Model Based on RMSE
-                best_model = comparison.loc[comparison["RMSE"].idxmin(), "Model"]
-                st.write(f"Best Model: {best_model}")
+                # # Select Best Model Based on RMSE
+                # best_model = comparison.loc[comparison["RMSE"].idxmin(), "Model"]
+                # st.write(f"Best Model: {best_model}")
 
-                # Ensure forecast data exists for the best model
-                if best_model in results and "Forecast" in results[best_model] and not results[best_model]["Forecast"].empty:
-                    forecast_data = results[best_model]["Forecast"]
-                else:
-                    forecast_data = None  # Handle missing forecast case
+                # # Ensure forecast data exists for the best model
+                # if best_model in results and "Forecast" in results[best_model] and not results[best_model]["Forecast"].empty:
+                #     forecast_data = results[best_model]["Forecast"]
+                # else:
+                #     forecast_data = None  # Handle missing forecast case
 
-                # Prepare Data for Comparison Chart
-                historical_data = train[["ds", "y"]].rename(columns={"y": "yhat"})
-                historical_data["Model"] = "Historical"
+                # # Prepare Data for Comparison Chart
+                # historical_data = train[["ds", "y"]].rename(columns={"y": "yhat"})
+                # historical_data["Model"] = "Historical"
 
-                # Define colors for different models
-                model_colors = {
-                    "Prophet": "blue",
-                    "ARIMA": "green",
-                    "XGBoost": "red",
-                    "AutoML": "purple"
-                }
+                # # Define colors for different models
+                # model_colors = {
+                #     "Prophet": "blue",
+                #     "ARIMA": "green",
+                #     "XGBoost": "red",
+                #     "AutoML": "purple"
+                # }
 
-                # Create Plotly Figure
-                fig = go.Figure()
+                # # Create Plotly Figure
+                # fig = go.Figure()
 
-                # Add Historical Data
-                fig.add_trace(go.Scatter(
-                    x=historical_data["ds"],
-                    y=historical_data["yhat"],
-                    mode="lines",
-                    name="Historical",
-                    line=dict(color="black", width=2)
-                ))
+                # # Add Historical Data
+                # fig.add_trace(go.Scatter(
+                #     x=historical_data["ds"],
+                #     y=historical_data["yhat"],
+                #     mode="lines",
+                #     name="Historical",
+                #     line=dict(color="black", width=2)
+                # ))
 
-                # Add Forecasts for Each Model (Only 12-month Forecast)
-                for model, result in results.items():
-                    if "Forecast" in result and result["Forecast"] is not None and not result["Forecast"].empty:
-                        forecast_df = result["Forecast"]
+                # # Add Forecasts for Each Model (Only 12-month Forecast)
+                # for model, result in results.items():
+                #     if "Forecast" in result and result["Forecast"] is not None and not result["Forecast"].empty:
+                #         forecast_df = result["Forecast"]
                         
-                        fig.add_trace(go.Scatter(
-                            x=forecast_df["ds"],
-                            y=forecast_df["yhat"],
-                            mode="lines",
-                            name=model,
-                            line=dict(width=2, color=model_colors.get(model, "gray"))
-                        ))
+                #         fig.add_trace(go.Scatter(
+                #             x=forecast_df["ds"],
+                #             y=forecast_df["yhat"],
+                #             mode="lines",
+                #             name=model,
+                #             line=dict(width=2, color=model_colors.get(model, "gray"))
+                #         ))
 
-                # Final Plot Formatting
-                fig.update_layout(
-                    title="Sales Forecast Comparison Across Models",
-                    xaxis_title="Date",
-                    yaxis_title="Sales",
-                    legend_title="Models",
-                    template="plotly_white"
-                )
+                # # Final Plot Formatting
+                # fig.update_layout(
+                #     title="Sales Forecast Comparison Across Models",
+                #     xaxis_title="Date",
+                #     yaxis_title="Sales",
+                #     legend_title="Models",
+                #     template="plotly_white"
+                # )
 
-                # Show the Chart
-                st.plotly_chart(fig, use_container_width=True)
+                # # Show the Chart
+                # st.plotly_chart(fig, use_container_width=True)
 
-                # Download Forecast
-                st.subheader("Download Forecast")
-                if forecast_data is not None:
-                    st.download_button("Download Forecast Data (CSV)", forecast_data.to_csv(index=False), "forecast.csv", "text/csv")
-                else:
-                    st.warning("No forecast data available for download.")
+                # # Download Forecast
+                # st.subheader("Download Forecast")
+                # if forecast_data is not None:
+                #     st.download_button("Download Forecast Data (CSV)", forecast_data.to_csv(index=False), "forecast.csv", "text/csv")
+                # else:
+                #     st.warning("No forecast data available for download.")
 
         except Exception as e:
             st.error(f"Error processing file: {e}")
