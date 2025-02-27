@@ -549,7 +549,7 @@ def main():
                         X_train=x_train,
                         y_train=y_train,
                         task="regression",
-                        time_budget=30,  # Training time limit
+                        time_budget=300,  # Training time limit
                         eval_method=eval_method,
                         estimator_list=["xgboost", "lgbm", "rf"]
                     )
