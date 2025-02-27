@@ -583,8 +583,7 @@ def main():
 
                 except Exception as e:
                     st.error(f"AutoML Model failed: {e}")
-
-                    return None
+                return None
 
                 # Model Performance Table
                 st.subheader("Model Performance Comparison")
