@@ -368,6 +368,116 @@ def main():
                 except Exception as e:
                     st.warning(f"ARIMA Model failed: {e}")
 
+
+                # XGBoost Model with Optimizations
+                st.write("Training XGBoost Model...")
+                try:
+                    # Step 1: Feature Engineering
+                    max_lag = 2  # Use only 2 lags
+                    rolling_windows = [3]  # Use only rolling mean with window 3
+                    xgb_data = train.copy()
+
+                    # Create lag features
+                    for lag in range(1, max_lag + 1):
+                        xgb_data[f"lag_{lag}"] = xgb_data["y"].shift(lag)
+
+                    # Add rolling statistics
+                    for window in rolling_windows:
+                        xgb_data[f"rolling_mean_{window}"] = xgb_data["y"].rolling(window=window).mean()
+
+                    # Add basic time-based features
+                    xgb_data["month"] = xgb_data["ds"].dt.month
+                    xgb_data["quarter"] = xgb_data["ds"].dt.quarter
+                    xgb_data["year"] = xgb_data["ds"].dt.year
+
+                    xgb_data.dropna(inplace=True)
+
+                    # Prepare training data
+                    x_train = xgb_data.drop(columns=["y", "ds"])
+                    y_train = xgb_data["y"]
+
+                    # Step 2: Train Final Model
+                    final_model = XGBRegressor(
+                        n_estimators=50,  # Reduced number of trees
+                        max_depth=3,       # Reduced depth
+                        learning_rate=0.2,  # Increased learning rate
+                        objective="reg:squarederror",
+                        random_state=42,
+                        n_jobs=-1  # Use all cores
+                    )
+                    final_model.fit(x_train, y_train)
+
+                    # Step 3: Forecast Future Values
+                    future_features = []
+                    for i in range(forecast_period):
+                        future_row = {
+                            f"lag_{lag}": train["y"].iloc[-lag] if lag <= len(train) else np.nan
+                            for lag in range(1, max_lag + 1)
+                        }
+                        future_row["rolling_mean_3"] = train["y"].rolling(window=min(3, len(train))).mean().iloc[-1] if len(train) > 1 else np.nan
+                        future_row["month"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).month
+                        future_row["quarter"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).quarter
+                        future_row["year"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).year
+                        future_features.append(future_row)
+
+                    future_df = pd.DataFrame(future_features)
+                    future_df.fillna(method="ffill", inplace=True)  # Forward fill missing values
+                    xgb_forecast = final_model.predict(future_df)
+
+                    # Ensure test['y'] length matches xgb_forecast
+                    matching_length = min(len(test["y"]), len(xgb_forecast))
+                    test_y_trimmed = test["y"].iloc[:matching_length]
+                    xgb_forecast_trimmed = xgb_forecast[:matching_length]
+
+                    # Calculate RMSE and MAPE with matched lengths
+                    rmse = mean_squared_error(test_y_trimmed, xgb_forecast_trimmed) ** 0.5  # RMSE = sqrt(MSE)
+                    mape = mean_absolute_percentage_error(test_y_trimmed, xgb_forecast_trimmed)
+
+                    # Save Results
+                    forecast_df = pd.DataFrame({
+                        "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
+                        "yhat": xgb_forecast
+                    })
+
+                    highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
+                    lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
+
+                    summary_text = (
+                        f"### Key Insights\n"
+                        f"- **Projected Growth:** Sales are expected to {'increase' if xgb_forecast[-1] > test['y'].iloc[-1] else 'decrease'} "
+                        f"by {abs((xgb_forecast[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100:.2f}% in the next period.\n"
+                        f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
+                        f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
+                        f"- **Performance Metrics:**\n"
+                        f"  - RMSE: {rmse:.2f}\n"
+                        f"  - MAPE: {mape:.2f}\n"
+                    )
+
+                    with st.expander("📊 XGBoost Model Summary"):
+                        st.markdown(summary_text)
+
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
+                    fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"], mode="lines", name="Forecast", line=dict(color="red", width=2)))
+
+                    fig.update_layout(
+                        title="XGBoost Forecast",
+                        xaxis_title="Date",
+                        yaxis_title="Sales",
+                        legend_title="Legend",
+                        template="plotly_white"
+                    )
+
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    results["XGBoost"] = {
+                        "RMSE": rmse,
+                        "MAPE": mape,
+                        "Forecast": forecast_df
+                    }
+                except Exception as e:
+                    st.warning(f"XGBoost Model failed: {e}")
+
                 st.write("🚀 Training AutoML Model...")
 
                 try:
@@ -499,115 +609,6 @@ def main():
 
                 except Exception as e:
                     st.error(f"❌ AutoML Model failed: {e}")
-                    
-                # XGBoost Model with Optimizations
-                st.write("Training XGBoost Model...")
-                try:
-                    # Step 1: Feature Engineering
-                    max_lag = 2  # Use only 2 lags
-                    rolling_windows = [3]  # Use only rolling mean with window 3
-                    xgb_data = train.copy()
-
-                    # Create lag features
-                    for lag in range(1, max_lag + 1):
-                        xgb_data[f"lag_{lag}"] = xgb_data["y"].shift(lag)
-
-                    # Add rolling statistics
-                    for window in rolling_windows:
-                        xgb_data[f"rolling_mean_{window}"] = xgb_data["y"].rolling(window=window).mean()
-
-                    # Add basic time-based features
-                    xgb_data["month"] = xgb_data["ds"].dt.month
-                    xgb_data["quarter"] = xgb_data["ds"].dt.quarter
-                    xgb_data["year"] = xgb_data["ds"].dt.year
-
-                    xgb_data.dropna(inplace=True)
-
-                    # Prepare training data
-                    x_train = xgb_data.drop(columns=["y", "ds"])
-                    y_train = xgb_data["y"]
-
-                    # Step 2: Train Final Model
-                    final_model = XGBRegressor(
-                        n_estimators=50,  # Reduced number of trees
-                        max_depth=3,       # Reduced depth
-                        learning_rate=0.2,  # Increased learning rate
-                        objective="reg:squarederror",
-                        random_state=42,
-                        n_jobs=-1  # Use all cores
-                    )
-                    final_model.fit(x_train, y_train)
-
-                    # Step 3: Forecast Future Values
-                    future_features = []
-                    for i in range(forecast_period):
-                        future_row = {
-                            f"lag_{lag}": train["y"].iloc[-lag] if lag <= len(train) else np.nan
-                            for lag in range(1, max_lag + 1)
-                        }
-                        future_row["rolling_mean_3"] = train["y"].rolling(window=min(3, len(train))).mean().iloc[-1] if len(train) > 1 else np.nan
-                        future_row["month"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).month
-                        future_row["quarter"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).quarter
-                        future_row["year"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).year
-                        future_features.append(future_row)
-
-                    future_df = pd.DataFrame(future_features)
-                    future_df.fillna(method="ffill", inplace=True)  # Forward fill missing values
-                    xgb_forecast = final_model.predict(future_df)
-
-                    # Ensure test['y'] length matches xgb_forecast
-                    matching_length = min(len(test["y"]), len(xgb_forecast))
-                    test_y_trimmed = test["y"].iloc[:matching_length]
-                    xgb_forecast_trimmed = xgb_forecast[:matching_length]
-
-                    # Calculate RMSE and MAPE with matched lengths
-                    rmse = mean_squared_error(test_y_trimmed, xgb_forecast_trimmed) ** 0.5  # RMSE = sqrt(MSE)
-                    mape = mean_absolute_percentage_error(test_y_trimmed, xgb_forecast_trimmed)
-
-                    # Save Results
-                    forecast_df = pd.DataFrame({
-                        "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
-                        "yhat": xgb_forecast
-                    })
-
-                    highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
-                    lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
-
-                    summary_text = (
-                        f"### Key Insights\n"
-                        f"- **Projected Growth:** Sales are expected to {'increase' if xgb_forecast[-1] > test['y'].iloc[-1] else 'decrease'} "
-                        f"by {abs((xgb_forecast[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100:.2f}% in the next period.\n"
-                        f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
-                        f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
-                        f"- **Performance Metrics:**\n"
-                        f"  - RMSE: {rmse:.2f}\n"
-                        f"  - MAPE: {mape:.2f}\n"
-                    )
-
-                    with st.expander("📊 XGBoost Model Summary"):
-                        st.markdown(summary_text)
-
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
-                    fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"], mode="lines", name="Forecast", line=dict(color="red", width=2)))
-
-                    fig.update_layout(
-                        title="XGBoost Forecast",
-                        xaxis_title="Date",
-                        yaxis_title="Sales",
-                        legend_title="Legend",
-                        template="plotly_white"
-                    )
-
-                    st.plotly_chart(fig, use_container_width=True)
-
-                    return {
-                        "RMSE": rmse,
-                        "MAPE": mape,
-                        "Forecast": forecast_df
-                    }
-                except Exception as e:
-                    st.warning(f"XGBoost Model failed: {e}")                
                 return None
 
                 # Model Performance Table
