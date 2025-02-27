@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "cde8f4a3360af19d49ea4ba5ae4f518096983a4864bd0a7bcfb12f1a0f382df8"
+            "sha256": "c792916df56b0c990eb2be1c17396909c339789bdd8694a3e0297648405ce157"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -806,6 +806,17 @@
             "index": "pypi",
             "markers": "python_version >= '3.8'",
             "version": "==1.4.7"
+        },
+        "lightgbm": {
+            "hashes": [
+                "sha256:02a40745c1972cf4a2cde764c7739228f45178c2237af2df40fde7063a58ac6a",
+                "sha256:044f65664c1a32c98cb619bafa97d8cd9d93c2c2d5053376aadfe509a3a3e7fa",
+                "sha256:10b8fbdcf851e4f68a1f02f38d99bdc44c7c7fb9b1a62dcf924a0d29ff73395c",
+                "sha256:843dd37c00a1096a8898b80e368b3eef7f5a5d327d1fd9eb770b6f3c2e1edc49",
+                "sha256:ef01e46939293a0a36729350a7384dc17a36880176d0f17d82b738bbe77e4528"
+            ],
+            "index": "pypi",
+            "version": "==3.3.5"
         },
         "lunarcalendar": {
             "hashes": [
@@ -1853,6 +1864,14 @@
             ],
             "markers": "python_version >= '3.9'",
             "version": "==6.0.0"
+        },
+        "wheel": {
+            "hashes": [
+                "sha256:661e1abd9198507b1409a20c02106d9670b2576e916d58f520316666abca6729",
+                "sha256:708e7481cc80179af0e556bbf0cc00b8444c7321e2700b8d8580231d13017248"
+            ],
+            "markers": "python_version >= '3.8'",
+            "version": "==0.45.1"
         },
         "xgboost": {
             "hashes": [
