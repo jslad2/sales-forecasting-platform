@@ -32,6 +32,7 @@ kiwisolver = "*"
 pyparsing = "*"
 fonttools = "*"
 pydeck = "*"
+lightgbm = "==3.3.5"  # Stable version compatible with FLAML
 
 [dev-packages]
 
