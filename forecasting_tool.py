@@ -479,137 +479,111 @@ def main():
                 #     st.warning(f"XGBoost Model failed: {e}")
 
 
-                st.write("🚀 Training AutoML Model...")
+                st.write("Training AutoML Model...")
                 try:
-                    # ✅ Step 1: Validate Data
-                    if train is None or test is None or train.empty or test.empty:
-                        st.error("🚨 Error: Train or test dataset is empty! AutoML will not run.")
-                        return None
-
-                    # ✅ Step 2: Feature Engineering
-                    max_lag = min(12, len(train) - 1)  # Limit maximum lags
+                    # Step 1: Feature Engineering
+                    max_lag = min(12, len(train) - 1)  # Limit max lags
                     automl_data = train.copy()
+                    st.write(f"Lags: {max_lag}")
 
-                    st.write(f"📊 Max Lags Used: {max_lag}")
-
-                    # 🔄 Add Lag Features
+                    # Add lag features
                     for lag in range(1, max_lag + 1):
                         automl_data[f"lag_{lag}"] = automl_data["y"].shift(lag)
 
-                    # 🔄 Add Rolling Statistics
+                    # Add rolling statistics (only if enough data exists)
                     if len(train) > max_lag + 3:
                         automl_data["rolling_mean_3"] = automl_data["y"].rolling(window=3).mean()
                         automl_data["rolling_std_3"] = automl_data["y"].rolling(window=3).std()
 
-                    # 🔄 Add Seasonal Features
+                    # Add seasonal features
                     automl_data["sin_month"] = np.sin(2 * np.pi * automl_data["ds"].dt.month / 12)
                     automl_data["cos_month"] = np.cos(2 * np.pi * automl_data["ds"].dt.month / 12)
 
-                    # 🚀 Apply Log Transformation
+                    # Apply log transformation to stabilize variance
                     if (automl_data["y"] < 0).any():
-                        st.warning("⚠️ Negative values detected in target variable. Skipping AutoML.")
-                        return None
+                        st.warning("Negative values detected in target variable. Skipping AutoML.")
+                        raise ValueError("Negative values in y")
 
-                    automl_data["y_log"] = np.log1p(automl_data["y"])  # log1p to handle zero values
-                    automl_data.dropna(inplace=True)  # Remove any NA values
+                    automl_data["y_log"] = np.log1p(automl_data["y"])  # Log transformation
+                    automl_data.dropna(inplace=True)  # Drop rows with NaN
 
-                    # ✅ Prepare Training Data
+                    # Prepare training data
                     x_train = automl_data.drop(columns=["y", "y_log", "ds"])
                     y_train = automl_data["y_log"]
 
-                    # 🚀 Data Validation Checks
-                    if len(x_train) < 5:
-                        st.warning("⚠️ Insufficient data to train AutoML. Skipping training.")
-                        return None
+                    # Debug: Check for NaNs or Inf values before training
+                    if x_train.isnull().any().any() or np.isinf(x_train).any().any():
+                        st.error("❌ NaN or Inf detected in x_train! Skipping AutoML.")
+                        raise ValueError("NaN/Inf in x_train")
+                    if y_train.isnull().any() or np.isinf(y_train).any():
+                        st.error("❌ NaN or Inf detected in y_train! Skipping AutoML.")
+                        raise ValueError("NaN/Inf in y_train")
 
-                    if x_train.isnull().values.any() or np.isinf(x_train).values.any():
-                        st.warning("⚠️ Invalid data detected in x_train. Skipping AutoML.")
-                        return None
-                    if y_train.isnull().values.any() or np.isinf(y_train).values.any():
-                        st.warning("⚠️ Invalid data detected in y_train. Skipping AutoML.")
-                        return None
+                    # Check for insufficient data
+                    if len(x_train) <= 1:
+                        st.error("Insufficient data to train AutoML. Please provide more samples.")
+                        raise ValueError("Insufficient samples")
 
-                    st.write(f"📊 x_train shape: {x_train.shape}")
-                    st.write(f"📊 y_train shape: {y_train.shape}")
+                    # Choose eval method dynamically
+                    eval_method = "cv" if len(x_train) > 5 else "holdout"
 
-                    # ✅ Initialize AutoML
+                    # Train AutoML
                     automl_model = AutoML()
-                    st.write("✅ AutoML Model Initialized")
-
-                    # ✅ AutoML Configuration
-                    st.write("🔧 AutoML Configuration:")
-                    st.write(f"- Task: regression")
-                    st.write(f"- Time Budget: 600 seconds")
-                    st.write(f"- Evaluation Method: {'cv' if len(x_train) > 5 else 'holdout'}")
-                    st.write(f"- Estimators: ['xgboost', 'lgbm', 'rf']")
-
-                    # ✅ Train AutoML Model
                     automl_model.fit(
                         X_train=x_train,
                         y_train=y_train,
                         task="regression",
-                        time_budget=600,
-                        eval_method="cv" if len(x_train) > 5 else "holdout",
+                        time_budget=300,  # Set training time limit
+                        eval_method=eval_method,
                         estimator_list=["xgboost", "lgbm", "rf"]
                     )
-                    st.success("✅ AutoML Training Completed!")
+                    st.write(f"AutoML Training Completed: Best Estimator - {automl_model.best_estimator}")
 
-                    # ✅ Generate Future Forecasts
-                    st.write("🔄 Generating Forecasts...")
-                    future_features = []
-                    for i in range(forecast_period):
-                        future_row = {
-                            f"lag_{lag}": train["y"].iloc[-lag] if lag <= len(train) else np.nan
-                            for lag in range(1, max_lag + 1)
-                        }
-                        future_row["rolling_mean_3"] = train["y"].rolling(window=min(3, len(train))).mean().iloc[-1] if len(train) > 1 else np.nan
-                        future_row["sin_month"] = np.sin(2 * np.pi * (train["ds"].iloc[-1].month + i + 1) / 12)
-                        future_row["cos_month"] = np.cos(2 * np.pi * (train["ds"].iloc[-1].month + i + 1) / 12)
-                        future_features.append(future_row)
+                    # Generate future forecasts
+                    st.write("Generating forecasts with AutoML...")
+                    test_lags = {f"lag_{lag}": [train["y"].iloc[-lag]] for lag in range(1, max_lag + 1)}
+                    test_lags["rolling_mean_3"] = train["y"].rolling(window=3).mean().iloc[-1]
+                    test_lags["rolling_std_3"] = train["y"].rolling(window=3).std().iloc[-1]
+                    test_lags["sin_month"] = np.sin(2 * np.pi * train["ds"].iloc[-1].month / 12)
+                    test_lags["cos_month"] = np.cos(2 * np.pi * train["ds"].iloc[-1].month / 12)
+                    future_df = pd.DataFrame(test_lags)
 
-                    future_df = pd.DataFrame(future_features).fillna(method="ffill")
+                    # Fill missing values
+                    future_df.fillna(method="ffill", inplace=True)
+                    future_df.fillna(0, inplace=True)
 
-                    # ✅ Predict Future Sales
-                    automl_forecast_log = automl_model.predict(future_df)
-                    automl_forecast = np.expm1(automl_forecast_log)  # Reverse log transformation
+                    automl_forecast = []
+                    for _ in range(forecast_period):
+                        next_forecast_log = automl_model.predict(future_df)[0]
+                        next_forecast = np.expm1(next_forecast_log)  # Reverse log transformation
+                        automl_forecast.append(next_forecast)
 
-                    # ✅ Ensure Test Data Matches Forecast Length
-                    matching_length = min(len(test["y"]), len(automl_forecast))
-                    test_y_trimmed = test["y"].iloc[:matching_length]
-                    automl_forecast_trimmed = automl_forecast[:matching_length]
+                        # Update future lagged features
+                        for lag in range(max_lag, 1, -1):
+                            future_df[f"lag_{lag}"] = future_df[f"lag_{lag - 1}"]
+                        future_df["lag_1"] = next_forecast
 
-                    # ✅ Calculate RMSE and MAPE
-                    rmse = mean_squared_error(test_y_trimmed, automl_forecast_trimmed) ** 0.5
-                    mape = mean_absolute_percentage_error(test_y_trimmed, automl_forecast_trimmed)
+                        # Update rolling statistics
+                        future_df["rolling_mean_3"] = np.mean(automl_forecast[-3:])
+                        future_df["rolling_std_3"] = np.std(automl_forecast[-3:])
 
-                    # ✅ Save Results
-                    forecast_df = pd.DataFrame({
-                        "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
-                        "yhat": automl_forecast
-                    })
-
-                    highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
-                    lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
-
-                    # ✅ Display Summary
-                    summary_text = (
-                        f"### Key Insights\n"
-                        f"- **Projected Growth:** Sales are expected to {'increase' if automl_forecast[-1] > test['y'].iloc[-1] else 'decrease'} "
-                        f"by {abs((automl_forecast[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100:.2f}% in the next period.\n"
-                        f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
-                        f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
-                        f"- **Performance Metrics:**\n"
-                        f"  - RMSE: {rmse:.2f}\n"
-                        f"  - MAPE: {mape:.2f}\n"
-                    )
-
-                    with st.expander("📊 AutoML Model Summary"):
-                        st.markdown(summary_text)
-
-                    return {"RMSE": rmse, "MAPE": mape, "Forecast": forecast_df}
+                    # Save AutoML results
+                    automl_rmse = mean_squared_error(test["y"], automl_forecast[:len(test)], squared=False)
+                    automl_mape = mean_absolute_percentage_error(test["y"], automl_forecast[:len(test)])
+                    results["AutoML"] = {
+                        "RMSE": automl_rmse,
+                        "MAPE": automl_mape,
+                        "Forecast": pd.DataFrame({
+                            "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
+                            "yhat": automl_forecast
+                        })
+                    }
+                    st.write(f"✅ AutoML RMSE: {automl_rmse}")
+                    st.write(f"✅ AutoML MAPE: {automl_mape}")
 
                 except Exception as e:
-                    st.error(f"❌ AutoML Failed: {e}")
+                    st.error(f"AutoML Model failed: {e}")
+
                     return None
 
                 # Model Performance Table
