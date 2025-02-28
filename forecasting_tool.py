@@ -490,12 +490,15 @@ def main():
                     for lag in range(1, max_lag + 1):
                         automl_data[f"lag_{lag}"] = automl_data["y"].shift(lag)
 
-                    # ✅ Adjust rolling statistics impact (reduce smoothing effect)
+                    # ✅ Add rolling statistics with conditional checks to avoid missing columns
                     if len(train) > max_lag + 5:
                         automl_data["rolling_mean_3"] = train["y"].rolling(window=3).mean()
                         automl_data["rolling_std_3"] = train["y"].rolling(window=3).std()
-                        automl_data["rolling_mean_6"] = train["y"].rolling(window=6).mean()
-                        automl_data["rolling_std_6"] = train["y"].rolling(window=6).std()
+
+                        if len(train) > 6:  # Ensure enough data for a 6-period rolling window
+                            automl_data["rolling_mean_6"] = train["y"].rolling(window=6).mean()
+                            automl_data["rolling_std_6"] = train["y"].rolling(window=6).std()
+
 
                     # ✅ Add seasonal features
                     automl_data["sin_month"] = np.sin(2 * np.pi * automl_data["ds"].dt.month / 12)
@@ -505,9 +508,23 @@ def main():
                     automl_data["y_log"] = np.log1p(automl_data["y"])
                     automl_data.dropna(inplace=True)  # Drop NA values
 
-                    # ✅ Prepare training data
-                    x_train = automl_data.drop(columns=["y", "y_log", "ds"])
+                    # ✅ Dynamically build feature list
+                    feature_cols = ["sin_month", "cos_month"] + [f"lag_{lag}" for lag in range(1, max_lag + 1)]
+
+                    # ✅ Conditionally add rolling features
+                    if "rolling_mean_3" in automl_data.columns:
+                        feature_cols.append("rolling_mean_3")
+                    if "rolling_std_3" in automl_data.columns:
+                        feature_cols.append("rolling_std_3")
+                    if "rolling_mean_6" in automl_data.columns:
+                        feature_cols.append("rolling_mean_6")
+                    if "rolling_std_6" in automl_data.columns:
+                        feature_cols.append("rolling_std_6")
+
+                    # ✅ Prepare training data dynamically
+                    x_train = automl_data[feature_cols]
                     y_train = automl_data["y_log"]
+
 
                     # ✅ Train AutoML
                     automl_model = AutoML()
@@ -532,16 +549,25 @@ def main():
                         st.write("🔍 Feature Importance:")
                         st.dataframe(importance)
 
-                    # ✅ Forecast Generation
-                    st.write("📈 **Generating Forecasts with AutoML...**")
+                    # ✅ Ensure `test_lags` includes dynamic features matching `x_train`
                     test_lags = {f"lag_{lag}": [train["y"].iloc[-lag]] for lag in range(1, max_lag + 1)}
-                    test_lags["rolling_mean_3"] = train["y"].rolling(window=3).mean().iloc[-1]
-                    test_lags["rolling_std_3"] = train["y"].rolling(window=3).std().iloc[-1]
-                    test_lags["sin_month"] = np.sin(2 * np.pi * train["ds"].iloc[-1].month / 12)
-                    test_lags["cos_month"] = np.cos(2 * np.pi * train["ds"].iloc[-1].month / 12)
+                    test_lags["sin_month"] = [np.sin(2 * np.pi * train["ds"].iloc[-1].month / 12)]
+                    test_lags["cos_month"] = [np.cos(2 * np.pi * train["ds"].iloc[-1].month / 12)]
+
+                    # ✅ Conditionally add rolling features if they exist
+                    if "rolling_mean_3" in train.columns:
+                        test_lags["rolling_mean_3"] = [train["y"].rolling(window=3).mean().iloc[-1]]
+                    if "rolling_std_3" in train.columns:
+                        test_lags["rolling_std_3"] = [train["y"].rolling(window=3).std().iloc[-1]]
+                    if "rolling_mean_6" in train.columns:
+                        test_lags["rolling_mean_6"] = [train["y"].rolling(window=6).mean().iloc[-1]]
+                    if "rolling_std_6" in train.columns:
+                        test_lags["rolling_std_6"] = [train["y"].rolling(window=6).std().iloc[-1]]
+
+                    # ✅ Convert dictionary to DataFrame
                     future_df = pd.DataFrame(test_lags)
 
-                    # ✅ Fill missing values
+                    # ✅ Handle potential NaN values (fills missing rolling values)
                     future_df.fillna(method="ffill", inplace=True)
                     future_df.fillna(0, inplace=True)
 
