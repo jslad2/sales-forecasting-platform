@@ -490,15 +490,14 @@ def main():
                     for lag in range(1, max_lag + 1):
                         automl_data[f"lag_{lag}"] = automl_data["y"].shift(lag)
 
-                    # ✅ Add rolling statistics with conditional checks to avoid missing columns
-                    if len(train) > max_lag + 5:
-                        automl_data["rolling_mean_3"] = train["y"].rolling(window=3).mean()
-                        automl_data["rolling_std_3"] = train["y"].rolling(window=3).std()
+                    # ✅ Add rolling statistics with conditional checks
+                    if len(automl_data) > 3:  # Ensure enough data for a 3-period rolling window
+                        automl_data["rolling_mean_3"] = automl_data["y"].rolling(window=3).mean()
+                        automl_data["rolling_std_3"] = automl_data["y"].rolling(window=3).std()
 
-                        if len(train) > 6:  # Ensure enough data for a 6-period rolling window
-                            automl_data["rolling_mean_6"] = train["y"].rolling(window=6).mean()
-                            automl_data["rolling_std_6"] = train["y"].rolling(window=6).std()
-
+                    if len(automl_data) > 6:  # Ensure enough data for a 6-period rolling window
+                        automl_data["rolling_mean_6"] = automl_data["y"].rolling(window=6).mean()
+                        automl_data["rolling_std_6"] = automl_data["y"].rolling(window=6).std()
 
                     # ✅ Add seasonal features
                     automl_data["sin_month"] = np.sin(2 * np.pi * automl_data["ds"].dt.month / 12)
@@ -511,20 +510,14 @@ def main():
                     # ✅ Dynamically build feature list
                     feature_cols = ["sin_month", "cos_month"] + [f"lag_{lag}" for lag in range(1, max_lag + 1)]
 
-                    # ✅ Conditionally add rolling features
-                    if "rolling_mean_3" in automl_data.columns:
-                        feature_cols.append("rolling_mean_3")
-                    if "rolling_std_3" in automl_data.columns:
-                        feature_cols.append("rolling_std_3")
-                    if "rolling_mean_6" in automl_data.columns:
-                        feature_cols.append("rolling_mean_6")
-                    if "rolling_std_6" in automl_data.columns:
-                        feature_cols.append("rolling_std_6")
+                    # ✅ Conditionally add rolling features only if they exist
+                    for feature in ["rolling_mean_3", "rolling_std_3", "rolling_mean_6", "rolling_std_6"]:
+                        if feature in automl_data.columns:
+                            feature_cols.append(feature)
 
                     # ✅ Prepare training data dynamically
                     x_train = automl_data[feature_cols]
                     y_train = automl_data["y_log"]
-
 
                     # ✅ Train AutoML
                     automl_model = AutoML()
@@ -554,20 +547,15 @@ def main():
                     test_lags["sin_month"] = [np.sin(2 * np.pi * train["ds"].iloc[-1].month / 12)]
                     test_lags["cos_month"] = [np.cos(2 * np.pi * train["ds"].iloc[-1].month / 12)]
 
-                    # ✅ Conditionally add rolling features if they exist
-                    if "rolling_mean_3" in train.columns:
-                        test_lags["rolling_mean_3"] = [train["y"].rolling(window=3).mean().iloc[-1]]
-                    if "rolling_std_3" in train.columns:
-                        test_lags["rolling_std_3"] = [train["y"].rolling(window=3).std().iloc[-1]]
-                    if "rolling_mean_6" in train.columns:
-                        test_lags["rolling_mean_6"] = [train["y"].rolling(window=6).mean().iloc[-1]]
-                    if "rolling_std_6" in train.columns:
-                        test_lags["rolling_std_6"] = [train["y"].rolling(window=6).std().iloc[-1]]
+                    # ✅ Conditionally add rolling features only if they exist
+                    for feature in ["rolling_mean_3", "rolling_std_3", "rolling_mean_6", "rolling_std_6"]:
+                        if feature in automl_data.columns:
+                            test_lags[feature] = [train["y"].rolling(window=int(feature.split("_")[-1])).mean().iloc[-1]]
 
                     # ✅ Convert dictionary to DataFrame
                     future_df = pd.DataFrame(test_lags)
 
-                    # ✅ Handle potential NaN values (fills missing rolling values)
+                    # ✅ Handle potential NaN values
                     future_df.fillna(method="ffill", inplace=True)
                     future_df.fillna(0, inplace=True)
 
@@ -583,10 +571,9 @@ def main():
                         future_df["lag_1"] = next_forecast  # Use the most recent prediction
 
                         # ✅ Adjust rolling statistics dynamically
-                        future_df["rolling_mean_3"] = np.mean(automl_forecast[-3:])
-                        future_df["rolling_mean_6"] = np.mean(automl_forecast[-6:]) if len(automl_forecast) > 6 else np.mean(automl_forecast)
-                        future_df["rolling_std_3"] = np.std(automl_forecast[-3:])
-                        future_df["rolling_std_6"] = np.std(automl_forecast[-6:]) if len(automl_forecast) > 6 else np.std(automl_forecast)
+                        for feature in ["rolling_mean_3", "rolling_std_3", "rolling_mean_6", "rolling_std_6"]:
+                            if feature in future_df.columns:
+                                future_df[feature] = np.mean(automl_forecast[-int(feature.split("_")[-1]):])
 
                     # ✅ Save & Display Results
                     forecast_df = pd.DataFrame({
@@ -644,6 +631,7 @@ def main():
 
                 except Exception as e:
                     st.error(f"❌ AutoML Model failed: {e}")
+
 
 
                 # Model Performance Table
