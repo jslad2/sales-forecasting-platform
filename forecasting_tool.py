@@ -482,7 +482,7 @@ def main():
 
                 try:
                     # ✅ Step 1: Feature Engineering
-                    max_lag = min(12, len(train) - 1)  # Limit max lags
+                    max_lag = min(12, len(train) - 1)  # Ensure enough lag features
                     automl_data = train.copy()
                     st.write(f"🔹 Max Lags Used: {max_lag}")
 
@@ -490,22 +490,20 @@ def main():
                     for lag in range(1, max_lag + 1):
                         automl_data[f"lag_{lag}"] = automl_data["y"].shift(lag)
 
-                    # ✅ Add rolling statistics (only if enough data exists)
-                    if len(train) > max_lag + 3:
-                        automl_data["rolling_mean_3"] = automl_data["y"].rolling(window=3).mean()
-                        automl_data["rolling_std_3"] = automl_data["y"].rolling(window=3).std()
+                    # ✅ Adjust rolling statistics impact (reduce smoothing effect)
+                    if len(train) > max_lag + 5:
+                        automl_data["rolling_mean_3"] = train["y"].rolling(window=3).mean()
+                        automl_data["rolling_std_3"] = train["y"].rolling(window=3).std()
+                        automl_data["rolling_mean_6"] = train["y"].rolling(window=6).mean()
+                        automl_data["rolling_std_6"] = train["y"].rolling(window=6).std()
 
                     # ✅ Add seasonal features
                     automl_data["sin_month"] = np.sin(2 * np.pi * automl_data["ds"].dt.month / 12)
                     automl_data["cos_month"] = np.cos(2 * np.pi * automl_data["ds"].dt.month / 12)
 
                     # ✅ Apply log transformation to stabilize variance
-                    if (automl_data["y"] < 0).any():
-                        st.error("❌ Negative values detected in target variable. Skipping AutoML.")
-                        raise ValueError("Negative values in y")
-
-                    automl_data["y_log"] = np.log1p(automl_data["y"])  # Log transformation
-                    automl_data.dropna(inplace=True)  # Drop rows with NaN
+                    automl_data["y_log"] = np.log1p(automl_data["y"])
+                    automl_data.dropna(inplace=True)  # Drop NA values
 
                     # ✅ Prepare training data
                     x_train = automl_data.drop(columns=["y", "y_log", "ds"])
@@ -518,13 +516,23 @@ def main():
                         X_train=x_train,
                         y_train=y_train,
                         task="regression",
-                        time_budget=300,  # Training time limit
+                        time_budget=300,
                         eval_method="cv",
-                        estimator_list=["xgboost", "lgbm", "rf"]
+                        estimator_list=["xgboost", "lgbm"]  # Removed RF to prevent smoothing
                     )
                     st.write(f"✅ AutoML Training Completed! Best Estimator: {automl_model.best_estimator}")
 
-                    # ✅ Generate future forecasts
+                    # ✅ Feature Importance Debugging
+                    if automl_model.best_estimator == "xgboost":
+                        xgb_model = automl_model.best_model_for_estimator("xgboost")
+                        importance = pd.DataFrame({
+                            "Feature": x_train.columns,
+                            "Importance": xgb_model.feature_importances_
+                        }).sort_values(by="Importance", ascending=False)
+                        st.write("🔍 Feature Importance:")
+                        st.dataframe(importance)
+
+                    # ✅ Forecast Generation
                     st.write("📈 **Generating Forecasts with AutoML...**")
                     test_lags = {f"lag_{lag}": [train["y"].iloc[-lag]] for lag in range(1, max_lag + 1)}
                     test_lags["rolling_mean_3"] = train["y"].rolling(window=3).mean().iloc[-1]
@@ -543,16 +551,18 @@ def main():
                         next_forecast = np.expm1(next_forecast_log)  # Reverse log transformation
                         automl_forecast.append(next_forecast)
 
-                        # ✅ Update future lagged features
+                        # ✅ Properly shift lag features
                         for lag in range(max_lag, 1, -1):
                             future_df[f"lag_{lag}"] = future_df[f"lag_{lag - 1}"]
-                        future_df["lag_1"] = next_forecast
+                        future_df["lag_1"] = next_forecast  # Use the most recent prediction
 
-                        # ✅ Update rolling statistics
+                        # ✅ Adjust rolling statistics dynamically
                         future_df["rolling_mean_3"] = np.mean(automl_forecast[-3:])
+                        future_df["rolling_mean_6"] = np.mean(automl_forecast[-6:]) if len(automl_forecast) > 6 else np.mean(automl_forecast)
                         future_df["rolling_std_3"] = np.std(automl_forecast[-3:])
+                        future_df["rolling_std_6"] = np.std(automl_forecast[-6:]) if len(automl_forecast) > 6 else np.std(automl_forecast)
 
-                    # ✅ Prepare Forecast DataFrame
+                    # ✅ Save & Display Results
                     forecast_df = pd.DataFrame({
                         "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
                         "yhat": automl_forecast
@@ -586,7 +596,6 @@ def main():
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
                     fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"], mode="lines", name="Forecast", line=dict(color="purple", width=2)))
-                    fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"].rolling(3).mean(), mode="lines", name="Smoothed Forecast", line=dict(color="magenta", dash="dot")))
 
                     fig.update_layout(
                         title="AutoML Forecast",
@@ -609,7 +618,7 @@ def main():
 
                 except Exception as e:
                     st.error(f"❌ AutoML Model failed: {e}")
-                return None
+
 
                 # Model Performance Table
                 # st.subheader("Model Performance Comparison")
