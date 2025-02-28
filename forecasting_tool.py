@@ -526,7 +526,7 @@ def main():
                         X_train=x_train,
                         y_train=y_train,
                         task="regression",
-                        time_budget=300,
+                        time_budget=600,
                         eval_method="cv",
                         estimator_list=["xgboost", "lgbm"]  # Removed RF to prevent smoothing
                     )
