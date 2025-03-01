@@ -482,9 +482,19 @@ def main():
 
                 try:
                     # ✅ Step 1: Feature Engineering
-                    max_lag = min(12, len(train) - 1)  # Ensure enough lag features
                     automl_data = train.copy()
-                    st.write(f"🔹 Max Lags Used: {max_lag}")
+
+                    # ✅ Dynamically determine max_lag based on dataset size
+                    if len(train) <= 6:
+                        max_lag = min(3, len(train) - 1)  # Minimum 3 months for very small datasets
+                    elif len(train) <= 12:
+                        max_lag = min(6, len(train) - 1)  # Use up to 6 months for medium datasets
+                    elif len(train) <= 24:
+                        max_lag = min(12, len(train) - 1)  # Use up to 12 months for moderately large datasets
+                    else:
+                        max_lag = min(24, len(train) - 1)  # Use up to 24 months for long datasets
+
+                    st.write(f"🔹 Adjusted Max Lags Used: {max_lag}")
 
                     # ✅ Add lag features
                     for lag in range(1, max_lag + 1):
@@ -492,12 +502,18 @@ def main():
 
                     # ✅ Add rolling statistics with conditional checks
                     if len(automl_data) > 3:  # Ensure enough data for a 3-period rolling window
-                        automl_data["rolling_mean_3"] = automl_data["y"].rolling(window=3).mean()
-                        automl_data["rolling_std_3"] = automl_data["y"].rolling(window=3).std()
+                        automl_data["rolling_mean_3"] = automl_data["y"].rolling(window=3, min_periods=1).mean()
+                        automl_data["rolling_std_3"] = automl_data["y"].rolling(window=3, min_periods=1).std()
 
                     if len(automl_data) > 6:  # Ensure enough data for a 6-period rolling window
-                        automl_data["rolling_mean_6"] = automl_data["y"].rolling(window=6).mean()
-                        automl_data["rolling_std_6"] = automl_data["y"].rolling(window=6).std()
+                        automl_data["rolling_mean_6"] = automl_data["y"].rolling(window=6, min_periods=1).mean()
+                        automl_data["rolling_std_6"] = automl_data["y"].rolling(window=6, min_periods=1).std()
+
+                    # ✅ Add Peak Indicator Feature
+                    if len(automl_data) > 6:  # Ensure at least 6 data points exist for peak detection
+                        automl_data["peak_indicator"] = (automl_data["y"] > automl_data["y"].rolling(window=6, min_periods=1).quantile(0.9)).astype(int)
+                    else:
+                        automl_data["peak_indicator"] = 0  # Default to no peaks if insufficient data
 
                     # ✅ Add seasonal features
                     automl_data["sin_month"] = np.sin(2 * np.pi * automl_data["ds"].dt.month / 12)
@@ -508,12 +524,15 @@ def main():
                     automl_data.dropna(inplace=True)  # Drop NA values
 
                     # ✅ Dynamically build feature list
-                    feature_cols = ["sin_month", "cos_month"] + [f"lag_{lag}" for lag in range(1, max_lag + 1)]
+                    feature_cols = ["sin_month", "cos_month", "peak_indicator"] + [f"lag_{lag}" for lag in range(1, max_lag + 1)]
 
                     # ✅ Conditionally add rolling features only if they exist
                     for feature in ["rolling_mean_3", "rolling_std_3", "rolling_mean_6", "rolling_std_6"]:
                         if feature in automl_data.columns:
                             feature_cols.append(feature)
+
+                    # ✅ Ensure all selected features exist before training
+                    feature_cols = [col for col in feature_cols if col in automl_data.columns]
 
                     # ✅ Prepare training data dynamically
                     x_train = automl_data[feature_cols]
@@ -523,13 +542,14 @@ def main():
                     automl_model = AutoML()
                     st.write("🔄 **Training AutoML Model...**")
                     automl_model.fit(
-                        X_train=x_train,
-                        y_train=y_train,
-                        task="regression",
-                        time_budget=600,
-                        eval_method="cv",
-                        estimator_list=["xgboost", "lgbm"]  # Removed RF to prevent smoothing
-                    )
+                    X_train=x_train,
+                    y_train=y_train,
+                    task="regression",
+                    time_budget=600,
+                    eval_method="cv",
+                    estimator_list=["xgboost"],  # Force XGBoost, remove LGBM
+                    metric="r2"  # Prioritize fitting trends over just minimizing error
+                )
                     st.write(f"✅ AutoML Training Completed! Best Estimator: {automl_model.best_estimator}")
 
                     # ✅ Feature Importance Debugging
@@ -560,20 +580,39 @@ def main():
                     future_df.fillna(0, inplace=True)
 
                     automl_forecast = []
-                    for _ in range(forecast_period):
+                    future_uncertainty = []  # Track prediction uncertainty (confidence intervals)
+
+                    for i in range(forecast_period):
+                        # ✅ Predict next forecast value
                         next_forecast_log = automl_model.predict(future_df)[0]
                         next_forecast = np.expm1(next_forecast_log)  # Reverse log transformation
                         automl_forecast.append(next_forecast)
 
-                        # ✅ Properly shift lag features
+                        # ✅ Capture uncertainty (std dev of recent forecasts)
+                        if len(automl_forecast) > 5:
+                            forecast_std = np.std(automl_forecast[-5:])  # Last 5 forecasts
+                        else:
+                            forecast_std = np.std(automl_forecast) if len(automl_forecast) > 1 else 0
+                        future_uncertainty.append(forecast_std)
+
+                        # ✅ Properly shift lag features dynamically
                         for lag in range(max_lag, 1, -1):
                             future_df[f"lag_{lag}"] = future_df[f"lag_{lag - 1}"]
                         future_df["lag_1"] = next_forecast  # Use the most recent prediction
 
-                        # ✅ Adjust rolling statistics dynamically
+                        # ✅ Adjust rolling statistics dynamically (Prevent NaN errors)
                         for feature in ["rolling_mean_3", "rolling_std_3", "rolling_mean_6", "rolling_std_6"]:
                             if feature in future_df.columns:
-                                future_df[feature] = np.mean(automl_forecast[-int(feature.split("_")[-1]):])
+                                window_size = int(feature.split("_")[-1])  # Extract window size
+                                future_df[feature] = np.mean(automl_forecast[-window_size:]) if len(automl_forecast) >= window_size else np.mean(automl_forecast)
+
+                        # ✅ Introduce a "Peak Indicator" feature
+                        if len(automl_forecast) > 6:
+                            peak_threshold = np.percentile(automl_forecast[-6:], 90)  # 90th percentile of last 6 values
+                            future_df["peak_indicator"] = 1 if next_forecast > peak_threshold else 0  # Mark as peak if above threshold
+                        else:
+                            future_df["peak_indicator"] = 0  # Default to no peak if not enough history
+
 
                     # ✅ Save & Display Results
                     forecast_df = pd.DataFrame({
