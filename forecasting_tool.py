@@ -477,7 +477,7 @@ def main():
                     }
                 except Exception as e:
                     st.warning(f"XGBoost Model failed: {e}")
-
+                    
                 st.write("🚀 Training AutoML Model...")
 
                 try:
@@ -509,7 +509,7 @@ def main():
                         automl_data["rolling_mean_6"] = automl_data["y"].rolling(window=6, min_periods=1).mean()
                         automl_data["rolling_std_6"] = automl_data["y"].rolling(window=6, min_periods=1).std()
 
-                    # ✅ Add Peak Indicator Feature (Check if rolling stats exist)
+                    # ✅ Add Peak Indicator Feature (Ensure rolling mean exists)
                     if "rolling_mean_6" in automl_data.columns:
                         automl_data["peak_indicator"] = (automl_data["y"] > automl_data["rolling_mean_6"]).astype(int)
                     else:
@@ -546,14 +546,14 @@ def main():
                     automl_model = AutoML()
                     st.write("🔄 **Training AutoML Model...**")
                     automl_model.fit(
-                    X_train=x_train,
-                    y_train=y_train,
-                    task="regression",
-                    time_budget=600,
-                    eval_method="cv",
-                    estimator_list=["xgboost"],  # Force XGBoost, remove LGBM
-                    metric="r2"  # Prioritize fitting trends over just minimizing error
-                )
+                        X_train=x_train,
+                        y_train=y_train,
+                        task="regression",
+                        time_budget=600,
+                        eval_method="cv",
+                        estimator_list=["xgboost"],  # Force XGBoost, remove LGBM
+                        metric="r2"  # Prioritize fitting trends over just minimizing error
+                    )
                     st.write(f"✅ AutoML Training Completed! Best Estimator: {automl_model.best_estimator}")
 
                     # ✅ Feature Importance Debugging
@@ -584,20 +584,12 @@ def main():
                     future_df.fillna(0, inplace=True)
 
                     automl_forecast = []
-                    future_uncertainty = []  # Track prediction uncertainty (confidence intervals)
 
                     for i in range(forecast_period):
                         # ✅ Predict next forecast value
                         next_forecast_log = automl_model.predict(future_df)[0]
                         next_forecast = np.expm1(next_forecast_log)  # Reverse log transformation
                         automl_forecast.append(next_forecast)
-
-                        # ✅ Capture uncertainty (std dev of recent forecasts)
-                        if len(automl_forecast) > 5:
-                            forecast_std = np.std(automl_forecast[-5:])  # Last 5 forecasts
-                        else:
-                            forecast_std = np.std(automl_forecast) if len(automl_forecast) > 1 else 0
-                        future_uncertainty.append(forecast_std)
 
                         # ✅ Properly shift lag features dynamically
                         for lag in range(max_lag, 1, -1):
@@ -613,67 +605,13 @@ def main():
                         # ✅ Introduce a "Peak Indicator" feature
                         if len(automl_forecast) > 6:
                             peak_threshold = np.percentile(automl_forecast[-6:], 90)  # 90th percentile of last 6 values
-                            future_df["peak_indicator"] = 1 if next_forecast > peak_threshold else 0  # Mark as peak if above threshold
+                            future_df["peak_indicator"] = 1 if next_forecast > peak_threshold else 0
                         else:
                             future_df["peak_indicator"] = 0  # Default to no peak if not enough history
 
-
-                    # ✅ Save & Display Results
-                    forecast_df = pd.DataFrame({
-                        "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
-                        "yhat": automl_forecast
-                    })
-
-                    # ✅ Evaluate AutoML Performance
-                    automl_rmse = mean_squared_error(test["y"], automl_forecast[:len(test)], squared=False)
-                    automl_mape = mean_absolute_percentage_error(test["y"], automl_forecast[:len(test)])
-
-                    # ✅ Identify Key Points
-                    highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
-                    lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
-
-                    # ✅ Summary Insights
-                    summary_text = (
-                        f"### Key Insights\n"
-                        f"- **Projected Growth:** Sales are expected to {'increase' if automl_forecast[-1] > test['y'].iloc[-1] else 'decrease'} "
-                        f"by {abs((automl_forecast[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100:.2f}% in the next period.\n"
-                        f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
-                        f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
-                        f"- **Performance Metrics:**\n"
-                        f"  - RMSE: {automl_rmse:.2f}\n"
-                        f"  - MAPE: {automl_mape:.2f}\n"
-                    )
-
-                    # ✅ Display Summary in an Expander
-                    with st.expander("📊 AutoML Model Summary"):
-                        st.markdown(summary_text)
-
-                    # ✅ Plot Forecast Results
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
-                    fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"], mode="lines", name="Forecast", line=dict(color="purple", width=2)))
-
-                    fig.update_layout(
-                        title="AutoML Forecast",
-                        xaxis_title="Date",
-                        yaxis_title="Sales",
-                        legend_title="Legend",
-                        template="plotly_white"
-                    )
-
-                    st.plotly_chart(fig, use_container_width=True)
-
-                    # ✅ Save Results
-                    results["AutoML"] = {
-                        "RMSE": automl_rmse,
-                        "MAPE": automl_mape,
-                        "Forecast": forecast_df
-                    }
-                    st.write(f"✅ **AutoML RMSE:** {automl_rmse:.2f}")
-                    st.write(f"✅ **AutoML MAPE:** {automl_mape:.2f}")
-
                 except Exception as e:
                     st.error(f"❌ AutoML Model failed: {e}")
+
 
 
 
