@@ -25,42 +25,42 @@ import time
 # Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
 st.set_page_config(layout="wide")
 
-# --- Custom Styling for Streamlit ---
-st.markdown("""
-    <style>
-        .stApp {
-            background-color: #F4F4F6;
-            color: #333333;
-        }
-        h1, h3 {
-            color: #2B3A42;
-            text-align: center;
-        }
-        .stButton>button {
-            background-color: #2B3A42;
-            color: white;
-            border-radius: 6px;
-            padding: 10px 20px;
-            font-size: 16px;
-        }
-        .stButton>button:hover {
-            background-color: #56BBAF;
-        }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+# # --- Custom Styling for Streamlit ---
+# st.markdown("""
+#     <style>
+#         .stApp {
+#             background-color: #F4F4F6;
+#             color: #333333;
+#         }
+#         h1, h3 {
+#             color: #2B3A42;
+#             text-align: center;
+#         }
+#         .stButton>button {
+#             background-color: #2B3A42;
+#             color: white;
+#             border-radius: 6px;
+#             padding: 10px 20px;
+#             font-size: 16px;
+#         }
+#         .stButton>button:hover {
+#             background-color: #56BBAF;
+#         }
+#     </style>
+#     """,
+#     unsafe_allow_html=True
+# )
 
-# --- Header ---
-st.markdown(
-    """
-    <header style="background-color: #2B3A42; padding: 20px; text-align: center; color: white; border-radius: 12px;">
-        <h1 style="margin: 0; font-size: 2.5rem;">Sales Dashboard</h1>
-        <p style="margin: 0; font-size: 1.2rem;">Empowering Your Business with Data-Driven Insights</p>
-    </header>
-    """,
-    unsafe_allow_html=True,
-)
+# # --- Header ---
+# st.markdown(
+#     """
+#     <header style="background-color: #2B3A42; padding: 20px; text-align: center; color: white; border-radius: 12px;">
+#         <h1 style="margin: 0; font-size: 2.5rem;">Sales Dashboard</h1>
+#         <p style="margin: 0; font-size: 1.2rem;">Empowering Your Business with Data-Driven Insights</p>
+#     </header>
+#     """,
+#     unsafe_allow_html=True,
+# )
 
 @st.cache_data
 def check_stationarity(series):
@@ -501,16 +501,16 @@ def main():
                         automl_data[f"lag_{lag}"] = automl_data["y"].shift(lag)
 
                     # ✅ Add rolling statistics with conditional checks
-                    if len(automl_data) > 3:  # Ensure enough data for a 3-period rolling window
+                    if len(automl_data) > 3:
                         automl_data["rolling_mean_3"] = automl_data["y"].rolling(window=3, min_periods=1).mean()
                         automl_data["rolling_std_3"] = automl_data["y"].rolling(window=3, min_periods=1).std()
 
-                    if len(automl_data) > 6:  # Ensure enough data for a 6-period rolling window
+                    if len(automl_data) > 6:
                         automl_data["rolling_mean_6"] = automl_data["y"].rolling(window=6, min_periods=1).mean()
                         automl_data["rolling_std_6"] = automl_data["y"].rolling(window=6, min_periods=1).std()
 
                     # ✅ Add Peak Indicator Feature (Ensure rolling mean exists)
-                    if "rolling_mean_6" in automl_data.columns:
+                    if "rolling_mean_6" in automl_data.columns and len(automl_data) > 6:
                         automl_data["peak_indicator"] = (automl_data["y"] > automl_data["rolling_mean_6"]).astype(int)
                     else:
                         automl_data["peak_indicator"] = 0  # Default to no peaks if not enough data
@@ -566,15 +566,20 @@ def main():
                         st.write("🔍 Feature Importance:")
                         st.dataframe(importance)
 
-                    # ✅ Ensure `test_lags` includes dynamic features matching `x_train`
+                    # ✅ Ensure `future_df` includes dynamic features matching `x_train`
                     test_lags = {f"lag_{lag}": [train["y"].iloc[-lag]] for lag in range(1, max_lag + 1)}
                     test_lags["sin_month"] = [np.sin(2 * np.pi * train["ds"].iloc[-1].month / 12)]
                     test_lags["cos_month"] = [np.cos(2 * np.pi * train["ds"].iloc[-1].month / 12)]
 
-                    # ✅ Conditionally add rolling features only if they exist
+                    # ✅ Add rolling features and `peak_indicator`
                     for feature in ["rolling_mean_3", "rolling_std_3", "rolling_mean_6", "rolling_std_6"]:
                         if feature in automl_data.columns:
-                            test_lags[feature] = [train["y"].rolling(window=int(feature.split("_")[-1])).mean().iloc[-1]]
+                            test_lags[feature] = [train["y"].rolling(window=int(feature.split("_")[-1]), min_periods=1).mean().iloc[-1]]
+
+                    if "peak_indicator" in automl_data.columns:
+                        test_lags["peak_indicator"] = [(train["y"].iloc[-1] > train["y"].rolling(window=6, min_periods=1).mean().iloc[-1]).astype(int)]
+                    else:
+                        test_lags["peak_indicator"] = [0]
 
                     # ✅ Convert dictionary to DataFrame
                     future_df = pd.DataFrame(test_lags)
@@ -588,31 +593,29 @@ def main():
                     for i in range(forecast_period):
                         # ✅ Predict next forecast value
                         next_forecast_log = automl_model.predict(future_df)[0]
-                        next_forecast = np.expm1(next_forecast_log)  # Reverse log transformation
+                        next_forecast = np.expm1(next_forecast_log)
                         automl_forecast.append(next_forecast)
 
                         # ✅ Properly shift lag features dynamically
                         for lag in range(max_lag, 1, -1):
                             future_df[f"lag_{lag}"] = future_df[f"lag_{lag - 1}"]
-                        future_df["lag_1"] = next_forecast  # Use the most recent prediction
+                        future_df["lag_1"] = next_forecast
 
-                        # ✅ Adjust rolling statistics dynamically (Prevent NaN errors)
+                        # ✅ Adjust rolling statistics dynamically
                         for feature in ["rolling_mean_3", "rolling_std_3", "rolling_mean_6", "rolling_std_6"]:
                             if feature in future_df.columns:
-                                window_size = int(feature.split("_")[-1])  # Extract window size
+                                window_size = int(feature.split("_")[-1])
                                 future_df[feature] = np.mean(automl_forecast[-window_size:]) if len(automl_forecast) >= window_size else np.mean(automl_forecast)
 
-                        # ✅ Introduce a "Peak Indicator" feature
+                        # ✅ Update `peak_indicator` dynamically
                         if len(automl_forecast) > 6:
-                            peak_threshold = np.percentile(automl_forecast[-6:], 90)  # 90th percentile of last 6 values
+                            peak_threshold = np.percentile(automl_forecast[-6:], 90)
                             future_df["peak_indicator"] = 1 if next_forecast > peak_threshold else 0
                         else:
-                            future_df["peak_indicator"] = 0  # Default to no peak if not enough history
+                            future_df["peak_indicator"] = 0
 
                 except Exception as e:
                     st.error(f"❌ AutoML Model failed: {e}")
-
-
 
 
                 # Model Performance Table
