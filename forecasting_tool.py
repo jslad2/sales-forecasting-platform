@@ -509,11 +509,11 @@ def main():
                         automl_data["rolling_mean_6"] = automl_data["y"].rolling(window=6, min_periods=1).mean()
                         automl_data["rolling_std_6"] = automl_data["y"].rolling(window=6, min_periods=1).std()
 
-                    # ✅ Add Peak Indicator Feature
-                    if len(automl_data) > 6:  # Ensure at least 6 data points exist for peak detection
-                        automl_data["peak_indicator"] = (automl_data["y"] > automl_data["y"].rolling(window=6, min_periods=1).quantile(0.9)).astype(int)
+                    # ✅ Add Peak Indicator Feature (Check if rolling stats exist)
+                    if "rolling_mean_6" in automl_data.columns:
+                        automl_data["peak_indicator"] = (automl_data["y"] > automl_data["rolling_mean_6"]).astype(int)
                     else:
-                        automl_data["peak_indicator"] = 0  # Default to no peaks if insufficient data
+                        automl_data["peak_indicator"] = 0  # Default to no peaks if not enough data
 
                     # ✅ Add seasonal features
                     automl_data["sin_month"] = np.sin(2 * np.pi * automl_data["ds"].dt.month / 12)
@@ -524,17 +524,21 @@ def main():
                     automl_data.dropna(inplace=True)  # Drop NA values
 
                     # ✅ Dynamically build feature list
-                    feature_cols = ["sin_month", "cos_month", "peak_indicator"] + [f"lag_{lag}" for lag in range(1, max_lag + 1)]
+                    feature_cols = ["sin_month", "cos_month"] + [f"lag_{lag}" for lag in range(1, max_lag + 1)]
 
-                    # ✅ Conditionally add rolling features only if they exist
+                    # ✅ Add `peak_indicator` only if it exists
+                    if "peak_indicator" in automl_data.columns:
+                        feature_cols.append("peak_indicator")
+
+                    # ✅ Conditionally add rolling features
                     for feature in ["rolling_mean_3", "rolling_std_3", "rolling_mean_6", "rolling_std_6"]:
                         if feature in automl_data.columns:
                             feature_cols.append(feature)
 
-                    # ✅ Ensure all selected features exist before training
+                    # ✅ Ensure only available features are used
                     feature_cols = [col for col in feature_cols if col in automl_data.columns]
 
-                    # ✅ Prepare training data dynamically
+                    # ✅ Prepare training data
                     x_train = automl_data[feature_cols]
                     y_train = automl_data["y_log"]
 
