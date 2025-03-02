@@ -13,18 +13,18 @@ def apply_styles():
             /* Top Banner */
             .banner {
                 background: linear-gradient(135deg, #2B3A42, #64D8CB);
-                padding: 40px;
+                padding: 50px;
                 text-align: center;
                 border-radius: 12px;
                 box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
                 color: white;
-                font-size: 1.5rem;
+                font-size: 2rem;
                 font-weight: bold;
             }
 
             /* Main Title */
             .main-title {
-                font-size: 2.8rem;
+                font-size: 2.5rem;
                 color: #2B3A42;
                 font-weight: bold;
                 text-align: center;
@@ -98,6 +98,24 @@ def display_file_upload():
         unsafe_allow_html=True,
     )
 
+# ✅ Display Model Summary Section
+def display_model_summary(best_model, metrics):
+    st.markdown("---")
+    st.markdown("<h2 style='text-align: center;'>🔍 Best Model Summary</h2>", unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <p class="subtext">
+            Based on our analysis, the best model for your dataset is <strong>{best_model}</strong>.
+            Here’s a quick overview of its performance:
+        </p>
+        <ul>
+            <li><strong>RMSE:</strong> {metrics["RMSE"]:.2f}</li>
+            <li><strong>MAPE:</strong> {metrics["MAPE"]:.2%}</li>
+        </ul>
+        """,
+        unsafe_allow_html=True
+    )
+
 # ✅ Main Function
 def run_app():
     try:
@@ -105,7 +123,15 @@ def run_app():
         display_header()  # Display header
         display_intro()  # Display intro section
         display_file_upload()  # Display file upload section
-        main()  # Run the forecasting tool
+        
+        # Run forecasting logic and retrieve results
+        results = main()
+
+        if results:
+            best_model = min(results, key=lambda x: results[x]["RMSE"])
+            best_metrics = results[best_model]
+            display_model_summary(best_model, best_metrics)
+
     except Exception as e:
         st.error(f"An error occurred: {e}")
 

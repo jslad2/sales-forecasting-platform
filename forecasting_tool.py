@@ -618,79 +618,120 @@ def main():
                     st.error(f"❌ AutoML Model failed: {e}")
 
 
-                # Model Performance Table
-                # st.subheader("Model Performance Comparison")
-                # comparison = pd.DataFrame([
-                #     {"Model": model, "RMSE": result["RMSE"], "MAPE": result["MAPE"]}
-                #     for model, result in results.items()
-                # ])
-                # st.dataframe(comparison)
+                # 📊 Model Performance Table
+                st.subheader("📌 Model Performance Comparison")
+                comparison = pd.DataFrame([
+                    {"Model": model, "RMSE": result["RMSE"], "MAPE": result["MAPE"]}
+                    for model, result in results.items()
+                ])
 
-                # # Select Best Model Based on RMSE
-                # best_model = comparison.loc[comparison["RMSE"].idxmin(), "Model"]
-                # st.write(f"Best Model: {best_model}")
+                # Sort by RMSE (lower is better)
+                comparison = comparison.sort_values(by="RMSE")
+                st.dataframe(comparison.style.highlight_min(subset=["RMSE", "MAPE"], color="lightgreen"))
 
-                # # Ensure forecast data exists for the best model
-                # if best_model in results and "Forecast" in results[best_model] and not results[best_model]["Forecast"].empty:
-                #     forecast_data = results[best_model]["Forecast"]
-                # else:
-                #     forecast_data = None  # Handle missing forecast case
+                # 🏆 Auto-Select the Best Model
+                best_model = comparison.iloc[0]["Model"]  # Model with the lowest RMSE
+                st.success(f"✨ **AI-Selected Best Model:** {best_model}")
 
-                # # Prepare Data for Comparison Chart
-                # historical_data = train[["ds", "y"]].rename(columns={"y": "yhat"})
-                # historical_data["Model"] = "Historical"
+                # Ensure forecast data exists for the best model
+                if best_model in results and "Forecast" in results[best_model] and not results[best_model]["Forecast"].empty:
+                    forecast_data = results[best_model]["Forecast"]
+                else:
+                    forecast_data = None  # Handle missing forecast case
 
-                # # Define colors for different models
-                # model_colors = {
-                #     "Prophet": "blue",
-                #     "ARIMA": "green",
-                #     "XGBoost": "red",
-                #     "AutoML": "purple"
-                # }
+                # 🔥 High-Risk Period Detection (Sudden Drops & Fluctuations)
+                st.markdown("### 🚨 High-Risk Sales Periods Identified")
 
-                # # Create Plotly Figure
-                # fig = go.Figure()
+                if forecast_data is not None:
+                    forecast_data["change"] = forecast_data["yhat"].pct_change() * 100  # Calculate percentage change
+                    forecast_data["risk"] = "✅ Stable"
 
-                # # Add Historical Data
-                # fig.add_trace(go.Scatter(
-                #     x=historical_data["ds"],
-                #     y=historical_data["yhat"],
-                #     mode="lines",
-                #     name="Historical",
-                #     line=dict(color="black", width=2)
-                # ))
+                    for i in range(1, len(forecast_data)):
+                        if forecast_data["change"].iloc[i] < -20:  # Sales drop > 20%
+                            forecast_data["risk"].iloc[i] = "❌ Major Decline"
+                        elif abs(forecast_data["change"].iloc[i]) > 15:  # Fluctuation > 15%
+                            forecast_data["risk"].iloc[i] = "⚠️ High Volatility"
 
-                # # Add Forecasts for Each Model (Only 12-month Forecast)
-                # for model, result in results.items():
-                #     if "Forecast" in result and result["Forecast"] is not None and not result["Forecast"].empty:
-                #         forecast_df = result["Forecast"]
-                        
-                #         fig.add_trace(go.Scatter(
-                #             x=forecast_df["ds"],
-                #             y=forecast_df["yhat"],
-                #             mode="lines",
-                #             name=model,
-                #             line=dict(width=2, color=model_colors.get(model, "gray"))
-                #         ))
+                    # Display risk analysis table
+                    st.dataframe(forecast_data[["ds", "yhat", "change", "risk"]].style.applymap(
+                        lambda x: "background-color: #FFDDC1" if x == "❌ Major Decline" else
+                                "background-color: #FFEEAA" if x == "⚠️ High Volatility" else
+                                "background-color: #C6ECAE",
+                        subset=["risk"]
+                    ))
 
-                # # Final Plot Formatting
-                # fig.update_layout(
-                #     title="Sales Forecast Comparison Across Models",
-                #     xaxis_title="Date",
-                #     yaxis_title="Sales",
-                #     legend_title="Models",
-                #     template="plotly_white"
-                # )
+                    # 🔍 AI Insights Summary
+                    highest_point = forecast_data.loc[forecast_data["yhat"].idxmax()]
+                    lowest_point = forecast_data.loc[forecast_data["yhat"].idxmin()]
+                    projected_growth = ((forecast_data["yhat"].iloc[-1] - test["y"].iloc[-1]) / test["y"].iloc[-1]) * 100
+                    trend = "📈 **Growth Expected**" if projected_growth > 0 else "📉 **Potential Decline**"
 
-                # # Show the Chart
-                # st.plotly_chart(fig, use_container_width=True)
+                    insights_text = f"""
+                    - **Projected Sales Growth:** {abs(projected_growth):.2f}% {trend}
+                    - **Peak Sales Expected:** ${highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}
+                    - **Lowest Predicted Sales:** ${lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}
+                    - **Optimal Decision Window:** Plan around peak sales in {highest_point['ds'].strftime('%B %Y')}
+                    - **Risk Zones Identified:** Check months marked as 🔥 'High-Risk' above
+                    - **Volatility Analysis:** Forecast suggests a {'stable' if abs(projected_growth) < 5 else 'fluctuating'} trend
+                    """
 
-                # # Download Forecast
-                # st.subheader("Download Forecast")
-                # if forecast_data is not None:
-                #     st.download_button("Download Forecast Data (CSV)", forecast_data.to_csv(index=False), "forecast.csv", "text/csv")
-                # else:
-                #     st.warning("No forecast data available for download.")
+                    with st.expander("🔮 AI-Powered Future Insights"):
+                        st.markdown(insights_text)
+
+                # 📊 Multi-Model Forecast Visualization
+                st.markdown("### 🔍 Forecast Comparison Across Models")
+
+                # Define colors for different models
+                model_colors = {
+                    "Prophet": "blue",
+                    "ARIMA": "green",
+                    "XGBoost": "red",
+                    "AutoML": "purple"
+                }
+
+                # Create Plotly Figure
+                fig = go.Figure()
+
+                # Add Historical Data
+                fig.add_trace(go.Scatter(
+                    x=train["ds"],
+                    y=train["y"],
+                    mode="lines",
+                    name="Historical Data",
+                    line=dict(color="black", width=2)
+                ))
+
+                # Add Forecasts for Each Model
+                for model, result in results.items():
+                    if "Forecast" in result and result["Forecast"] is not None and not result["Forecast"].empty:
+                        forecast_df = result["Forecast"]
+
+                        fig.add_trace(go.Scatter(
+                            x=forecast_df["ds"],
+                            y=forecast_df["yhat"],
+                            mode="lines",
+                            name=f"{model} Forecast",
+                            line=dict(width=2, color=model_colors.get(model, "gray"))
+                        ))
+
+                # Final Plot Formatting
+                fig.update_layout(
+                    title="📊 Multi-Model Sales Forecast",
+                    xaxis_title="Date",
+                    yaxis_title="Sales",
+                    legend_title="Models",
+                    template="plotly_white"
+                )
+
+                # Show the Chart
+                st.plotly_chart(fig, use_container_width=True)
+
+                # 📥 Download Forecast Data
+                st.markdown("### 📥 Download Forecast Data")
+                if forecast_data is not None:
+                    st.download_button("📩 Download Best Model Forecast (CSV)", forecast_data.to_csv(index=False), "forecast.csv", "text/csv")
+                else:
+                    st.warning("⚠️ No forecast data available for download.")
 
         except Exception as e:
             st.error(f"Error processing file: {e}")
@@ -698,70 +739,5 @@ def main():
 if __name__ == "__main__":
     main()
 
-# import pandas as pd
-# import numpy as np
-# import streamlit as st
-# import sys
-# import flaml
-# from flaml import AutoML
-
-# def main(): 
-#     st.title("🔍 AutoML Debugging Test")
-    
-#     # ✅ Debugging Information
-#     st.write(f"🔍 FLAML Version: {flaml.__version__}")
-#     st.write(f"🔍 Python Executable: {sys.executable}")
-
-#     # ✅ Generate More Training Data (At Least 20 Samples)
-#     num_samples = 20  # Try increasing this from 12 to 20+
-#     x_train = pd.DataFrame(np.random.rand(num_samples, 16), columns=[f"feature_{i}" for i in range(16)])
-#     y_train = pd.Series(np.random.rand(num_samples), name="target")
-
-#     st.subheader("Training Data Preview")
-#     st.dataframe(x_train)
-#     st.dataframe(y_train)
-
-#     # ✅ Check for NaNs or Inf
-#     if x_train.isnull().sum().sum() > 0 or np.isinf(x_train).sum().sum() > 0:
-#         st.error("🚨 x_train contains NaN or Inf values!")
-#         return
-#     if y_train.isnull().sum() > 0 or np.isinf(y_train).sum() > 0:
-#         st.error("🚨 y_train contains NaN or Inf values!")
-#         return
-
-#     # ✅ Initialize AutoML
-#     automl_model = AutoML()
-#     st.write(f"🔍 AutoML Instance Type: {type(automl_model)}")
-
-#     # 🚀 Button to Start Training
-#     if st.button("🚀 Train AutoML"):
-#         try:
-#             st.write("🔄 Training AutoML Model...")
-#             st.write(f"🔍 AutoML Fit Method: {getattr(automl_model, 'fit', None)}")
-
-#             # ✅ Explicit Check for Callable Fit Function
-#             if not callable(getattr(automl_model, "fit", None)):
-#                 st.error("🚨 `AutoML.fit()` is not callable. FLAML might be broken.")
-#                 return
-
-#             st.write("✅ `AutoML.fit()` is callable. Training will start now.")
-
-#             automl_model.fit(
-#                 X_train=x_train,
-#                 y_train=y_train,
-#                 task="regression",
-#                 time_budget=10,
-#                 eval_method="holdout",  # Force simple train-test split
-#                 estimator_list=["rf"]  # Only use Random Forest for debugging
-#             )
-
-#             st.success("✅ AutoML training completed successfully!")
-#             st.write(f"🏆 Best Estimator: {automl_model.best_estimator}")
-
-#         except Exception as e:
-#             st.error(f"❌ AutoML failed: {e}")
-
-# if __name__ == "__main__":
-#     main()
 
 
