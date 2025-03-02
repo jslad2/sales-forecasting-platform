@@ -471,8 +471,8 @@ def main():
 
                     # Populate results dictionary
                     results["XGBoost"] = {
-                        "RMSE": float(xgb_rmse),
-                        "MAPE": float(xgb_mape),
+                        "RMSE": float(rmse),
+                        "MAPE": float(mape),
                         "Forecast": forecast_df
                     }
                 except Exception as e:
@@ -652,7 +652,7 @@ def main():
                             "RMSE": float(result["RMSE"]),
                             "MAPE": float(result["MAPE"])
                         })
-                        
+
                 # Check if any valid models were added to the comparison
                 if comparison_data:
                     comparison = pd.DataFrame(comparison_data)
