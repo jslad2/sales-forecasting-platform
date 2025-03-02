@@ -51,8 +51,16 @@ def preprocess_data(data, date_column, sales_column):
 
         # Check stationarity
         stationarity_result = check_stationarity(data["y"])
-        st.subheader("Stationarity Test")
-        st.write(f"Conclusion: The series is **{stationarity_result}**.")
+        st.markdown(
+                    """
+                    <div style="text-align: center;">
+                        <h2 style="color: #2B3A42;">📊 Stationarity Test</h2>
+                        <p style="font-size: 1.2rem;">Conclusion: The series is <strong>Stationary</strong>.</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
 
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
@@ -164,7 +172,15 @@ def main():
                 if data is None:
                     return
 
-                st.write("Preprocessed Monthly Data:")
+                st.markdown(
+                            """
+                            <div style="text-align: center;">
+                                <h3 style="color: #2B3A42;">📅 Preprocessed Monthly Data</h3>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+
                 st.dataframe(data)
 
                 # Determine Testing Period Dynamically
@@ -608,13 +624,23 @@ def main():
                 # Create a DataFrame for model comparison
                 comparison_data = []
                 for model, result in results.items():
-                    if "RMSE" in result and "MAPE" in result and isinstance(result["RMSE"], (int, float)) and isinstance(result["MAPE"], (int, float)):
-                        comparison_data.append({
-                            "Model": model,
-                            "RMSE": result["RMSE"],
-                            "MAPE": result["MAPE"]
-                        })
+                    # Ensure the result contains valid RMSE and MAPE values
+                    if isinstance(result, dict) and "RMSE" in result and "MAPE" in result:
+                        try:
+                            # Convert RMSE and MAPE to float (in case they are numpy.float64)
+                            rmse = float(result["RMSE"])
+                            mape = float(result["MAPE"])
+                            comparison_data.append({
+                                "Model": model,
+                                "RMSE": rmse,
+                                "MAPE": mape
+                            })
+                        except (TypeError, ValueError) as e:
+                            st.warning(f"⚠️ Invalid RMSE or MAPE for model {model}: {e}")
+                    else:
+                        st.warning(f"⚠️ Invalid result format for model {model}. Expected a dictionary with 'RMSE' and 'MAPE' keys.")
 
+                # Check if any valid models were added to the comparison
                 if comparison_data:
                     comparison = pd.DataFrame(comparison_data)
                     comparison = comparison.sort_values(by="RMSE")  # Sort models by accuracy (lower RMSE is better)
@@ -637,40 +663,43 @@ def main():
 
                 # 🔥 Detect High-Risk Periods in Forecast
                 if forecast_data is not None:
-                    forecast_data["change"] = forecast_data["yhat"].pct_change() * 100
-                    forecast_data["risk"] = "✅ Stable"
+                    try:
+                        forecast_data["change"] = forecast_data["yhat"].pct_change() * 100
+                        forecast_data["risk"] = "✅ Stable"
 
-                    for i in range(1, len(forecast_data)):
-                        if forecast_data["change"].iloc[i] < -20:
-                            forecast_data["risk"].iloc[i] = "❌ Major Decline"
-                        elif abs(forecast_data["change"].iloc[i]) > 15:
-                            forecast_data["risk"].iloc[i] = "⚠️ High Volatility"
+                        for i in range(1, len(forecast_data)):
+                            if forecast_data["change"].iloc[i] < -20:
+                                forecast_data["risk"].iloc[i] = "❌ Major Decline"
+                            elif abs(forecast_data["change"].iloc[i]) > 15:
+                                forecast_data["risk"].iloc[i] = "⚠️ High Volatility"
 
-                    st.markdown("### 🚨 High-Risk Sales Periods Identified")
-                    st.dataframe(forecast_data[["ds", "yhat", "change", "risk"]].style.applymap(
-                        lambda x: "background-color: #FFDDC1" if x == "❌ Major Decline" else
-                                "background-color: #FFEEAA" if x == "⚠️ High Volatility" else
-                                "background-color: #C6ECAE",
-                        subset=["risk"]
-                    ))
+                        st.markdown("### 🚨 High-Risk Sales Periods Identified")
+                        st.dataframe(forecast_data[["ds", "yhat", "change", "risk"]].style.applymap(
+                            lambda x: "background-color: #FFDDC1" if x == "❌ Major Decline" else
+                                    "background-color: #FFEEAA" if x == "⚠️ High Volatility" else
+                                    "background-color: #C6ECAE",
+                            subset=["risk"]
+                        ))
 
-                    # 📊 AI-Powered Insights
-                    highest_point = forecast_data.loc[forecast_data["yhat"].idxmax()]
-                    lowest_point = forecast_data.loc[forecast_data["yhat"].idxmin()]
-                    projected_growth = ((forecast_data["yhat"].iloc[-1] - test["y"].iloc[-1]) / test["y"].iloc[-1]) * 100
-                    trend = "📈 **Growth Expected**" if projected_growth > 0 else "📉 **Potential Decline**"
+                        # 📊 AI-Powered Insights
+                        highest_point = forecast_data.loc[forecast_data["yhat"].idxmax()]
+                        lowest_point = forecast_data.loc[forecast_data["yhat"].idxmin()]
+                        projected_growth = ((forecast_data["yhat"].iloc[-1] - test["y"].iloc[-1]) / test["y"].iloc[-1]) * 100
+                        trend = "📈 **Growth Expected**" if projected_growth > 0 else "📉 **Potential Decline**"
 
-                    insights_text = f"""
-                    - **Projected Sales Growth:** {abs(projected_growth):.2f}% {trend}
-                    - **Peak Sales Expected:** ${highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}
-                    - **Lowest Predicted Sales:** ${lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}
-                    - **Optimal Decision Window:** Plan around peak sales in {highest_point['ds'].strftime('%B %Y')}
-                    - **Risk Zones Identified:** Check months marked as 🔥 'High-Risk' above
-                    - **Volatility Analysis:** Forecast suggests a {'stable' if abs(projected_growth) < 5 else 'fluctuating'} trend
-                    """
+                        insights_text = f"""
+                        - **Projected Sales Growth:** {abs(projected_growth):.2f}% {trend}
+                        - **Peak Sales Expected:** ${highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}
+                        - **Lowest Predicted Sales:** ${lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}
+                        - **Optimal Decision Window:** Plan around peak sales in {highest_point['ds'].strftime('%B %Y')}
+                        - **Risk Zones Identified:** Check months marked as 🔥 'High-Risk' above
+                        - **Volatility Analysis:** Forecast suggests a {'stable' if abs(projected_growth) < 5 else 'fluctuating'} trend
+                        """
 
-                    with st.expander("🔮 AI-Powered Future Insights"):
-                        st.markdown(insights_text)
+                        with st.expander("🔮 AI-Powered Future Insights"):
+                            st.markdown(insights_text)
+                    except Exception as e:
+                        st.error(f"❌ Error analyzing forecast data: {e}")
 
                 # 📊 Multi-Model Forecast Visualization
                 st.markdown("### 🔍 Forecast Comparison Across Models")
@@ -713,13 +742,16 @@ def main():
                 # 📥 Download Forecast Data
                 st.markdown("### 📥 Download Forecast Data")
                 if forecast_data is not None:
-                    csv = forecast_data.to_csv(index=False)
-                    st.download_button(
-                        label="📩 Download Best Model Forecast (CSV)",
-                        data=csv,
-                        file_name="forecast.csv",
-                        mime="text/csv"
-                    )
+                    try:
+                        csv = forecast_data.to_csv(index=False)
+                        st.download_button(
+                            label="📩 Download Best Model Forecast (CSV)",
+                            data=csv,
+                            file_name="forecast.csv",
+                            mime="text/csv"
+                        )
+                    except Exception as e:
+                        st.error(f"❌ Error generating download file: {e}")
                 else:
                     st.warning("⚠️ No forecast data available for download.")
 
