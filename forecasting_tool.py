@@ -174,12 +174,12 @@ def main():
             # 🗂 Dropdowns for Column Selection (Centered)
             col1, col2 = st.columns([1, 1])
             with col1:
-                date_column = st.selectbox("📅 Select the Date Column:", data.columns, key="date_col")
+                date_column = st.selectbox("📅 Select the Date Column:", ["-- Select Column --"] + list(data.columns), key="date_col")
             with col2:
-                sales_column = st.selectbox("💰 Select the Sales Column:", data.columns, key="sales_col")
+                sales_column = st.selectbox("💰 Select the Sales Column:", ["-- Select Column --"] + list(data.columns), key="sales_col")
 
-            # 🚀 Disable "Start Forecast" Button Until Columns are Selected
-            if date_column and sales_column:
+            # 🚀 Disable "Start Forecast" Button Until Valid Selections
+            if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
                 start_forecast = st.button("✅ Start Forecast", key="start_btn", help="Click to generate your AI-powered forecast")
             else:
                 start_forecast = st.button("⏳ Select Columns First", disabled=True, key="start_disabled")
@@ -269,7 +269,7 @@ def main():
                         "MAPE": float(prophet_mape),
                         "Forecast": prophet_forecast
                     }
-
+    
                     with st.expander("📊 Prophet Model Summary"):
                         st.markdown(summary_text)
 
