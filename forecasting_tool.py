@@ -646,12 +646,21 @@ def main():
                 # Create a DataFrame for model comparison
                 comparison_data = []
                 for model, result in results.items():
+                    # Ensure the result contains valid RMSE and MAPE values
                     if isinstance(result, dict) and "RMSE" in result and "MAPE" in result:
-                        comparison_data.append({
-                            "Model": model,
-                            "RMSE": float(result["RMSE"]),
-                            "MAPE": float(result["MAPE"])
-                        })
+                        try:
+                            # Convert RMSE and MAPE to float (in case they are numpy.float64)
+                            rmse = float(result["RMSE"])
+                            mape = float(result["MAPE"])
+                            comparison_data.append({
+                                "Model": model,
+                                "RMSE": rmse,
+                                "MAPE": mape
+                            })
+                        except (TypeError, ValueError) as e:
+                            st.warning(f"⚠️ Invalid RMSE or MAPE for model {model}: {e}")
+                    else:
+                        st.warning(f"⚠️ Invalid result format for model {model}. Expected a dictionary with 'RMSE' and 'MAPE' keys.")
 
                 # Check if any valid models were added to the comparison
                 if comparison_data:
