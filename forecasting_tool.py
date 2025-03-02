@@ -204,7 +204,23 @@ def main():
                     unsafe_allow_html=True,
                 )
 
-                # 🖥 Expand table to full width (prevents horizontal scrolling)
+                # Custom CSS to center the DataFrame and make columns auto-width
+                st.markdown(
+                    """
+                    <style>
+                    .stDataFrame {
+                        margin: 0 auto;  /* Center the DataFrame */
+                        width: 100% !important;  /* Expand to full width */
+                    }
+                    .stDataFrame th, .stDataFrame td {
+                        white-space: nowrap;  /* Prevent text wrapping */
+                    }
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                # 🖥 Display the DataFrame with full width and auto-width columns
                 st.dataframe(
                     data,
                     width=1200,  # Adjust width for full-screen usage
