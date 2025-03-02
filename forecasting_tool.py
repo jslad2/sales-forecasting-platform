@@ -25,43 +25,6 @@ import time
 # Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
 st.set_page_config(layout="wide")
 
-# # --- Custom Styling for Streamlit ---
-# st.markdown("""
-#     <style>
-#         .stApp {
-#             background-color: #F4F4F6;
-#             color: #333333;
-#         }
-#         h1, h3 {
-#             color: #2B3A42;
-#             text-align: center;
-#         }
-#         .stButton>button {
-#             background-color: #2B3A42;
-#             color: white;
-#             border-radius: 6px;
-#             padding: 10px 20px;
-#             font-size: 16px;
-#         }
-#         .stButton>button:hover {
-#             background-color: #56BBAF;
-#         }
-#     </style>
-#     """,
-#     unsafe_allow_html=True
-# )
-
-# # --- Header ---
-# st.markdown(
-#     """
-#     <header style="background-color: #2B3A42; padding: 20px; text-align: center; color: white; border-radius: 12px;">
-#         <h1 style="margin: 0; font-size: 2.5rem;">Sales Dashboard</h1>
-#         <p style="margin: 0; font-size: 1.2rem;">Empowering Your Business with Data-Driven Insights</p>
-#     </header>
-#     """,
-#     unsafe_allow_html=True,
-# )
-
 @st.cache_data
 def check_stationarity(series):
     """
@@ -180,7 +143,6 @@ def find_best_prophet_params(train):
     return best_params, best_rmse
 
 def main():
-    st.title("Sales Forecasting Platform")
 
     # File Upload
     uploaded_file = st.file_uploader("Upload your sales data file", type=["csv"])
