@@ -510,7 +510,7 @@ def main():
                         X_train=x_train,
                         y_train=y_train,
                         task="regression",
-                        time_budget=60,
+                        time_budget=60,  # Reduced time budget for faster training
                         eval_method="cv",
                         estimator_list=["xgboost"],  # Force XGBoost, remove LGBM
                         metric="r2"  # Prioritize fitting trends over just minimizing error
@@ -549,12 +549,12 @@ def main():
                     future_df.fillna(method="ffill", inplace=True)
                     future_df.fillna(0, inplace=True)
 
+                    # ✅ Generate Forecast
                     automl_forecast = []
-
                     for i in range(forecast_period):
                         # ✅ Predict next forecast value
-                        next_forecast_log = automl_model.predict(future_df)[0]
-                        next_forecast = np.expm1(next_forecast_log)
+                        next_forecast_log = automl_model.predict(future_df)[0]  # Extract the first value
+                        next_forecast = np.expm1(next_forecast_log)  # Reverse log transformation
                         automl_forecast.append(next_forecast)
 
                         # ✅ Properly shift lag features dynamically
@@ -575,6 +575,24 @@ def main():
                         else:
                             future_df["peak_indicator"] = 0
 
+                    # ✅ Prepare Forecast DataFrame
+                    forecast_dates = pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M")
+                    forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": automl_forecast})
+
+                    # ✅ Calculate RMSE and MAPE
+                    test_y = test["y"].values
+                    automl_rmse = np.sqrt(mean_squared_error(test_y, forecast_df["yhat"][:len(test_y)]))
+                    automl_mape = mean_absolute_percentage_error(test_y, forecast_df["yhat"][:len(test_y)])
+
+                    # ✅ Save Results
+                    results["AutoML"] = {
+                        "RMSE": automl_rmse,
+                        "MAPE": automl_mape,
+                        "Forecast": forecast_df
+                    }
+
+                    st.success("✅ AutoML Forecast Generated Successfully!")
+
                 except Exception as e:
                     st.error(f"❌ AutoML Model failed: {e}")
 
@@ -586,13 +604,20 @@ def main():
 
                 # 📊 Model Performance Table
                 st.subheader("📌 Model Performance Comparison")
-                comparison = pd.DataFrame([
-                    {"Model": model, "RMSE": result["RMSE"], "MAPE": result["MAPE"]}
-                    for model, result in results.items() if "RMSE" in result and "MAPE" in result
-                ])
 
-                if not comparison.empty and "RMSE" in comparison.columns:
-                    comparison = comparison.sort_values(by="RMSE")  # Sort models by accuracy
+                # Create a DataFrame for model comparison
+                comparison_data = []
+                for model, result in results.items():
+                    if "RMSE" in result and "MAPE" in result and isinstance(result["RMSE"], (int, float)) and isinstance(result["MAPE"], (int, float)):
+                        comparison_data.append({
+                            "Model": model,
+                            "RMSE": result["RMSE"],
+                            "MAPE": result["MAPE"]
+                        })
+
+                if comparison_data:
+                    comparison = pd.DataFrame(comparison_data)
+                    comparison = comparison.sort_values(by="RMSE")  # Sort models by accuracy (lower RMSE is better)
                     st.dataframe(comparison.style.highlight_min(subset=["RMSE", "MAPE"], color="lightgreen"))
 
                     # 🏆 AI-Selected Best Model
@@ -668,7 +693,6 @@ def main():
                 for model, result in results.items():
                     if "Forecast" in result and result["Forecast"] is not None and not result["Forecast"].empty:
                         forecast_df = result["Forecast"]
-
                         fig.add_trace(go.Scatter(
                             x=forecast_df["ds"],
                             y=forecast_df["yhat"],
@@ -689,7 +713,13 @@ def main():
                 # 📥 Download Forecast Data
                 st.markdown("### 📥 Download Forecast Data")
                 if forecast_data is not None:
-                    st.download_button("📩 Download Best Model Forecast (CSV)", forecast_data.to_csv(index=False), "forecast.csv", "text/csv")
+                    csv = forecast_data.to_csv(index=False)
+                    st.download_button(
+                        label="📩 Download Best Model Forecast (CSV)",
+                        data=csv,
+                        file_name="forecast.csv",
+                        mime="text/csv"
+                    )
                 else:
                     st.warning("⚠️ No forecast data available for download.")
 
