@@ -172,14 +172,24 @@ def main():
                 if data is None:
                     return
 
+                # 📅 Centered Preprocessed Monthly Data Section
                 st.markdown(
-                            """
-                            <div style="text-align: center;">
-                                <h3 style="color: #2B3A42;">📅 Preprocessed Monthly Data</h3>
-                            </div>
-                            """,
-                            unsafe_allow_html=True,
-                        )
+                    """
+                    <div style="text-align: center;">
+                        <h2 style="color: #2B3A42;">
+                            <span style="font-size: 1.5em;">📅</span> Preprocessed Monthly Data
+                        </h2>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+                # 🖥 Expand table to full width (prevents horizontal scrolling)
+                st.dataframe(
+                    data,
+                    width=1200,  # Adjust width for full-screen usage
+                    height=400  # Adjust height to display more rows at once
+                )
 
                 st.dataframe(data)
 
