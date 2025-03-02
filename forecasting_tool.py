@@ -357,12 +357,6 @@ def main():
                         f"  - MAPE: {arima_mape:.2f}\n"
                     )
 
-                    results = {
-                        "RMSE": arima_rmse,
-                        "MAPE": arima_mape,
-                        "Forecast": forecast_df
-                    }
-
                     with st.expander("📊 ARIMA Model Summary"):
                         st.markdown(summary_text)
 
