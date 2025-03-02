@@ -565,7 +565,7 @@ def main():
                         X_train=x_train,
                         y_train=y_train,
                         task="regression",
-                        time_budget=60,  # Reduced time budget for faster training
+                        time_budget=600,  # Reduced time budget for faster training
                         eval_method="cv",
                         estimator_list=["xgboost"],  # Force XGBoost, remove LGBM
                         metric="r2"  # Prioritize fitting trends over just minimizing error
