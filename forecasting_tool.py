@@ -624,7 +624,7 @@ def main():
                 # Create a DataFrame for model comparison
                 comparison_data = []
                 for model, result in results.items():
-                    # Ensure the result contains valid RMSE and MAPE values
+                    # Ensure the result is a dictionary and contains valid RMSE and MAPE values
                     if isinstance(result, dict) and "RMSE" in result and "MAPE" in result:
                         try:
                             # Convert RMSE and MAPE to float (in case they are numpy.float64)
