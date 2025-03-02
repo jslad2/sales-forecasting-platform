@@ -548,7 +548,7 @@ def main():
                         X_train=x_train,
                         y_train=y_train,
                         task="regression",
-                        time_budget=600,
+                        time_budget=60,
                         eval_method="cv",
                         estimator_list=["xgboost"],  # Force XGBoost, remove LGBM
                         metric="r2"  # Prioritize fitting trends over just minimizing error
@@ -730,7 +730,6 @@ def main():
                     st.download_button("📩 Download Best Model Forecast (CSV)", forecast_data.to_csv(index=False), "forecast.csv", "text/csv")
                 else:
                     st.warning("⚠️ No forecast data available for download.")
-
 
         except Exception as e:
             st.error(f"Error processing file: {e}")
