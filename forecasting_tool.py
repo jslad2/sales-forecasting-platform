@@ -191,8 +191,6 @@ def main():
                     height=400  # Adjust height to display more rows at once
                 )
 
-                st.dataframe(data)
-
                 # Determine Testing Period Dynamically
                 testing_period = int(len(data) * 0.2)
                 train = data.iloc[:-testing_period]
@@ -270,7 +268,13 @@ def main():
 
                     st.plotly_chart(fig, use_container_width=True)
 
-                    # return results
+                    # Populate results dictionary
+                    results["Prophet"] = {
+                        "RMSE": float(prophet_rmse),
+                        "MAPE": float(prophet_mape),
+                        "Forecast": prophet_forecast
+                    }
+
                 except Exception as e:
                     st.warning(f"Failed to train Prophet model: {e}")
                     
@@ -352,6 +356,13 @@ def main():
                     )
 
                     st.plotly_chart(fig, use_container_width=True)
+
+                        # Populate results dictionary
+                    results["ARIMA"] = {
+                        "RMSE": float(arima_rmse),
+                        "MAPE": float(arima_mape),
+                        "Forecast": forecast_df
+                    }
 
                 except Exception as e:
                     st.warning(f"ARIMA Model failed: {e}")
@@ -458,9 +469,10 @@ def main():
 
                     st.plotly_chart(fig, use_container_width=True)
 
+                    # Populate results dictionary
                     results["XGBoost"] = {
-                        "RMSE": rmse,
-                        "MAPE": mape,
+                        "RMSE": float(xgb_rmse),
+                        "MAPE": float(xgb_mape),
                         "Forecast": forecast_df
                     }
                 except Exception as e:
@@ -610,10 +622,10 @@ def main():
                     automl_rmse = np.sqrt(mean_squared_error(test_y, forecast_df["yhat"][:len(test_y)]))
                     automl_mape = mean_absolute_percentage_error(test_y, forecast_df["yhat"][:len(test_y)])
 
-                    # ✅ Save Results
+                    # Populate results dictionary
                     results["AutoML"] = {
-                        "RMSE": automl_rmse,
-                        "MAPE": automl_mape,
+                        "RMSE": float(automl_rmse),
+                        "MAPE": float(automl_mape),
                         "Forecast": forecast_df
                     }
 
@@ -634,22 +646,13 @@ def main():
                 # Create a DataFrame for model comparison
                 comparison_data = []
                 for model, result in results.items():
-                    # Ensure the result is a dictionary and contains valid RMSE and MAPE values
                     if isinstance(result, dict) and "RMSE" in result and "MAPE" in result:
-                        try:
-                            # Convert RMSE and MAPE to float (in case they are numpy.float64)
-                            rmse = float(result["RMSE"])
-                            mape = float(result["MAPE"])
-                            comparison_data.append({
-                                "Model": model,
-                                "RMSE": rmse,
-                                "MAPE": mape
-                            })
-                        except (TypeError, ValueError) as e:
-                            st.warning(f"⚠️ Invalid RMSE or MAPE for model {model}: {e}")
-                    else:
-                        st.warning(f"⚠️ Invalid result format for model {model}. Expected a dictionary with 'RMSE' and 'MAPE' keys.")
-
+                        comparison_data.append({
+                            "Model": model,
+                            "RMSE": float(result["RMSE"]),
+                            "MAPE": float(result["MAPE"])
+                        })
+                        
                 # Check if any valid models were added to the comparison
                 if comparison_data:
                     comparison = pd.DataFrame(comparison_data)
