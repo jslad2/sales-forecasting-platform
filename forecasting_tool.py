@@ -479,7 +479,6 @@ def main():
                     st.warning(f"XGBoost Model failed: {e}")
                     
                 st.write("🚀 Training AutoML Model...")
-
                 try:
                     # ✅ Step 1: Feature Engineering
                     automl_data = train.copy()
@@ -618,41 +617,49 @@ def main():
                     st.error(f"❌ AutoML Model failed: {e}")
 
 
+                # ✅ Ensure at least one model generated forecasts
+                if not results:
+                    st.error("⚠️ No models successfully generated forecasts. Please check your input data.")
+                    st.stop()
+
                 # 📊 Model Performance Table
                 st.subheader("📌 Model Performance Comparison")
                 comparison = pd.DataFrame([
                     {"Model": model, "RMSE": result["RMSE"], "MAPE": result["MAPE"]}
-                    for model, result in results.items()
+                    for model, result in results.items() if "RMSE" in result and "MAPE" in result
                 ])
 
-                # Sort by RMSE (lower is better)
-                comparison = comparison.sort_values(by="RMSE")
-                st.dataframe(comparison.style.highlight_min(subset=["RMSE", "MAPE"], color="lightgreen"))
+                if not comparison.empty and "RMSE" in comparison.columns:
+                    comparison = comparison.sort_values(by="RMSE")  # Sort models by accuracy
+                    st.dataframe(comparison.style.highlight_min(subset=["RMSE", "MAPE"], color="lightgreen"))
 
-                # 🏆 Auto-Select the Best Model
-                best_model = comparison.iloc[0]["Model"]  # Model with the lowest RMSE
-                st.success(f"✨ **AI-Selected Best Model:** {best_model}")
+                    # 🏆 AI-Selected Best Model
+                    best_model = comparison.iloc[0]["Model"]
+                    st.success(f"✨ **AI-Selected Best Model:** {best_model}")
 
-                # Ensure forecast data exists for the best model
-                if best_model in results and "Forecast" in results[best_model] and not results[best_model]["Forecast"].empty:
-                    forecast_data = results[best_model]["Forecast"]
+                    # ✅ Validate forecast data
+                    if best_model and best_model in results and "Forecast" in results[best_model] and isinstance(results[best_model]["Forecast"], pd.DataFrame) and not results[best_model]["Forecast"].empty:
+                        forecast_data = results[best_model]["Forecast"]
+                    else:
+                        st.warning("⚠️ No valid forecast data available.")
+                        forecast_data = None
                 else:
-                    forecast_data = None  # Handle missing forecast case
+                    st.error("⚠️ No valid model results available for comparison.")
+                    best_model = None
+                    forecast_data = None
 
-                # 🔥 High-Risk Period Detection (Sudden Drops & Fluctuations)
-                st.markdown("### 🚨 High-Risk Sales Periods Identified")
-
+                # 🔥 Detect High-Risk Periods in Forecast
                 if forecast_data is not None:
-                    forecast_data["change"] = forecast_data["yhat"].pct_change() * 100  # Calculate percentage change
+                    forecast_data["change"] = forecast_data["yhat"].pct_change() * 100
                     forecast_data["risk"] = "✅ Stable"
 
                     for i in range(1, len(forecast_data)):
-                        if forecast_data["change"].iloc[i] < -20:  # Sales drop > 20%
+                        if forecast_data["change"].iloc[i] < -20:
                             forecast_data["risk"].iloc[i] = "❌ Major Decline"
-                        elif abs(forecast_data["change"].iloc[i]) > 15:  # Fluctuation > 15%
+                        elif abs(forecast_data["change"].iloc[i]) > 15:
                             forecast_data["risk"].iloc[i] = "⚠️ High Volatility"
 
-                    # Display risk analysis table
+                    st.markdown("### 🚨 High-Risk Sales Periods Identified")
                     st.dataframe(forecast_data[["ds", "yhat", "change", "risk"]].style.applymap(
                         lambda x: "background-color: #FFDDC1" if x == "❌ Major Decline" else
                                 "background-color: #FFEEAA" if x == "⚠️ High Volatility" else
@@ -660,7 +667,7 @@ def main():
                         subset=["risk"]
                     ))
 
-                    # 🔍 AI Insights Summary
+                    # 📊 AI-Powered Insights
                     highest_point = forecast_data.loc[forecast_data["yhat"].idxmax()]
                     lowest_point = forecast_data.loc[forecast_data["yhat"].idxmin()]
                     projected_growth = ((forecast_data["yhat"].iloc[-1] - test["y"].iloc[-1]) / test["y"].iloc[-1]) * 100
@@ -680,8 +687,6 @@ def main():
 
                 # 📊 Multi-Model Forecast Visualization
                 st.markdown("### 🔍 Forecast Comparison Across Models")
-
-                # Define colors for different models
                 model_colors = {
                     "Prophet": "blue",
                     "ARIMA": "green",
@@ -689,10 +694,7 @@ def main():
                     "AutoML": "purple"
                 }
 
-                # Create Plotly Figure
                 fig = go.Figure()
-
-                # Add Historical Data
                 fig.add_trace(go.Scatter(
                     x=train["ds"],
                     y=train["y"],
@@ -701,7 +703,6 @@ def main():
                     line=dict(color="black", width=2)
                 ))
 
-                # Add Forecasts for Each Model
                 for model, result in results.items():
                     if "Forecast" in result and result["Forecast"] is not None and not result["Forecast"].empty:
                         forecast_df = result["Forecast"]
@@ -714,7 +715,6 @@ def main():
                             line=dict(width=2, color=model_colors.get(model, "gray"))
                         ))
 
-                # Final Plot Formatting
                 fig.update_layout(
                     title="📊 Multi-Model Sales Forecast",
                     xaxis_title="Date",
@@ -722,8 +722,6 @@ def main():
                     legend_title="Models",
                     template="plotly_white"
                 )
-
-                # Show the Chart
                 st.plotly_chart(fig, use_container_width=True)
 
                 # 📥 Download Forecast Data
@@ -732,6 +730,7 @@ def main():
                     st.download_button("📩 Download Best Model Forecast (CSV)", forecast_data.to_csv(index=False), "forecast.csv", "text/csv")
                 else:
                     st.warning("⚠️ No forecast data available for download.")
+
 
         except Exception as e:
             st.error(f"Error processing file: {e}")
