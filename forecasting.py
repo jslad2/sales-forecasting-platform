@@ -39,13 +39,6 @@ def display_intro():
                 SynovaAI helps businesses forecast sales, demand, and inventory with AI-powered predictive analytics.
                 Gain <strong>data-driven insights</strong> and optimize your strategy today.
             </p>
-            <div style="text-align: center; margin-top: 20px;">
-                <a href="https://synovaai.com" target="_blank" 
-                   style="background-color: #64D8CB; color: white; padding: 12px 24px; text-decoration: none; font-size: 1rem; 
-                          border-radius: 8px; font-weight: bold;">
-                    Learn More About AI Forecasting
-                </a>
-            </div>
         </section>
         """,
         unsafe_allow_html=True,
