@@ -262,13 +262,6 @@ def main():
                         f"  - RMSE: {prophet_rmse:.2f}\n"
                         f"  - MAPE: {prophet_mape:.2f}\n"
                     )
-
-                    # Populate results dictionary
-                    results["Prophet"] = {
-                        "RMSE": float(prophet_rmse),
-                        "MAPE": float(prophet_mape),
-                        "Forecast": prophet_forecast
-                    }
     
                     with st.expander("📊 Prophet Model Summary"):
                         st.markdown(summary_text)
@@ -289,6 +282,12 @@ def main():
 
                     st.plotly_chart(fig, use_container_width=True)
 
+                    # Populate results dictionary
+                    results["Prophet"] = {
+                        "RMSE": float(prophet_rmse),
+                        "MAPE": float(prophet_mape),
+                        "Forecast": prophet_forecast
+                    }
                 except Exception as e:
                     st.warning(f"Failed to train Prophet model: {e}")
                     
