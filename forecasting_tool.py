@@ -161,12 +161,32 @@ def main():
             st.write("Uploaded Data:")
             st.dataframe(data)
 
-            # Column Mapping
-            st.subheader("Map Your Columns")
-            date_column = st.selectbox("Select the Date Column:", data.columns)
-            sales_column = st.selectbox("Select the Sales Column:", data.columns)
+            # 📌 Center "Map Your Columns" Section
+            st.markdown(
+                """
+                <div style="text-align: center;">
+                    <h2 style="color: #2B3A42;">🛠️ Map Your Columns</h2>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-            if st.button("Start Forecast"):
+            # 🗂 Dropdowns for Column Selection (Centered)
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                date_column = st.selectbox("📅 Select the Date Column:", data.columns, key="date_col")
+            with col2:
+                sales_column = st.selectbox("💰 Select the Sales Column:", data.columns, key="sales_col")
+
+            # 🚀 Disable "Start Forecast" Button Until Columns are Selected
+            if date_column and sales_column:
+                start_forecast = st.button("✅ Start Forecast", key="start_btn", help="Click to generate your AI-powered forecast")
+            else:
+                start_forecast = st.button("⏳ Select Columns First", disabled=True, key="start_disabled")
+
+            # 🏁 Run Forecast Only If Button is Clicked
+            if start_forecast:
+                # Run forecast logic
                 # Preprocess Data
                 data = preprocess_data(data, date_column, sales_column)
                 if data is None:
