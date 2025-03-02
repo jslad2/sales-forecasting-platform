@@ -61,7 +61,6 @@ def preprocess_data(data, date_column, sales_column):
                     unsafe_allow_html=True,
                 )
 
-
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
             data["y"] = data["y"].diff().dropna()
@@ -192,40 +191,37 @@ def main():
                 if data is None:
                     return
 
-                # 📅 Centered Preprocessed Monthly Data Section
+                # ✅ Centered Header with Icon
                 st.markdown(
                     """
                     <div style="text-align: center;">
-                        <h2 style="color: #2B3A42;">
-                            <span style="font-size: 1.5em;">📅</span> Preprocessed Monthly Data
+                        <h2 style="color: #2B3A42; font-size: 1.8em;">
+                            📅 Preprocessed Monthly Data
                         </h2>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
 
-                # Custom CSS to center the DataFrame and make columns auto-width
-                st.markdown(
-                    """
-                    <style>
-                    .stDataFrame {
-                        margin: 0 auto;  /* Center the DataFrame */
-                        width: 100% !important;  /* Expand to full width */
-                    }
-                    .stDataFrame th, .stDataFrame td {
-                        white-space: nowrap;  /* Prevent text wrapping */
-                    }
-                    </style>
-                    """,
-                    unsafe_allow_html=True
-                )
+                # ✅ Use Streamlit's Expander to Organize Data
+                with st.expander("📊 View Processed Data"):
+                    # ✅ Adjust Column Widths Dynamically
+                    st.markdown(
+                        """
+                        <style>
+                        .stDataFrame { text-align: center; margin: auto; }
+                        .stDataFrame table { width: 100% !important; }
+                        </style>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
-                # 🖥 Display the DataFrame with full width and auto-width columns
-                st.dataframe(
-                    data,
-                    width=1200,  # Adjust width for full-screen usage
-                    height=400  # Adjust height to display more rows at once
-                )
+                    # ✅ Display DataFrame with Improved Spacing
+                    st.dataframe(
+                        data.style.set_properties(**{"text-align": "center"}),
+                        width=1400,  # Wider Table
+                        height=450   # Show More Rows
+                    )
 
                 # Determine Testing Period Dynamically
                 testing_period = int(len(data) * 0.2)
@@ -306,362 +302,360 @@ def main():
                     }
                 except Exception as e:
                     st.warning(f"Failed to train Prophet model: {e}")
+
+                # st.write("Training ARIMA Model...")
+                # try:
+                #     # Analyze seasonality dynamically
+                #     if len(train) <= 12:
+                #         st.warning("Insufficient data for seasonal differencing. Using non-seasonal ARIMA.")
+                #         seasonal = False
+                #     else:
+                #         st.write("Analyzing seasonality in the data...")
+                #         decomposition = seasonal_decompose(train["y"], model="additive", period=12)
+                #         seasonality_present = np.any(np.abs(decomposition.seasonal) > 0.01)
+
+                #         if seasonality_present:
+                #             st.write("Seasonality detected. Using seasonal ARIMA.")
+                #             seasonal = True
+                #         else:
+                #             st.write("No significant seasonality detected. Using non-seasonal ARIMA.")
+                #             seasonal = False
+
+                #     # Automatically configure ARIMA model
+                #     arima_model = auto_arima(
+                #         train["y"],
+                #         seasonal=seasonal,
+                #         m=12 if seasonal else 1,
+                #         d=1,
+                #         D=1 if seasonal else 0,
+                #         trace=True,
+                #         suppress_warnings=True,
+                #         error_action="ignore",
+                #         stepwise=True
+                #     )
+
+                #     # Generate future forecast
+                #     arima_forecast = arima_model.predict(n_periods=forecast_period)
+                #     forecast_dates = pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M")
+                #     forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": arima_forecast})
+
+                #     # Evaluate performance
+                #     arima_rmse = mean_squared_error(test["y"], arima_forecast[:len(test)]) ** 0.5
+                #     arima_mape = mean_absolute_percentage_error(test["y"], arima_forecast[:len(test)])
+
+                #     # Identify high and low points
+                #     highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
+                #     lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
+
+                #     summary_text = (
+                #         f"### Key Insights\n"
+                #         f"- **Projected Growth:** Sales are expected to {'increase' if forecast_df['yhat'].iloc[-1] > test['y'].iloc[-1] else 'decrease'} by {abs(((forecast_df['yhat'].iloc[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100):.2f}% in the next period.\n"
+                #         f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
+                #         f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
+                #         f"- **Performance Metrics:**\n"
+                #         f"  - RMSE: {arima_rmse:.2f}\n"
+                #         f"  - MAPE: {arima_mape:.2f}\n"
+                #     )
+
+                #     results = {
+                #         "RMSE": arima_rmse,
+                #         "MAPE": arima_mape,
+                #         "Forecast": forecast_df
+                #     }
+
+                #     with st.expander("📊 ARIMA Model Summary"):
+                #         st.markdown(summary_text)
+
+                #     fig = go.Figure()
+                #     fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
+                #     fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"], mode="lines", name="Forecast", line=dict(color="green", width=2)))
+
+                #     fig.update_layout(
+                #         title="ARIMA Forecast",
+                #         xaxis_title="Date",
+                #         yaxis_title="Sales",
+                #         legend_title="Legend",
+                #         template="plotly_white"
+                #     )
+
+                #     st.plotly_chart(fig, use_container_width=True)
+
+                #         # Populate results dictionary
+                #     results["ARIMA"] = {
+                #         "RMSE": float(arima_rmse),
+                #         "MAPE": float(arima_mape),
+                #         "Forecast": forecast_df
+                #     }
+
+                # except Exception as e:
+                #     st.warning(f"ARIMA Model failed: {e}")
+
+
+                # # XGBoost Model with Optimizations
+                # st.write("Training XGBoost Model...")
+                # try:
+                #     # Step 1: Feature Engineering
+                #     max_lag = 2  # Use only 2 lags
+                #     rolling_windows = [3]  # Use only rolling mean with window 3
+                #     xgb_data = train.copy()
+
+                #     # Create lag features
+                #     for lag in range(1, max_lag + 1):
+                #         xgb_data[f"lag_{lag}"] = xgb_data["y"].shift(lag)
+
+                #     # Add rolling statistics
+                #     for window in rolling_windows:
+                #         xgb_data[f"rolling_mean_{window}"] = xgb_data["y"].rolling(window=window).mean()
+
+                #     # Add basic time-based features
+                #     xgb_data["month"] = xgb_data["ds"].dt.month
+                #     xgb_data["quarter"] = xgb_data["ds"].dt.quarter
+                #     xgb_data["year"] = xgb_data["ds"].dt.year
+
+                #     xgb_data.dropna(inplace=True)
+
+                #     # Prepare training data
+                #     x_train = xgb_data.drop(columns=["y", "ds"])
+                #     y_train = xgb_data["y"]
+
+                #     # Step 2: Train Final Model
+                #     final_model = XGBRegressor(
+                #         n_estimators=50,  # Reduced number of trees
+                #         max_depth=3,       # Reduced depth
+                #         learning_rate=0.2,  # Increased learning rate
+                #         objective="reg:squarederror",
+                #         random_state=42,
+                #         n_jobs=-1  # Use all cores
+                #     )
+                #     final_model.fit(x_train, y_train)
+
+                #     # Step 3: Forecast Future Values
+                #     future_features = []
+                #     for i in range(forecast_period):
+                #         future_row = {
+                #             f"lag_{lag}": train["y"].iloc[-lag] if lag <= len(train) else np.nan
+                #             for lag in range(1, max_lag + 1)
+                #         }
+                #         future_row["rolling_mean_3"] = train["y"].rolling(window=min(3, len(train))).mean().iloc[-1] if len(train) > 1 else np.nan
+                #         future_row["month"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).month
+                #         future_row["quarter"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).quarter
+                #         future_row["year"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).year
+                #         future_features.append(future_row)
+
+                #     future_df = pd.DataFrame(future_features)
+                #     future_df.fillna(method="ffill", inplace=True)  # Forward fill missing values
+                #     xgb_forecast = final_model.predict(future_df)
+
+                #     # Ensure test['y'] length matches xgb_forecast
+                #     matching_length = min(len(test["y"]), len(xgb_forecast))
+                #     test_y_trimmed = test["y"].iloc[:matching_length]
+                #     xgb_forecast_trimmed = xgb_forecast[:matching_length]
+
+                #     # Calculate RMSE and MAPE with matched lengths
+                #     rmse = mean_squared_error(test_y_trimmed, xgb_forecast_trimmed) ** 0.5  # RMSE = sqrt(MSE)
+                #     mape = mean_absolute_percentage_error(test_y_trimmed, xgb_forecast_trimmed)
+
+                #     # Save Results
+                #     forecast_df = pd.DataFrame({
+                #         "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
+                #         "yhat": xgb_forecast
+                #     })
+
+                #     highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
+                #     lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
+
+                #     summary_text = (
+                #         f"### Key Insights\n"
+                #         f"- **Projected Growth:** Sales are expected to {'increase' if xgb_forecast[-1] > test['y'].iloc[-1] else 'decrease'} "
+                #         f"by {abs((xgb_forecast[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100:.2f}% in the next period.\n"
+                #         f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
+                #         f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
+                #         f"- **Performance Metrics:**\n"
+                #         f"  - RMSE: {rmse:.2f}\n"
+                #         f"  - MAPE: {mape:.2f}\n"
+                #     )
+
+                #     with st.expander("📊 XGBoost Model Summary"):
+                #         st.markdown(summary_text)
+
+                #     fig = go.Figure()
+                #     fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
+                #     fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"], mode="lines", name="Forecast", line=dict(color="red", width=2)))
+
+                #     fig.update_layout(
+                #         title="XGBoost Forecast",
+                #         xaxis_title="Date",
+                #         yaxis_title="Sales",
+                #         legend_title="Legend",
+                #         template="plotly_white"
+                #     )
+
+                #     st.plotly_chart(fig, use_container_width=True)
+
+                #     # Populate results dictionary
+                #     results["XGBoost"] = {
+                #         "RMSE": float(rmse),
+                #         "MAPE": float(mape),
+                #         "Forecast": forecast_df
+                #     }
+                # except Exception as e:
+                #     st.warning(f"XGBoost Model failed: {e}")
                     
-
-
-                st.write("Training ARIMA Model...")
-                try:
-                    # Analyze seasonality dynamically
-                    if len(train) <= 12:
-                        st.warning("Insufficient data for seasonal differencing. Using non-seasonal ARIMA.")
-                        seasonal = False
-                    else:
-                        st.write("Analyzing seasonality in the data...")
-                        decomposition = seasonal_decompose(train["y"], model="additive", period=12)
-                        seasonality_present = np.any(np.abs(decomposition.seasonal) > 0.01)
-
-                        if seasonality_present:
-                            st.write("Seasonality detected. Using seasonal ARIMA.")
-                            seasonal = True
-                        else:
-                            st.write("No significant seasonality detected. Using non-seasonal ARIMA.")
-                            seasonal = False
-
-                    # Automatically configure ARIMA model
-                    arima_model = auto_arima(
-                        train["y"],
-                        seasonal=seasonal,
-                        m=12 if seasonal else 1,
-                        d=1,
-                        D=1 if seasonal else 0,
-                        trace=True,
-                        suppress_warnings=True,
-                        error_action="ignore",
-                        stepwise=True
-                    )
-
-                    # Generate future forecast
-                    arima_forecast = arima_model.predict(n_periods=forecast_period)
-                    forecast_dates = pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M")
-                    forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": arima_forecast})
-
-                    # Evaluate performance
-                    arima_rmse = mean_squared_error(test["y"], arima_forecast[:len(test)]) ** 0.5
-                    arima_mape = mean_absolute_percentage_error(test["y"], arima_forecast[:len(test)])
-
-                    # Identify high and low points
-                    highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
-                    lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
-
-                    summary_text = (
-                        f"### Key Insights\n"
-                        f"- **Projected Growth:** Sales are expected to {'increase' if forecast_df['yhat'].iloc[-1] > test['y'].iloc[-1] else 'decrease'} by {abs(((forecast_df['yhat'].iloc[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100):.2f}% in the next period.\n"
-                        f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
-                        f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
-                        f"- **Performance Metrics:**\n"
-                        f"  - RMSE: {arima_rmse:.2f}\n"
-                        f"  - MAPE: {arima_mape:.2f}\n"
-                    )
-
-                    results = {
-                        "RMSE": arima_rmse,
-                        "MAPE": arima_mape,
-                        "Forecast": forecast_df
-                    }
-
-                    with st.expander("📊 ARIMA Model Summary"):
-                        st.markdown(summary_text)
-
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
-                    fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"], mode="lines", name="Forecast", line=dict(color="green", width=2)))
-
-                    fig.update_layout(
-                        title="ARIMA Forecast",
-                        xaxis_title="Date",
-                        yaxis_title="Sales",
-                        legend_title="Legend",
-                        template="plotly_white"
-                    )
-
-                    st.plotly_chart(fig, use_container_width=True)
-
-                        # Populate results dictionary
-                    results["ARIMA"] = {
-                        "RMSE": float(arima_rmse),
-                        "MAPE": float(arima_mape),
-                        "Forecast": forecast_df
-                    }
-
-                except Exception as e:
-                    st.warning(f"ARIMA Model failed: {e}")
-
-
-                # XGBoost Model with Optimizations
-                st.write("Training XGBoost Model...")
-                try:
-                    # Step 1: Feature Engineering
-                    max_lag = 2  # Use only 2 lags
-                    rolling_windows = [3]  # Use only rolling mean with window 3
-                    xgb_data = train.copy()
-
-                    # Create lag features
-                    for lag in range(1, max_lag + 1):
-                        xgb_data[f"lag_{lag}"] = xgb_data["y"].shift(lag)
-
-                    # Add rolling statistics
-                    for window in rolling_windows:
-                        xgb_data[f"rolling_mean_{window}"] = xgb_data["y"].rolling(window=window).mean()
-
-                    # Add basic time-based features
-                    xgb_data["month"] = xgb_data["ds"].dt.month
-                    xgb_data["quarter"] = xgb_data["ds"].dt.quarter
-                    xgb_data["year"] = xgb_data["ds"].dt.year
-
-                    xgb_data.dropna(inplace=True)
-
-                    # Prepare training data
-                    x_train = xgb_data.drop(columns=["y", "ds"])
-                    y_train = xgb_data["y"]
-
-                    # Step 2: Train Final Model
-                    final_model = XGBRegressor(
-                        n_estimators=50,  # Reduced number of trees
-                        max_depth=3,       # Reduced depth
-                        learning_rate=0.2,  # Increased learning rate
-                        objective="reg:squarederror",
-                        random_state=42,
-                        n_jobs=-1  # Use all cores
-                    )
-                    final_model.fit(x_train, y_train)
-
-                    # Step 3: Forecast Future Values
-                    future_features = []
-                    for i in range(forecast_period):
-                        future_row = {
-                            f"lag_{lag}": train["y"].iloc[-lag] if lag <= len(train) else np.nan
-                            for lag in range(1, max_lag + 1)
-                        }
-                        future_row["rolling_mean_3"] = train["y"].rolling(window=min(3, len(train))).mean().iloc[-1] if len(train) > 1 else np.nan
-                        future_row["month"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).month
-                        future_row["quarter"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).quarter
-                        future_row["year"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).year
-                        future_features.append(future_row)
-
-                    future_df = pd.DataFrame(future_features)
-                    future_df.fillna(method="ffill", inplace=True)  # Forward fill missing values
-                    xgb_forecast = final_model.predict(future_df)
-
-                    # Ensure test['y'] length matches xgb_forecast
-                    matching_length = min(len(test["y"]), len(xgb_forecast))
-                    test_y_trimmed = test["y"].iloc[:matching_length]
-                    xgb_forecast_trimmed = xgb_forecast[:matching_length]
-
-                    # Calculate RMSE and MAPE with matched lengths
-                    rmse = mean_squared_error(test_y_trimmed, xgb_forecast_trimmed) ** 0.5  # RMSE = sqrt(MSE)
-                    mape = mean_absolute_percentage_error(test_y_trimmed, xgb_forecast_trimmed)
-
-                    # Save Results
-                    forecast_df = pd.DataFrame({
-                        "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
-                        "yhat": xgb_forecast
-                    })
-
-                    highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
-                    lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
-
-                    summary_text = (
-                        f"### Key Insights\n"
-                        f"- **Projected Growth:** Sales are expected to {'increase' if xgb_forecast[-1] > test['y'].iloc[-1] else 'decrease'} "
-                        f"by {abs((xgb_forecast[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100:.2f}% in the next period.\n"
-                        f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
-                        f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
-                        f"- **Performance Metrics:**\n"
-                        f"  - RMSE: {rmse:.2f}\n"
-                        f"  - MAPE: {mape:.2f}\n"
-                    )
-
-                    with st.expander("📊 XGBoost Model Summary"):
-                        st.markdown(summary_text)
-
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
-                    fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"], mode="lines", name="Forecast", line=dict(color="red", width=2)))
-
-                    fig.update_layout(
-                        title="XGBoost Forecast",
-                        xaxis_title="Date",
-                        yaxis_title="Sales",
-                        legend_title="Legend",
-                        template="plotly_white"
-                    )
-
-                    st.plotly_chart(fig, use_container_width=True)
-
-                    # Populate results dictionary
-                    results["XGBoost"] = {
-                        "RMSE": float(rmse),
-                        "MAPE": float(mape),
-                        "Forecast": forecast_df
-                    }
-                except Exception as e:
-                    st.warning(f"XGBoost Model failed: {e}")
-                    
-                st.write("🚀 Training AutoML Model...")
-                try:
-                    # ✅ Step 1: Feature Engineering
-                    automl_data = train.copy()
-
-                    # ✅ Dynamically determine max_lag based on dataset size
-                    if len(train) <= 6:
-                        max_lag = min(3, len(train) - 1)  # Minimum 3 months for very small datasets
-                    elif len(train) <= 12:
-                        max_lag = min(6, len(train) - 1)  # Use up to 6 months for medium datasets
-                    elif len(train) <= 24:
-                        max_lag = min(12, len(train) - 1)  # Use up to 12 months for moderately large datasets
-                    else:
-                        max_lag = min(24, len(train) - 1)  # Use up to 24 months for long datasets
-
-                    st.write(f"🔹 Adjusted Max Lags Used: {max_lag}")
-
-                    # ✅ Add lag features
-                    for lag in range(1, max_lag + 1):
-                        automl_data[f"lag_{lag}"] = automl_data["y"].shift(lag)
-
-                    # ✅ Add rolling statistics with conditional checks
-                    if len(automl_data) > 3:
-                        automl_data["rolling_mean_3"] = automl_data["y"].rolling(window=3, min_periods=1).mean()
-                        automl_data["rolling_std_3"] = automl_data["y"].rolling(window=3, min_periods=1).std()
-
-                    if len(automl_data) > 6:
-                        automl_data["rolling_mean_6"] = automl_data["y"].rolling(window=6, min_periods=1).mean()
-                        automl_data["rolling_std_6"] = automl_data["y"].rolling(window=6, min_periods=1).std()
-
-                    # ✅ Add Peak Indicator Feature (Ensure rolling mean exists)
-                    if "rolling_mean_6" in automl_data.columns and len(automl_data) > 6:
-                        automl_data["peak_indicator"] = (automl_data["y"] > automl_data["rolling_mean_6"]).astype(int)
-                    else:
-                        automl_data["peak_indicator"] = 0  # Default to no peaks if not enough data
-
-                    # ✅ Add seasonal features
-                    automl_data["sin_month"] = np.sin(2 * np.pi * automl_data["ds"].dt.month / 12)
-                    automl_data["cos_month"] = np.cos(2 * np.pi * automl_data["ds"].dt.month / 12)
-
-                    # ✅ Apply log transformation to stabilize variance
-                    automl_data["y_log"] = np.log1p(automl_data["y"])
-                    automl_data.dropna(inplace=True)  # Drop NA values
-
-                    # ✅ Dynamically build feature list
-                    feature_cols = ["sin_month", "cos_month"] + [f"lag_{lag}" for lag in range(1, max_lag + 1)]
-
-                    # ✅ Add `peak_indicator` only if it exists
-                    if "peak_indicator" in automl_data.columns:
-                        feature_cols.append("peak_indicator")
-
-                    # ✅ Conditionally add rolling features
-                    for feature in ["rolling_mean_3", "rolling_std_3", "rolling_mean_6", "rolling_std_6"]:
-                        if feature in automl_data.columns:
-                            feature_cols.append(feature)
-
-                    # ✅ Ensure only available features are used
-                    feature_cols = [col for col in feature_cols if col in automl_data.columns]
-
-                    # ✅ Prepare training data
-                    x_train = automl_data[feature_cols]
-                    y_train = automl_data["y_log"]
-
-                    # ✅ Train AutoML
-                    automl_model = AutoML()
-                    st.write("🔄 **Training AutoML Model...**")
-                    automl_model.fit(
-                        X_train=x_train,
-                        y_train=y_train,
-                        task="regression",
-                        time_budget=60,  # Reduced time budget for faster training
-                        eval_method="cv",
-                        estimator_list=["xgboost"],  # Force XGBoost, remove LGBM
-                        metric="r2"  # Prioritize fitting trends over just minimizing error
-                    )
-                    st.write(f"✅ AutoML Training Completed! Best Estimator: {automl_model.best_estimator}")
-
-                    # ✅ Feature Importance Debugging
-                    if automl_model.best_estimator == "xgboost":
-                        xgb_model = automl_model.best_model_for_estimator("xgboost")
-                        importance = pd.DataFrame({
-                            "Feature": x_train.columns,
-                            "Importance": xgb_model.feature_importances_
-                        }).sort_values(by="Importance", ascending=False)
-                        st.write("🔍 Feature Importance:")
-                        st.dataframe(importance)
-
-                    # ✅ Ensure `future_df` includes dynamic features matching `x_train`
-                    test_lags = {f"lag_{lag}": [train["y"].iloc[-lag]] for lag in range(1, max_lag + 1)}
-                    test_lags["sin_month"] = [np.sin(2 * np.pi * train["ds"].iloc[-1].month / 12)]
-                    test_lags["cos_month"] = [np.cos(2 * np.pi * train["ds"].iloc[-1].month / 12)]
-
-                    # ✅ Add rolling features and `peak_indicator`
-                    for feature in ["rolling_mean_3", "rolling_std_3", "rolling_mean_6", "rolling_std_6"]:
-                        if feature in automl_data.columns:
-                            test_lags[feature] = [train["y"].rolling(window=int(feature.split("_")[-1]), min_periods=1).mean().iloc[-1]]
-
-                    if "peak_indicator" in automl_data.columns:
-                        test_lags["peak_indicator"] = [(train["y"].iloc[-1] > train["y"].rolling(window=6, min_periods=1).mean().iloc[-1]).astype(int)]
-                    else:
-                        test_lags["peak_indicator"] = [0]
-
-                    # ✅ Convert dictionary to DataFrame
-                    future_df = pd.DataFrame(test_lags)
-
-                    # ✅ Handle potential NaN values
-                    future_df.fillna(method="ffill", inplace=True)
-                    future_df.fillna(0, inplace=True)
-
-                    # ✅ Generate Forecast
-                    automl_forecast = []
-                    for i in range(forecast_period):
-                        # ✅ Predict next forecast value
-                        next_forecast_log = automl_model.predict(future_df)[0]  # Extract the first value
-                        next_forecast = np.expm1(next_forecast_log)  # Reverse log transformation
-                        automl_forecast.append(next_forecast)
-
-                        # ✅ Properly shift lag features dynamically
-                        for lag in range(max_lag, 1, -1):
-                            future_df[f"lag_{lag}"] = future_df[f"lag_{lag - 1}"]
-                        future_df["lag_1"] = next_forecast
-
-                        # ✅ Adjust rolling statistics dynamically
-                        for feature in ["rolling_mean_3", "rolling_std_3", "rolling_mean_6", "rolling_std_6"]:
-                            if feature in future_df.columns:
-                                window_size = int(feature.split("_")[-1])
-                                future_df[feature] = np.mean(automl_forecast[-window_size:]) if len(automl_forecast) >= window_size else np.mean(automl_forecast)
-
-                        # ✅ Update `peak_indicator` dynamically
-                        if len(automl_forecast) > 6:
-                            peak_threshold = np.percentile(automl_forecast[-6:], 90)
-                            future_df["peak_indicator"] = 1 if next_forecast > peak_threshold else 0
-                        else:
-                            future_df["peak_indicator"] = 0
-
-                    # ✅ Prepare Forecast DataFrame
-                    forecast_dates = pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M")
-                    forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": automl_forecast})
-
-                    # ✅ Calculate RMSE and MAPE
-                    test_y = test["y"].values
-                    automl_rmse = np.sqrt(mean_squared_error(test_y, forecast_df["yhat"][:len(test_y)]))
-                    automl_mape = mean_absolute_percentage_error(test_y, forecast_df["yhat"][:len(test_y)])
-
-                    # Populate results dictionary
-                    results["AutoML"] = {
-                        "RMSE": float(automl_rmse),
-                        "MAPE": float(automl_mape),
-                        "Forecast": forecast_df
-                    }
-
-                    st.success("✅ AutoML Forecast Generated Successfully!")
-
-                except Exception as e:
-                    st.error(f"❌ AutoML Model failed: {e}")
+                # st.write("🚀 Training AutoML Model...")
+                # try:
+                #     # ✅ Step 1: Feature Engineering
+                #     automl_data = train.copy()
+
+                #     # ✅ Dynamically determine max_lag based on dataset size
+                #     if len(train) <= 6:
+                #         max_lag = min(3, len(train) - 1)  # Minimum 3 months for very small datasets
+                #     elif len(train) <= 12:
+                #         max_lag = min(6, len(train) - 1)  # Use up to 6 months for medium datasets
+                #     elif len(train) <= 24:
+                #         max_lag = min(12, len(train) - 1)  # Use up to 12 months for moderately large datasets
+                #     else:
+                #         max_lag = min(24, len(train) - 1)  # Use up to 24 months for long datasets
+
+                #     st.write(f"🔹 Adjusted Max Lags Used: {max_lag}")
+
+                #     # ✅ Add lag features
+                #     for lag in range(1, max_lag + 1):
+                #         automl_data[f"lag_{lag}"] = automl_data["y"].shift(lag)
+
+                #     # ✅ Add rolling statistics with conditional checks
+                #     if len(automl_data) > 3:
+                #         automl_data["rolling_mean_3"] = automl_data["y"].rolling(window=3, min_periods=1).mean()
+                #         automl_data["rolling_std_3"] = automl_data["y"].rolling(window=3, min_periods=1).std()
+
+                #     if len(automl_data) > 6:
+                #         automl_data["rolling_mean_6"] = automl_data["y"].rolling(window=6, min_periods=1).mean()
+                #         automl_data["rolling_std_6"] = automl_data["y"].rolling(window=6, min_periods=1).std()
+
+                #     # ✅ Add Peak Indicator Feature (Ensure rolling mean exists)
+                #     if "rolling_mean_6" in automl_data.columns and len(automl_data) > 6:
+                #         automl_data["peak_indicator"] = (automl_data["y"] > automl_data["rolling_mean_6"]).astype(int)
+                #     else:
+                #         automl_data["peak_indicator"] = 0  # Default to no peaks if not enough data
+
+                #     # ✅ Add seasonal features
+                #     automl_data["sin_month"] = np.sin(2 * np.pi * automl_data["ds"].dt.month / 12)
+                #     automl_data["cos_month"] = np.cos(2 * np.pi * automl_data["ds"].dt.month / 12)
+
+                #     # ✅ Apply log transformation to stabilize variance
+                #     automl_data["y_log"] = np.log1p(automl_data["y"])
+                #     automl_data.dropna(inplace=True)  # Drop NA values
+
+                #     # ✅ Dynamically build feature list
+                #     feature_cols = ["sin_month", "cos_month"] + [f"lag_{lag}" for lag in range(1, max_lag + 1)]
+
+                #     # ✅ Add `peak_indicator` only if it exists
+                #     if "peak_indicator" in automl_data.columns:
+                #         feature_cols.append("peak_indicator")
+
+                #     # ✅ Conditionally add rolling features
+                #     for feature in ["rolling_mean_3", "rolling_std_3", "rolling_mean_6", "rolling_std_6"]:
+                #         if feature in automl_data.columns:
+                #             feature_cols.append(feature)
+
+                #     # ✅ Ensure only available features are used
+                #     feature_cols = [col for col in feature_cols if col in automl_data.columns]
+
+                #     # ✅ Prepare training data
+                #     x_train = automl_data[feature_cols]
+                #     y_train = automl_data["y_log"]
+
+                #     # ✅ Train AutoML
+                #     automl_model = AutoML()
+                #     st.write("🔄 **Training AutoML Model...**")
+                #     automl_model.fit(
+                #         X_train=x_train,
+                #         y_train=y_train,
+                #         task="regression",
+                #         time_budget=60,  # Reduced time budget for faster training
+                #         eval_method="cv",
+                #         estimator_list=["xgboost"],  # Force XGBoost, remove LGBM
+                #         metric="r2"  # Prioritize fitting trends over just minimizing error
+                #     )
+                #     st.write(f"✅ AutoML Training Completed! Best Estimator: {automl_model.best_estimator}")
+
+                #     # ✅ Feature Importance Debugging
+                #     if automl_model.best_estimator == "xgboost":
+                #         xgb_model = automl_model.best_model_for_estimator("xgboost")
+                #         importance = pd.DataFrame({
+                #             "Feature": x_train.columns,
+                #             "Importance": xgb_model.feature_importances_
+                #         }).sort_values(by="Importance", ascending=False)
+                #         st.write("🔍 Feature Importance:")
+                #         st.dataframe(importance)
+
+                #     # ✅ Ensure `future_df` includes dynamic features matching `x_train`
+                #     test_lags = {f"lag_{lag}": [train["y"].iloc[-lag]] for lag in range(1, max_lag + 1)}
+                #     test_lags["sin_month"] = [np.sin(2 * np.pi * train["ds"].iloc[-1].month / 12)]
+                #     test_lags["cos_month"] = [np.cos(2 * np.pi * train["ds"].iloc[-1].month / 12)]
+
+                #     # ✅ Add rolling features and `peak_indicator`
+                #     for feature in ["rolling_mean_3", "rolling_std_3", "rolling_mean_6", "rolling_std_6"]:
+                #         if feature in automl_data.columns:
+                #             test_lags[feature] = [train["y"].rolling(window=int(feature.split("_")[-1]), min_periods=1).mean().iloc[-1]]
+
+                #     if "peak_indicator" in automl_data.columns:
+                #         test_lags["peak_indicator"] = [(train["y"].iloc[-1] > train["y"].rolling(window=6, min_periods=1).mean().iloc[-1]).astype(int)]
+                #     else:
+                #         test_lags["peak_indicator"] = [0]
+
+                #     # ✅ Convert dictionary to DataFrame
+                #     future_df = pd.DataFrame(test_lags)
+
+                #     # ✅ Handle potential NaN values
+                #     future_df.fillna(method="ffill", inplace=True)
+                #     future_df.fillna(0, inplace=True)
+
+                #     # ✅ Generate Forecast
+                #     automl_forecast = []
+                #     for i in range(forecast_period):
+                #         # ✅ Predict next forecast value
+                #         next_forecast_log = automl_model.predict(future_df)[0]  # Extract the first value
+                #         next_forecast = np.expm1(next_forecast_log)  # Reverse log transformation
+                #         automl_forecast.append(next_forecast)
+
+                #         # ✅ Properly shift lag features dynamically
+                #         for lag in range(max_lag, 1, -1):
+                #             future_df[f"lag_{lag}"] = future_df[f"lag_{lag - 1}"]
+                #         future_df["lag_1"] = next_forecast
+
+                #         # ✅ Adjust rolling statistics dynamically
+                #         for feature in ["rolling_mean_3", "rolling_std_3", "rolling_mean_6", "rolling_std_6"]:
+                #             if feature in future_df.columns:
+                #                 window_size = int(feature.split("_")[-1])
+                #                 future_df[feature] = np.mean(automl_forecast[-window_size:]) if len(automl_forecast) >= window_size else np.mean(automl_forecast)
+
+                #         # ✅ Update `peak_indicator` dynamically
+                #         if len(automl_forecast) > 6:
+                #             peak_threshold = np.percentile(automl_forecast[-6:], 90)
+                #             future_df["peak_indicator"] = 1 if next_forecast > peak_threshold else 0
+                #         else:
+                #             future_df["peak_indicator"] = 0
+
+                #     # ✅ Prepare Forecast DataFrame
+                #     forecast_dates = pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M")
+                #     forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": automl_forecast})
+
+                #     # ✅ Calculate RMSE and MAPE
+                #     test_y = test["y"].values
+                #     automl_rmse = np.sqrt(mean_squared_error(test_y, forecast_df["yhat"][:len(test_y)]))
+                #     automl_mape = mean_absolute_percentage_error(test_y, forecast_df["yhat"][:len(test_y)])
+
+                #     # Populate results dictionary
+                #     results["AutoML"] = {
+                #         "RMSE": float(automl_rmse),
+                #         "MAPE": float(automl_mape),
+                #         "Forecast": forecast_df
+                #     }
+
+                #     st.success("✅ AutoML Forecast Generated Successfully!")
+
+                # except Exception as e:
+                #     st.error(f"❌ AutoML Model failed: {e}")
 
 
                 # ✅ Ensure at least one model generated forecasts
