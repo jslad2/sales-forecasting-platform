@@ -1,5 +1,5 @@
 import streamlit as st
-from forecasting_tool import main  # Import the forecasting logic
+from forecasting_tool import main  # Keep forecasting logic separate
 
 # ✅ Apply custom SynovaAI styles
 def apply_styles():
@@ -116,30 +116,6 @@ def display_model_summary(best_model, metrics):
         unsafe_allow_html=True
     )
 
-# ✅ Display Forecast Visualizations
-def display_forecast_visualizations(results):
-    st.markdown("---")
-    st.markdown("<h2 style='text-align: center;'>📊 Forecast Visualizations</h2>", unsafe_allow_html=True)
-    
-    for model, result in results.items():
-        with st.expander(f"📈 {model} Forecast"):
-            st.plotly_chart(result["Forecast"].figure, use_container_width=True)
-            st.markdown(f"### Insights\n{result['Insights']}")
-
-# ✅ Display High-Risk Periods
-def display_high_risk_periods(results):
-    st.markdown("---")
-    st.markdown("<h2 style='text-align: center;'>🚨 High-Risk Sales Periods</h2>", unsafe_allow_html=True)
-    
-    for model, result in results.items():
-        with st.expander(f"🔍 {model} High-Risk Periods"):
-            st.dataframe(result["HighRiskPeriods"].style.applymap(
-                lambda x: "background-color: #FFDDC1" if x == "❌ Major Decline" else
-                        "background-color: #FFEEAA" if x == "⚠️ High Volatility" else
-                        "background-color: #C6ECAE",
-                subset=["risk"]
-            ))
-
 # ✅ Main Function
 def run_app():
     try:
@@ -155,8 +131,6 @@ def run_app():
             best_model = min(results, key=lambda x: results[x]["RMSE"])
             best_metrics = results[best_model]
             display_model_summary(best_model, best_metrics)
-            display_forecast_visualizations(results)
-            display_high_risk_periods(results)
 
     except Exception as e:
         st.error(f"An error occurred: {e}")

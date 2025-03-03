@@ -800,41 +800,6 @@ def main():
 if __name__ == "__main__":
     main()
 
-def main():
-    results = {}  # Store results from all models
-    try:
-        # Your existing forecasting logic here
-        # Example: Train Prophet, ARIMA, XGBoost, AutoML models
 
-        # Populate results dictionary
-        results = {
-            "Prophet": {
-                "RMSE": prophet_rmse,
-                "MAPE": prophet_mape,
-                "Forecast": prophet_forecast,
-                "Insights": prophet_insights,
-            },
-            "ARIMA": {
-                "RMSE": arima_rmse,
-                "MAPE": arima_mape,
-                "Forecast": arima_forecast,
-                "Insights": arima_insights,
-            },
-            "XGBoost": {
-                "RMSE": xgb_rmse,
-                "MAPE": xgb_mape,
-                "Forecast": xgb_forecast,
-                "Insights": xgb_insights,
-            },
-            "AutoML": {
-                "RMSE": automl_rmse,
-                "MAPE": automl_mape,
-                "Forecast": automl_forecast,
-                "Insights": automl_insights,
-            },
-        }
-    except Exception as e:
-        st.error(f"Error in forecasting logic: {e}")
-    return results
 
 
