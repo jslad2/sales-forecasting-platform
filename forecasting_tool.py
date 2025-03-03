@@ -69,23 +69,22 @@ def preprocess_data(data, date_column, sales_column):
         st.error(f"Error during data preprocessing: {e}")
         return None
 
-def detect_and_add_seasonalities(model, data):
-    """
-    Detect seasonalities dynamically and add them to the Prophet model.
-    """
-    data_frequency = pd.infer_freq(data["ds"])
+def detect_seasonality(train):
+    seasonal_periods = []
+    if len(train) > 365:
+        seasonal_periods.append(("yearly", 365.25, 10))
+    if len(train) > 90:
+        seasonal_periods.append(("quarterly", 91.25, 5))
+    if len(train) > 30:
+        seasonal_periods.append(("monthly", 30.5, 5))
     
-    # Use len(data) instead of infer_freq when dealing with non-standard time steps
-    if len(data) > 365:  # Assume yearly data if > 365 points
-        model.add_seasonality(name="yearly", period=365.25, fourier_order=10)
-    elif len(data) > 90:  # Quarterly data
-        model.add_seasonality(name="quarterly", period=91.25, fourier_order=5)
-    elif len(data) > 30:  # Monthly data
-        model.add_seasonality(name="monthly", period=30.5, fourier_order=5)
-    else:
-        model.add_seasonality(name="weekly", period=7, fourier_order=3)
-    
-    return model
+    return seasonal_periods
+
+# Add detected seasonalities to the model
+seasonal_periods = detect_seasonality(train)
+for name, period, fourier_order in seasonal_periods:
+    prophet_model.add_seasonality(name=name, period=period, fourier_order=fourier_order)
+
 
 def find_best_prophet_params(train):
     """
@@ -243,30 +242,45 @@ def main():
                 st.write(f"Best Parameters: {best_params}")
                 st.write(f"Best RMSE from cross-validation: {best_rmse}")
 
-                # Step 2: Train Final Model
                 try:
-                    st.write("Training Prophet Model with Best Parameters...")
+                    st.write("🚀 Training Prophet Model with Best Parameters...")
+
+                    # Define Prophet model with optimized parameters
                     prophet_model = Prophet(
                         seasonality_mode=best_params["seasonality_mode"],
-                        changepoint_prior_scale=best_params["changepoint_prior_scale"]
+                        changepoint_prior_scale=best_params["changepoint_prior_scale"],
+                        interval_width=0.8
                     )
 
-                    prophet_model = detect_and_add_seasonalities(prophet_model, train)
+                    # Detect & dynamically add seasonalities
+                    seasonal_periods = detect_seasonality(train)
+                    for name, period, fourier_order in seasonal_periods:
+                        prophet_model.add_seasonality(name=name, period=period, fourier_order=fourier_order)
+
+                    # Train the model
                     prophet_model.fit(train)
 
-                    future = prophet_model.make_future_dataframe(periods=forecast_period, freq="M")
+                    # Generate future dates & predict
+                    future = prophet_model.make_future_dataframe(periods=forecast_period, freq="M", include_history=False)
                     prophet_forecast = prophet_model.predict(future)
 
-                    prophet_rmse = mean_squared_error(test["y"], prophet_forecast["yhat"].iloc[-len(test):]) ** 0.5
-                    prophet_mape = mean_absolute_percentage_error(test["y"], prophet_forecast["yhat"].iloc[-len(test):])
+                    # Ensure we only use future forecasts
+                    prophet_forecast = prophet_forecast[prophet_forecast["ds"] >= train["ds"].max()]
 
-                    # Identify high and low points in the forecast
-                    highest_point = prophet_forecast.loc[prophet_forecast['yhat'].idxmax()]
-                    lowest_point = prophet_forecast.loc[prophet_forecast['yhat'].idxmin()]
+                    # Fix RMSE & MAPE calculations
+                    matching_length = min(len(test["y"]), len(prophet_forecast))
+                    prophet_rmse = mean_squared_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]) ** 0.5
+                    prophet_mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length])
 
+                    # Identify peak & lowest forecast points
+                    highest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmax()]
+                    lowest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmin()]
+
+                    # Display key insights
                     summary_text = (
                         f"### Key Insights\n"
-                        f"- **Projected Growth:** Sales are expected to {'increase' if prophet_forecast['yhat'].iloc[-1] > test['y'].iloc[-1] else 'decrease'} by {abs(((prophet_forecast['yhat'].iloc[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100):.2f}% in the next period.\n"
+                        f"- **Projected Growth:** Sales are expected to {'increase' if prophet_forecast['yhat'].iloc[-1] > test['y'].iloc[-1] else 'decrease'} "
+                        f"by {abs(((prophet_forecast['yhat'].iloc[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100):.2f}% in the next period.\n"
                         f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
                         f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
                         f"- **Best Model Parameters:** {best_params}\n"
@@ -274,34 +288,22 @@ def main():
                         f"  - RMSE: {prophet_rmse:.2f}\n"
                         f"  - MAPE: {prophet_mape:.2f}\n"
                     )
-    
+
                     with st.expander("📊 Prophet Model Summary"):
                         st.markdown(summary_text)
 
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat"], mode="lines", name="Forecast", line=dict(color="blue", width=2)))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_upper"], mode="lines", name="Upper Confidence", line=dict(color="lightblue", dash="dot")))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_lower"], mode="lines", name="Lower Confidence", line=dict(color="lightblue", dash="dot")))
-
-                    fig.update_layout(
-                        title="Prophet Forecast with Confidence Intervals",
-                        xaxis_title="Date",
-                        yaxis_title="Sales",
-                        legend_title="Legend",
-                        template="plotly_white"
-                    )
-
+                    # Improved Prophet Visualization
                     st.plotly_chart(fig, use_container_width=True)
 
-                    # Populate results dictionary
+                    # Save results
                     results["Prophet"] = {
                         "RMSE": float(prophet_rmse),
                         "MAPE": float(prophet_mape),
                         "Forecast": prophet_forecast
                     }
+
                 except Exception as e:
-                    st.warning(f"Failed to train Prophet model: {e}")
+                    st.warning(f"❌ Prophet Model failed: {e}")
 
                 st.write("🔄 Training ARIMA Model...")
 
