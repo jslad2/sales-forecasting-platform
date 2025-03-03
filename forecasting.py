@@ -1,8 +1,5 @@
 import streamlit as st
 from forecasting_tool import main  # Keep forecasting logic separate
-import pandas as pd
-import plotly.express as px
-import datetime
 
 # ✅ Apply custom SynovaAI styles
 def apply_styles():
@@ -69,27 +66,6 @@ def apply_styles():
                 background-color: #56BBAF !important;
                 transform: scale(1.05);
             }
-
-            /* Premium Features Section */
-            .premium-feature {
-                background: #FFFFFF;
-                border-radius: 12px;
-                padding: 20px;
-                margin: 20px 0;
-                box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-            }
-
-            .premium-feature h3 {
-                color: #2B3A42;
-                font-size: 1.5rem;
-                margin-bottom: 10px;
-            }
-
-            .premium-feature p {
-                color: #444;
-                font-size: 1rem;
-                line-height: 1.6;
-            }
         </style>
         """,
         unsafe_allow_html=True,
@@ -121,8 +97,6 @@ def display_file_upload():
         """,
         unsafe_allow_html=True,
     )
-    uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
-    return uploaded_file
 
 # ✅ Display Model Summary Section
 def display_model_summary(best_model, metrics):
@@ -142,67 +116,21 @@ def display_model_summary(best_model, metrics):
         unsafe_allow_html=True
     )
 
-# ✅ Display Forecast Visualization
-def display_forecast_visualization(forecast_data):
-    st.markdown("---")
-    st.markdown("<h2 style='text-align: center;'>📊 Forecast Visualization</h2>", unsafe_allow_html=True)
-    fig = px.line(forecast_data, x="Date", y="Sales", title="Sales Forecast Over Time")
-    st.plotly_chart(fig, use_container_width=True)
-
-# ✅ Display Premium Features
-def display_premium_features():
-    st.markdown("---")
-    st.markdown("<h2 style='text-align: center;'>✨ Premium Features</h2>", unsafe_allow_html=True)
-    st.markdown(
-        """
-        <div class="premium-feature">
-            <h3>Advanced Analytics Dashboard</h3>
-            <p>Access an interactive dashboard to explore your data in-depth. Visualize trends, seasonality, and anomalies with advanced charts and graphs.</p>
-        </div>
-        <div class="premium-feature">
-            <h3>Customizable Forecast Period</h3>
-            <p>Choose your forecast horizon (e.g., 30 days, 90 days, 1 year) and customize the granularity of predictions to suit your business needs.</p>
-        </div>
-        <div class="premium-feature">
-            <h3>Exportable Reports</h3>
-            <p>Download detailed PDF reports with insights, forecasts, and recommendations to share with your team or stakeholders.</p>
-        </div>
-        <div class="premium-feature">
-            <h3>Priority Support</h3>
-            <p>Get priority access to our support team for any questions or issues. We’re here to help you succeed!</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
 # ✅ Main Function
 def run_app():
     try:
         apply_styles()  # Apply custom styles
         display_header()  # Display header
         display_intro()  # Display intro section
-        uploaded_file = display_file_upload()  # Display file upload section
+        display_file_upload()  # Display file upload section
+        
+        # Run forecasting logic and retrieve results
+        results = main()
 
-        if uploaded_file is not None:
-            # Load data
-            data = pd.read_csv(uploaded_file)
-            st.write("### Preview of Uploaded Data")
-            st.write(data.head())
-
-            # Run forecasting logic and retrieve results
-            results = main(data)
-
-            if results:
-                best_model = min(results, key=lambda x: results[x]["RMSE"])
-                best_metrics = results[best_model]
-                display_model_summary(best_model, best_metrics)
-
-                # Display forecast visualization
-                forecast_data = results[best_model]["forecast"]
-                display_forecast_visualization(forecast_data)
-
-        # Display premium features
-        display_premium_features()
+        if results:
+            best_model = min(results, key=lambda x: results[x]["RMSE"])
+            best_metrics = results[best_model]
+            display_model_summary(best_model, best_metrics)
 
     except Exception as e:
         st.error(f"An error occurred: {e}")

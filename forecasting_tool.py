@@ -25,7 +25,6 @@ import time
 # Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
 st.set_page_config(layout="wide")
 
-@st.cache_data
 def check_stationarity(series):
     """
     Perform the Augmented Dickey-Fuller test to check stationarity.
@@ -34,7 +33,6 @@ def check_stationarity(series):
     p_value = result[1]
     return "Stationary" if p_value < 0.05 else "Non-Stationary"
 
-@st.cache_data
 def preprocess_data(data, date_column, sales_column):
     """
     Preprocess the uploaded data and check stationarity.
@@ -75,16 +73,17 @@ def detect_and_add_seasonalities(model, data):
     Detect seasonalities dynamically and add them to the Prophet model.
     """
     data_frequency = pd.infer_freq(data["ds"])
-    if data_frequency == "D":  # Daily data
-        model.add_seasonality(name="daily", period=1, fourier_order=3)
-    elif data_frequency == "W":  # Weekly data
-        model.add_seasonality(name="weekly", period=7, fourier_order=3)
-    elif data_frequency == "M":  # Monthly data
-        model.add_seasonality(name="monthly", period=30.5, fourier_order=5)
-    elif data_frequency == "Q":  # Quarterly data
-        model.add_seasonality(name="quarterly", period=91.25, fourier_order=5)
-    elif data_frequency == "Y":  # Yearly data
+    
+    # Use len(data) instead of infer_freq when dealing with non-standard time steps
+    if len(data) > 365:  # Assume yearly data if > 365 points
         model.add_seasonality(name="yearly", period=365.25, fourier_order=10)
+    elif len(data) > 90:  # Quarterly data
+        model.add_seasonality(name="quarterly", period=91.25, fourier_order=5)
+    elif len(data) > 30:  # Monthly data
+        model.add_seasonality(name="monthly", period=30.5, fourier_order=5)
+    else:
+        model.add_seasonality(name="weekly", period=7, fourier_order=3)
+    
     return model
 
 def find_best_prophet_params(train):
@@ -305,10 +304,12 @@ def main():
 
                 st.write("Training ARIMA Model...")
                 try:
-                    # Analyze seasonality dynamically
-                    if len(train) <= 12:
-                        st.warning("Insufficient data for seasonal differencing. Using non-seasonal ARIMA.")
-                        seasonal = False
+                    forecast_dates = pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M")
+                    forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": arima_forecast})
+
+                    if len(arima_forecast) < len(test):  # Avoid indexing errors
+                        st.warning("ARIMA forecast shorter than expected. Adjusting to match test set length.")
+                        forecast_df = forecast_df.iloc[:len(test)]
                     else:
                         st.write("Analyzing seasonality in the data...")
                         decomposition = seasonal_decompose(train["y"], model="additive", period=12)
@@ -385,59 +386,87 @@ def main():
                     st.warning(f"ARIMA Model failed: {e}")
 
 
-                # XGBoost Model with Optimizations
+                # XGBoost Model with Dynamic Adaptation
                 st.write("Training XGBoost Model...")
+
                 try:
-                    # Step 1: Feature Engineering
-                    max_lag = 2  # Use only 2 lags
-                    rolling_windows = [3]  # Use only rolling mean with window 3
+                    # Step 1: Dynamic Feature Engineering
+                    max_lag = min(12, len(train) - 1)  # Adapt lags based on dataset size
+                    rolling_windows = [3, 6] if len(train) > 6 else [3]  # Use multiple rolling windows if data permits
+
                     xgb_data = train.copy()
 
-                    # Create lag features
+                    # Create lag features dynamically
                     for lag in range(1, max_lag + 1):
                         xgb_data[f"lag_{lag}"] = xgb_data["y"].shift(lag)
 
-                    # Add rolling statistics
+                    # Add rolling statistics dynamically
                     for window in rolling_windows:
                         xgb_data[f"rolling_mean_{window}"] = xgb_data["y"].rolling(window=window).mean()
+                        xgb_data[f"rolling_std_{window}"] = xgb_data["y"].rolling(window=window).std()
 
-                    # Add basic time-based features
+                    # Add time-based features
                     xgb_data["month"] = xgb_data["ds"].dt.month
                     xgb_data["quarter"] = xgb_data["ds"].dt.quarter
                     xgb_data["year"] = xgb_data["ds"].dt.year
+                    xgb_data["sin_month"] = np.sin(2 * np.pi * xgb_data["month"] / 12)
+                    xgb_data["cos_month"] = np.cos(2 * np.pi * xgb_data["month"] / 12)
 
+                    # Drop missing values after feature engineering
                     xgb_data.dropna(inplace=True)
 
                     # Prepare training data
-                    x_train = xgb_data.drop(columns=["y", "ds"])
+                    feature_cols = [col for col in xgb_data.columns if col not in ["y", "ds"]]
+                    x_train = xgb_data[feature_cols]
                     y_train = xgb_data["y"]
 
-                    # Step 2: Train Final Model
+                    # Step 2: Train XGBoost Model
                     final_model = XGBRegressor(
-                        n_estimators=50,  # Reduced number of trees
-                        max_depth=3,       # Reduced depth
-                        learning_rate=0.2,  # Increased learning rate
+                        n_estimators=50,  # Adjust dynamically if needed
+                        max_depth=min(5, max(2, len(train) // 10)),  # Adapt max depth to dataset size
+                        learning_rate=0.1 if len(train) > 50 else 0.2,  # Adjust LR for larger datasets
                         objective="reg:squarederror",
                         random_state=42,
-                        n_jobs=-1  # Use all cores
+                        n_jobs=-1
                     )
                     final_model.fit(x_train, y_train)
 
                     # Step 3: Forecast Future Values
                     future_features = []
                     for i in range(forecast_period):
-                        future_row = {
-                            f"lag_{lag}": train["y"].iloc[-lag] if lag <= len(train) else np.nan
-                            for lag in range(1, max_lag + 1)
-                        }
-                        future_row["rolling_mean_3"] = train["y"].rolling(window=min(3, len(train))).mean().iloc[-1] if len(train) > 1 else np.nan
+                        future_row = {}
+
+                        # Generate lag features dynamically
+                        for lag in range(1, max_lag + 1):
+                            future_row[f"lag_{lag}"] = train["y"].iloc[-lag] if lag <= len(train) else np.nan
+
+                        # Generate rolling features dynamically
+                        for window in rolling_windows:
+                            future_row[f"rolling_mean_{window}"] = (
+                                train["y"].rolling(window=min(window, len(train))).mean().iloc[-1]
+                                if len(train) > 1
+                                else np.nan
+                            )
+                            future_row[f"rolling_std_{window}"] = (
+                                train["y"].rolling(window=min(window, len(train))).std().iloc[-1]
+                                if len(train) > 1
+                                else np.nan
+                            )
+
+                        # Generate seasonal features dynamically
                         future_row["month"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).month
                         future_row["quarter"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).quarter
                         future_row["year"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).year
+                        future_row["sin_month"] = np.sin(2 * np.pi * future_row["month"] / 12)
+                        future_row["cos_month"] = np.cos(2 * np.pi * future_row["month"] / 12)
+
                         future_features.append(future_row)
 
+                    # Convert to DataFrame and forward-fill missing values
                     future_df = pd.DataFrame(future_features)
-                    future_df.fillna(method="ffill", inplace=True)  # Forward fill missing values
+                    future_df.fillna(method="ffill", inplace=True)
+
+                    # Predict future values
                     xgb_forecast = final_model.predict(future_df)
 
                     # Ensure test['y'] length matches xgb_forecast
@@ -492,8 +521,10 @@ def main():
                         "MAPE": float(mape),
                         "Forecast": forecast_df
                     }
+
                 except Exception as e:
                     st.warning(f"XGBoost Model failed: {e}")
+
                     
                 st.write("🚀 Training AutoML Model...")
                 try:
@@ -703,17 +734,15 @@ def main():
                 # 🔥 Detect High-Risk Periods in Forecast
                 if forecast_data is not None:
                     try:
-                        forecast_data["change"] = forecast_data["yhat"].pct_change() * 100
-                        forecast_data["risk"] = "✅ Stable"
+                        forecast_data["volatility"] = forecast_data["yhat"].rolling(3).std()
 
-                        for i in range(1, len(forecast_data)):
-                            if forecast_data["change"].iloc[i] < -20:
-                                forecast_data["risk"].iloc[i] = "❌ Major Decline"
-                            elif abs(forecast_data["change"].iloc[i]) > 15:
-                                forecast_data["risk"].iloc[i] = "⚠️ High Volatility"
+                        # Define risk levels dynamically
+                        forecast_data["risk"] = "✅ Stable"
+                        forecast_data.loc[forecast_data["volatility"] > forecast_data["volatility"].quantile(0.75), "risk"] = "⚠️ High Volatility"
+                        forecast_data.loc[forecast_data["volatility"] > forecast_data["volatility"].quantile(0.9), "risk"] = "❌ Major Decline"
 
                         st.markdown("### 🚨 High-Risk Sales Periods Identified")
-                        st.dataframe(forecast_data[["ds", "yhat", "change", "risk"]].style.applymap(
+                        st.dataframe(forecast_data[["ds", "yhat", "volatility", "risk"]].style.applymap(
                             lambda x: "background-color: #FFDDC1" if x == "❌ Major Decline" else
                                     "background-color: #FFEEAA" if x == "⚠️ High Volatility" else
                                     "background-color: #C6ECAE",
