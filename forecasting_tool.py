@@ -503,8 +503,13 @@ def main():
                         future_features.append(future_row)
 
                     future_df = pd.DataFrame(future_features)
-                    future_df.fillna(method="ffill", inplace=True)
-                    future_df.fillna(0, inplace=True)
+
+                    # Ensure `yoy_growth` is in future data
+                    if "yoy_growth" in x_train.columns:
+                        future_df["yoy_growth"] = 0  # No past growth data for future
+
+                    # Fix Column Order to Match Training Data
+                    future_df = future_df[x_train.columns]
 
                     # Predict future values
                     xgb_forecast = final_model.predict(future_df)
@@ -516,10 +521,23 @@ def main():
                     })
 
                     # Plot XGBoost Forecast
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
+                    fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"], mode="lines", name="Forecast", line=dict(color="red", width=2)))
+
+                    fig.update_layout(
+                        title="XGBoost Forecast",
+                        xaxis_title="Date",
+                        yaxis_title="Sales",
+                        legend_title="Legend",
+                        template="plotly_white"
+                    )
+
                     st.plotly_chart(fig, use_container_width=True)
 
                 except Exception as e:
                     st.warning(f"❌ XGBoost Model failed: {e}")
+
                     
                 st.write("🚀 Training AutoML Model...")
                 try:
