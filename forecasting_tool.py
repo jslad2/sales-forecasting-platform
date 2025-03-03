@@ -302,33 +302,39 @@ def main():
                 except Exception as e:
                     st.warning(f"Failed to train Prophet model: {e}")
 
-                st.write("Training ARIMA Model...")
+                st.write("🔄 Training ARIMA Model...")
                 try:
-                    forecast_dates = pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M")
-                    forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": arima_forecast})
-
-                    if len(arima_forecast) < len(test):  # Avoid indexing errors
-                        st.warning("ARIMA forecast shorter than expected. Adjusting to match test set length.")
-                        forecast_df = forecast_df.iloc[:len(test)]
-                    else:
-                        st.write("Analyzing seasonality in the data...")
+                    # Detect seasonality using seasonal decomposition & ACF plot
+                    st.write("📊 Analyzing seasonality in the data...")
+                    try:
                         decomposition = seasonal_decompose(train["y"], model="additive", period=12)
                         seasonality_present = np.any(np.abs(decomposition.seasonal) > 0.01)
+                        
+                        # Use ACF to confirm seasonality
+                        acf_values = plot_acf(train["y"], lags=12, alpha=0.05)
+                        seasonality_confirmed = any(np.abs(acf_values[1]) > 0.2)
 
-                        if seasonality_present:
-                            st.write("Seasonality detected. Using seasonal ARIMA.")
+                        if seasonality_present and seasonality_confirmed:
+                            st.write("✅ Seasonality detected. Using **seasonal ARIMA**.")
                             seasonal = True
                         else:
-                            st.write("No significant seasonality detected. Using non-seasonal ARIMA.")
+                            st.write("⚠️ No significant seasonality detected. Using **non-seasonal ARIMA**.")
                             seasonal = False
+                    except Exception as e:
+                        st.warning(f"⚠️ Error in seasonality analysis: {e}")
+                        seasonal = False  # Default to non-seasonal ARIMA if error occurs
 
                     # Automatically configure ARIMA model
                     arima_model = auto_arima(
                         train["y"],
                         seasonal=seasonal,
                         m=12 if seasonal else 1,
-                        d=1,
+                        d=None,  # Auto-detect differencing
                         D=1 if seasonal else 0,
+                        start_p=0, start_q=0,
+                        max_p=3, max_q=3,
+                        start_P=0, start_Q=0,
+                        max_P=2, max_Q=2,
                         trace=True,
                         suppress_warnings=True,
                         error_action="ignore",
@@ -336,21 +342,35 @@ def main():
                     )
 
                     # Generate future forecast
+                    st.write("📅 Generating ARIMA Forecast...")
                     arima_forecast = arima_model.predict(n_periods=forecast_period)
+
+                    # Ensure forecast matches expected length
+                    if len(arima_forecast) < forecast_period:
+                        st.warning("⚠️ ARIMA forecast shorter than expected. Adjusting to match test set length.")
+                        forecast_period = len(arima_forecast)
+
+                    # Prepare forecast DataFrame
                     forecast_dates = pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M")
-                    forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": arima_forecast})
+                    forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": arima_forecast[:forecast_period]})
 
                     # Evaluate performance
-                    arima_rmse = mean_squared_error(test["y"], arima_forecast[:len(test)]) ** 0.5
-                    arima_mape = mean_absolute_percentage_error(test["y"], arima_forecast[:len(test)])
+                    matching_length = min(len(test["y"]), len(forecast_df))
+                    test_y_trimmed = test["y"].iloc[:matching_length]
+                    forecast_y_trimmed = forecast_df["yhat"].iloc[:matching_length]
+
+                    arima_rmse = mean_squared_error(test_y_trimmed, forecast_y_trimmed) ** 0.5
+                    arima_mape = mean_absolute_percentage_error(test_y_trimmed, forecast_y_trimmed)
 
                     # Identify high and low points
                     highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
                     lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
 
+                    # Display Key Insights
                     summary_text = (
                         f"### Key Insights\n"
-                        f"- **Projected Growth:** Sales are expected to {'increase' if forecast_df['yhat'].iloc[-1] > test['y'].iloc[-1] else 'decrease'} by {abs(((forecast_df['yhat'].iloc[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100):.2f}% in the next period.\n"
+                        f"- **Projected Growth:** Sales are expected to {'increase' if forecast_df['yhat'].iloc[-1] > test['y'].iloc[-1] else 'decrease'} "
+                        f"by {abs(((forecast_df['yhat'].iloc[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100):.2f}% in the next period.\n"
                         f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
                         f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
                         f"- **Performance Metrics:**\n"
@@ -361,12 +381,13 @@ def main():
                     with st.expander("📊 ARIMA Model Summary"):
                         st.markdown(summary_text)
 
+                    # Plot ARIMA Forecast
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
                     fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"], mode="lines", name="Forecast", line=dict(color="green", width=2)))
 
                     fig.update_layout(
-                        title="ARIMA Forecast",
+                        title="📈 ARIMA Forecast",
                         xaxis_title="Date",
                         yaxis_title="Sales",
                         legend_title="Legend",
@@ -375,7 +396,7 @@ def main():
 
                     st.plotly_chart(fig, use_container_width=True)
 
-                        # Populate results dictionary
+                    # Populate results dictionary
                     results["ARIMA"] = {
                         "RMSE": float(arima_rmse),
                         "MAPE": float(arima_mape),
@@ -383,8 +404,7 @@ def main():
                     }
 
                 except Exception as e:
-                    st.warning(f"ARIMA Model failed: {e}")
-
+                    st.warning(f"❌ ARIMA Model failed: {e}")
 
                 # XGBoost Model with Dynamic Adaptation
                 st.write("Training XGBoost Model...")
