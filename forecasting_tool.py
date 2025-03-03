@@ -69,22 +69,28 @@ def preprocess_data(data, date_column, sales_column):
         st.error(f"Error during data preprocessing: {e}")
         return None
 
-def detect_seasonality(train):
-    seasonal_periods = []
-    if len(train) > 365:
-        seasonal_periods.append(("yearly", 365.25, 10))
-    if len(train) > 90:
-        seasonal_periods.append(("quarterly", 91.25, 5))
-    if len(train) > 30:
-        seasonal_periods.append(("monthly", 30.5, 5))
-    
-    return seasonal_periods
 
-# Add detected seasonalities to the model
-seasonal_periods = detect_seasonality(train)
-for name, period, fourier_order in seasonal_periods:
-    prophet_model.add_seasonality(name=name, period=period, fourier_order=fourier_order)
 
+def detect_and_add_seasonalities(model, data):
+    """
+    Detect seasonalities dynamically and add them to the Prophet model.
+    """
+    try:
+        # Run seasonal decomposition
+        decomposition = seasonal_decompose(data["y"], model="additive", period=12)
+
+        # Identify if seasonality exists
+        if decomposition.seasonal.abs().max() > 0.01:
+            model.add_seasonality(name="monthly", period=30.5, fourier_order=5)
+        if len(data) > 90:
+            model.add_seasonality(name="quarterly", period=91.25, fourier_order=5)
+        if len(data) > 365:
+            model.add_seasonality(name="yearly", period=365.25, fourier_order=10)
+
+    except Exception as e:
+        st.warning(f"⚠️ Seasonality detection failed: {e}")
+
+    return model
 
 def find_best_prophet_params(train):
     """
@@ -253,9 +259,7 @@ def main():
                     )
 
                     # Detect & dynamically add seasonalities
-                    seasonal_periods = detect_seasonality(train)
-                    for name, period, fourier_order in seasonal_periods:
-                        prophet_model.add_seasonality(name=name, period=period, fourier_order=fourier_order)
+                    prophet_model = detect_and_add_seasonalities(prophet_model, train)
 
                     # Train the model
                     prophet_model.fit(train)
@@ -293,6 +297,52 @@ def main():
                         st.markdown(summary_text)
 
                     # Improved Prophet Visualization
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
+                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat"], mode="lines", name="Forecast", line=dict(color="blue", width=2)))
+
+                    # Confidence Intervals
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"], 
+                        y=prophet_forecast["yhat_upper"], 
+                        mode="lines", 
+                        name="Upper Confidence", 
+                        line=dict(color="lightblue", dash="dot")
+                    ))
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"], 
+                        y=prophet_forecast["yhat_lower"], 
+                        mode="lines", 
+                        name="Lower Confidence", 
+                        line=dict(color="lightblue", dash="dot"),
+                        fill="tonexty"
+                    ))
+
+                    # Highlight Highest & Lowest Points
+                    fig.add_trace(go.Scatter(
+                        x=[highest_point["ds"]], 
+                        y=[highest_point["yhat"]],
+                        mode="markers",
+                        marker=dict(color="green", size=10, symbol="star"),
+                        name="Peak Sales"
+                    ))
+
+                    fig.add_trace(go.Scatter(
+                        x=[lowest_point["ds"]], 
+                        y=[lowest_point["yhat"]],
+                        mode="markers",
+                        marker=dict(color="red", size=10, symbol="star"),
+                        name="Lowest Sales"
+                    ))
+
+                    fig.update_layout(
+                        title="📈 Prophet Forecast with Confidence Intervals",
+                        xaxis_title="Date",
+                        yaxis_title="Sales",
+                        legend_title="Legend",
+                        template="plotly_white"
+                    )
+
                     st.plotly_chart(fig, use_container_width=True)
 
                     # Save results
@@ -304,6 +354,8 @@ def main():
 
                 except Exception as e:
                     st.warning(f"❌ Prophet Model failed: {e}")
+
+
 
                 st.write("🔄 Training ARIMA Model...")
 
