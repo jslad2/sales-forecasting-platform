@@ -235,68 +235,97 @@ def main():
                 results = {}
 
                 # Prophet Model
-                st.write("Finding the best Prophet hyperparameters...")
+                st.write("🚀 Finding the best Prophet hyperparameters...")
                 best_params, best_rmse = find_best_prophet_params(train)  # No need for 'test' parameter anymore
+
                 if best_params is None:
-                    st.error("No valid Prophet parameters were found. Check your data preprocessing or parameter grid.")
+                    st.error("❌ No valid Prophet parameters were found. Check your data preprocessing or parameter grid.")
                     return
 
-                st.write(f"Best Parameters: {best_params}")
-                st.write(f"Best RMSE from cross-validation: {best_rmse}")
-
-                # Prophet Model
-                st.write("Finding the best Prophet hyperparameters...")
-                best_params, best_rmse = find_best_prophet_params(train)  # No need for 'test' parameter anymore
-                if best_params is None:
-                    st.error("No valid Prophet parameters were found. Check your data preprocessing or parameter grid.")
-                    return
-
-                st.write(f"Best Parameters: {best_params}")
-                st.write(f"Best RMSE from cross-validation: {best_rmse}")
+                st.write(f"✅ Best Parameters: {best_params}")
+                st.write(f"📉 Best RMSE from cross-validation: {best_rmse}")
 
                 # Step 2: Train Final Model
                 try:
-                    st.write("Training Prophet Model with Best Parameters...")
+                    st.write("📊 Training Prophet Model with Best Parameters...")
+
+                    # Define Prophet model
                     prophet_model = Prophet(
                         seasonality_mode=best_params["seasonality_mode"],
                         changepoint_prior_scale=best_params["changepoint_prior_scale"]
                     )
 
-                    prophet_model = detect_and_add_seasonalities(prophet_model, train)
+                    # Detect & dynamically add seasonalities
+                    try:
+                        prophet_model = detect_and_add_seasonalities(prophet_model, train)
+                    except Exception as e:
+                        st.warning(f"⚠️ Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
+
+                    # Train the model
                     prophet_model.fit(train)
 
-                    future = prophet_model.make_future_dataframe(periods=forecast_period, freq="M")
+                    # Generate future dates & predict
+                    future = prophet_model.make_future_dataframe(periods=forecast_period, freq="M", include_history=False)
                     prophet_forecast = prophet_model.predict(future)
 
-                    prophet_rmse = mean_squared_error(test["y"], prophet_forecast["yhat"].iloc[-len(test):]) ** 0.5
-                    prophet_mape = mean_absolute_percentage_error(test["y"], prophet_forecast["yhat"].iloc[-len(test):])
+                    # Ensure only future forecasts are used
+                    prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
 
-                    # Identify high and low points in the forecast
-                    highest_point = prophet_forecast.loc[prophet_forecast['yhat'].idxmax()]
-                    lowest_point = prophet_forecast.loc[prophet_forecast['yhat'].idxmin()]
+                    # Ensure test set matches forecast length for metric calculation
+                    matching_length = min(len(test["y"]), len(prophet_forecast))
+                    prophet_rmse = mean_squared_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]) ** 0.5
+                    prophet_mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length])
 
+                    # Identify highest & lowest forecasted sales
+                    highest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmax()]
+                    lowest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmin()]
+
+                    # Display key insights
                     summary_text = (
-                        f"### Key Insights\n"
-                        f"- **Projected Growth:** Sales are expected to {'increase' if prophet_forecast['yhat'].iloc[-1] > test['y'].iloc[-1] else 'decrease'} by {abs(((prophet_forecast['yhat'].iloc[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100):.2f}% in the next period.\n"
+                        f"### 📊 Key Insights\n"
+                        f"- **Projected Growth:** Sales are expected to {'increase' if prophet_forecast['yhat'].iloc[-1] > test['y'].iloc[-1] else 'decrease'} "
+                        f"by {abs(((prophet_forecast['yhat'].iloc[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100):.2f}% in the next period.\n"
                         f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
                         f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
                         f"- **Best Model Parameters:** {best_params}\n"
                         f"- **Performance Metrics:**\n"
-                        f"  - RMSE: {prophet_rmse:.2f}\n"
-                        f"  - MAPE: {prophet_mape:.2f}\n"
+                        f"  - 📉 RMSE: {prophet_rmse:.2f}\n"
+                        f"  - 📉 MAPE: {prophet_mape:.2f}\n"
                     )
-    
+
                     with st.expander("📊 Prophet Model Summary"):
                         st.markdown(summary_text)
 
+                    # Prophet Visualization (Original Style)
                     fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat"], mode="lines", name="Forecast", line=dict(color="blue", width=2)))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_upper"], mode="lines", name="Upper Confidence", line=dict(color="lightblue", dash="dot")))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_lower"], mode="lines", name="Lower Confidence", line=dict(color="lightblue", dash="dot")))
 
+                    # Historical Data
+                    fig.add_trace(go.Scatter(
+                        x=train["ds"], y=train["y"], mode="lines", name="Historical",
+                        line=dict(color="black", width=2)
+                    ))
+
+                    # Forecast Data
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"], y=prophet_forecast["yhat"], mode="lines", name="Forecast",
+                        line=dict(color="blue", width=2)
+                    ))
+
+                    # Confidence Intervals
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"], y=prophet_forecast["yhat_upper"], mode="lines",
+                        name="Upper Confidence", line=dict(color="lightblue", dash="dot"),
+                        showlegend=False
+                    ))
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"], y=prophet_forecast["yhat_lower"], mode="lines",
+                        name="Lower Confidence", line=dict(color="lightblue", dash="dot"),
+                        fill="tonexty", showlegend=False
+                    ))
+
+                    # Display Plot
                     fig.update_layout(
-                        title="Prophet Forecast with Confidence Intervals",
+                        title="📈 Prophet Forecast with Confidence Intervals",
                         xaxis_title="Date",
                         yaxis_title="Sales",
                         legend_title="Legend",
@@ -305,14 +334,16 @@ def main():
 
                     st.plotly_chart(fig, use_container_width=True)
 
-                    # Populate results dictionary
+                    # Save results
                     results["Prophet"] = {
                         "RMSE": float(prophet_rmse),
                         "MAPE": float(prophet_mape),
                         "Forecast": prophet_forecast
                     }
+
                 except Exception as e:
-                    st.warning(f"Failed to train Prophet model: {e}")
+                    st.warning(f"❌ Prophet Model failed: {e}")
+
 
                 st.write("🔄 Training ARIMA Model...")
 
