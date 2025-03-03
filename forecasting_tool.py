@@ -429,13 +429,12 @@ def main():
                     st.warning(f"❌ ARIMA Model failed: {e}")
 
 
-                # XGBoost Model with Dynamic Adaptation
-                st.write("Training XGBoost Model...")
+                st.write("🚀 Training XGBoost Model...")
 
                 try:
                     # Step 1: Dynamic Feature Engineering
-                    max_lag = min(12, len(train) - 1)  # Adapt lags based on dataset size
-                    rolling_windows = [3, 6] if len(train) > 6 else [3]  # Use multiple rolling windows if data permits
+                    max_lag = min(12, len(train) - 1)  # Ensure dataset has enough history for lagging
+                    rolling_windows = [3, 6] if len(train) > 6 else [3]  # Dynamic rolling statistics
 
                     xgb_data = train.copy()
 
@@ -465,9 +464,9 @@ def main():
 
                     # Step 2: Train XGBoost Model
                     final_model = XGBRegressor(
-                        n_estimators=50,  # Adjust dynamically if needed
-                        max_depth=min(5, max(2, len(train) // 10)),  # Adapt max depth to dataset size
-                        learning_rate=0.1 if len(train) > 50 else 0.2,  # Adjust LR for larger datasets
+                        n_estimators=100,  # Increase for better pattern recognition
+                        max_depth=5,  # Moderate depth to balance learning
+                        learning_rate=0.1,  # Standard learning rate
                         objective="reg:squarederror",
                         random_state=42,
                         n_jobs=-1
@@ -508,6 +507,7 @@ def main():
                     # Convert to DataFrame and forward-fill missing values
                     future_df = pd.DataFrame(future_features)
                     future_df.fillna(method="ffill", inplace=True)
+                    future_df.fillna(0, inplace=True)  # Ensure no NaN values remain
 
                     # Predict future values
                     xgb_forecast = final_model.predict(future_df)
@@ -530,20 +530,7 @@ def main():
                     highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
                     lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
 
-                    summary_text = (
-                        f"### Key Insights\n"
-                        f"- **Projected Growth:** Sales are expected to {'increase' if xgb_forecast[-1] > test['y'].iloc[-1] else 'decrease'} "
-                        f"by {abs((xgb_forecast[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100:.2f}% in the next period.\n"
-                        f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
-                        f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
-                        f"- **Performance Metrics:**\n"
-                        f"  - RMSE: {rmse:.2f}\n"
-                        f"  - MAPE: {mape:.2f}\n"
-                    )
-
-                    with st.expander("📊 XGBoost Model Summary"):
-                        st.markdown(summary_text)
-
+                    # Plot XGBoost Forecast
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
                     fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"], mode="lines", name="Forecast", line=dict(color="red", width=2)))
@@ -566,7 +553,8 @@ def main():
                     }
 
                 except Exception as e:
-                    st.warning(f"XGBoost Model failed: {e}")
+                    st.warning(f"❌ XGBoost Model failed: {e}")
+
 
                     
                 st.write("🚀 Training AutoML Model...")
