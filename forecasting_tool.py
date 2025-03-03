@@ -296,36 +296,14 @@ def main():
                     with st.expander("📊 Prophet Model Summary"):
                         st.markdown(summary_text)
 
-                    # Prophet Visualization (Original Style)
                     fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
+                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat"], mode="lines", name="Forecast", line=dict(color="blue", width=2)))
+                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_upper"], mode="lines", name="Upper Confidence", line=dict(color="lightblue", dash="dot")))
+                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_lower"], mode="lines", name="Lower Confidence", line=dict(color="lightblue", dash="dot")))
 
-                    # Historical Data
-                    fig.add_trace(go.Scatter(
-                        x=train["ds"], y=train["y"], mode="lines", name="Historical",
-                        line=dict(color="black", width=2)
-                    ))
-
-                    # Forecast Data
-                    fig.add_trace(go.Scatter(
-                        x=prophet_forecast["ds"], y=prophet_forecast["yhat"], mode="lines", name="Forecast",
-                        line=dict(color="blue", width=2)
-                    ))
-
-                    # Confidence Intervals
-                    fig.add_trace(go.Scatter(
-                        x=prophet_forecast["ds"], y=prophet_forecast["yhat_upper"], mode="lines",
-                        name="Upper Confidence", line=dict(color="lightblue", dash="dot"),
-                        showlegend=False
-                    ))
-                    fig.add_trace(go.Scatter(
-                        x=prophet_forecast["ds"], y=prophet_forecast["yhat_lower"], mode="lines",
-                        name="Lower Confidence", line=dict(color="lightblue", dash="dot"),
-                        fill="tonexty", showlegend=False
-                    ))
-
-                    # Display Plot
                     fig.update_layout(
-                        title="📈 Prophet Forecast with Confidence Intervals",
+                        title="Prophet Forecast with Confidence Intervals",
                         xaxis_title="Date",
                         yaxis_title="Sales",
                         legend_title="Legend",
