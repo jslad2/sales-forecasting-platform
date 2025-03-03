@@ -598,7 +598,7 @@ def main():
                         task="regression",
                         time_budget=600,  # Reduced time budget for faster training
                         eval_method="cv",
-                        estimator_list=["xgboost"],  # Force XGBoost, remove LGBM
+                        estimator_list=["xgboost", "lgbm", "rf"],  # Force XGBoost, remove LGBM
                         metric="r2"  # Prioritize fitting trends over just minimizing error
                     )
                     st.write(f"✅ AutoML Training Completed! Best Estimator: {automl_model.best_estimator}")
