@@ -433,19 +433,25 @@ def main():
 
                 try:
                     # Step 1: Dynamic Feature Engineering
-                    max_lag = min(12, len(train) - 1)  # Ensure dataset has enough history for lagging
-                    rolling_windows = [3, 6] if len(train) > 6 else [3]  # Dynamic rolling statistics
+                    max_lag = min(12, len(train) - 1)
+                    rolling_windows = [3, 6, 12] if len(train) > 12 else [3, 6]
 
                     xgb_data = train.copy()
 
-                    # Create lag features dynamically
+                    # Create lag features
                     for lag in range(1, max_lag + 1):
                         xgb_data[f"lag_{lag}"] = xgb_data["y"].shift(lag)
 
-                    # Add rolling statistics dynamically
+                    # Add rolling statistics
                     for window in rolling_windows:
                         xgb_data[f"rolling_mean_{window}"] = xgb_data["y"].rolling(window=window).mean()
                         xgb_data[f"rolling_std_{window}"] = xgb_data["y"].rolling(window=window).std()
+
+                    # Add trend growth
+                    if len(train) > 12:
+                        xgb_data["yoy_growth"] = (xgb_data["y"] / xgb_data["y"].shift(12)) - 1
+                    else:
+                        xgb_data["yoy_growth"] = 0
 
                     # Add time-based features
                     xgb_data["month"] = xgb_data["ds"].dt.month
@@ -454,7 +460,7 @@ def main():
                     xgb_data["sin_month"] = np.sin(2 * np.pi * xgb_data["month"] / 12)
                     xgb_data["cos_month"] = np.cos(2 * np.pi * xgb_data["month"] / 12)
 
-                    # Drop missing values after feature engineering
+                    # Drop missing values
                     xgb_data.dropna(inplace=True)
 
                     # Prepare training data
@@ -464,38 +470,30 @@ def main():
 
                     # Step 2: Train XGBoost Model
                     final_model = XGBRegressor(
-                        n_estimators=100,  # Increase for better pattern recognition
-                        max_depth=5,  # Moderate depth to balance learning
-                        learning_rate=0.1,  # Standard learning rate
+                        n_estimators=300,
+                        max_depth=7,
+                        learning_rate=0.05,
                         objective="reg:squarederror",
+                        colsample_bytree=0.8,
+                        subsample=0.8,
                         random_state=42,
                         n_jobs=-1
                     )
                     final_model.fit(x_train, y_train)
 
-                    # Step 3: Forecast Future Values
+                    # Step 3: Generate Future Data
                     future_features = []
                     for i in range(forecast_period):
                         future_row = {}
 
-                        # Generate lag features dynamically
-                        for lag in range(1, max_lag + 1):
-                            future_row[f"lag_{lag}"] = train["y"].iloc[-lag] if lag <= len(train) else np.nan
-
-                        # Generate rolling features dynamically
                         for window in rolling_windows:
-                            future_row[f"rolling_mean_{window}"] = (
-                                train["y"].rolling(window=min(window, len(train))).mean().iloc[-1]
-                                if len(train) > 1
-                                else np.nan
-                            )
-                            future_row[f"rolling_std_{window}"] = (
-                                train["y"].rolling(window=min(window, len(train))).std().iloc[-1]
-                                if len(train) > 1
-                                else np.nan
-                            )
+                            past_values = train["y"].iloc[-window:].values
+                            future_row[f"rolling_mean_{window}"] = np.mean(past_values) if len(past_values) > 0 else 0
+                            future_row[f"rolling_std_{window}"] = np.std(past_values) if len(past_values) > 0 else 0
 
-                        # Generate seasonal features dynamically
+                        for lag in range(1, max_lag + 1):
+                            future_row[f"lag_{lag}"] = train["y"].iloc[-lag] if lag <= len(train) else 0
+
                         future_row["month"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).month
                         future_row["quarter"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).quarter
                         future_row["year"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).year
@@ -504,58 +502,24 @@ def main():
 
                         future_features.append(future_row)
 
-                    # Convert to DataFrame and forward-fill missing values
                     future_df = pd.DataFrame(future_features)
                     future_df.fillna(method="ffill", inplace=True)
-                    future_df.fillna(0, inplace=True)  # Ensure no NaN values remain
+                    future_df.fillna(0, inplace=True)
 
                     # Predict future values
                     xgb_forecast = final_model.predict(future_df)
 
-                    # Ensure test['y'] length matches xgb_forecast
-                    matching_length = min(len(test["y"]), len(xgb_forecast))
-                    test_y_trimmed = test["y"].iloc[:matching_length]
-                    xgb_forecast_trimmed = xgb_forecast[:matching_length]
-
-                    # Calculate RMSE and MAPE with matched lengths
-                    rmse = mean_squared_error(test_y_trimmed, xgb_forecast_trimmed) ** 0.5  # RMSE = sqrt(MSE)
-                    mape = mean_absolute_percentage_error(test_y_trimmed, xgb_forecast_trimmed)
-
-                    # Save Results
+                    # Convert to DataFrame
                     forecast_df = pd.DataFrame({
                         "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
                         "yhat": xgb_forecast
                     })
 
-                    highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
-                    lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
-
                     # Plot XGBoost Forecast
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
-                    fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"], mode="lines", name="Forecast", line=dict(color="red", width=2)))
-
-                    fig.update_layout(
-                        title="XGBoost Forecast",
-                        xaxis_title="Date",
-                        yaxis_title="Sales",
-                        legend_title="Legend",
-                        template="plotly_white"
-                    )
-
                     st.plotly_chart(fig, use_container_width=True)
-
-                    # Populate results dictionary
-                    results["XGBoost"] = {
-                        "RMSE": float(rmse),
-                        "MAPE": float(mape),
-                        "Forecast": forecast_df
-                    }
 
                 except Exception as e:
                     st.warning(f"❌ XGBoost Model failed: {e}")
-
-
                     
                 st.write("🚀 Training AutoML Model...")
                 try:
