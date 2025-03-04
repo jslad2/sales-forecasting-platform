@@ -220,28 +220,28 @@ def login():
 
         try:
             user_response = supabase.auth.sign_in_with_password({"email": email, "password": password})
-
             print(f"🔍 Supabase Response: {user_response}")  # Debugging
 
             if user_response and "user" in user_response:
                 user_data = user_response["user"]
 
-                # ✅ Store session data
+                # ✅ Store session data correctly
                 session["user_email"] = user_data["email"]
                 session["user_id"] = user_data["id"]
                 session["session_id"] = os.urandom(24).hex()  # Unique session ID
+                session["access_token"] = user_response["access_token"]  # Store the token
+                session["refresh_token"] = user_response["refresh_token"]
 
                 print(f"✅ Login successful! Session ID: {session['session_id']}")  # Debugging
-
-                return redirect(url_for("dashboard"))
+                return jsonify({"status": "success", "redirect": "/dashboard"})  # Respond with success
 
             else:
                 print("❌ Supabase returned invalid credentials")  # Debugging
-                flash("❌ Invalid login credentials. Please try again.", "error")
+                return jsonify({"status": "error", "message": "Invalid login credentials"}), 401
 
         except Exception as e:
             print(f"🔥 Login error: {str(e)}")  # Debugging
-            flash(f"❌ Error during login: {str(e)}", "error")
+            return jsonify({"status": "error", "message": str(e)}), 500
 
     return render_template("login.html")
 

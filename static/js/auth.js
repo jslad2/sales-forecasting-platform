@@ -19,9 +19,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 if (data.status === "success") {
                     console.log("✅ Redirecting to dashboard...");
-                    window.location.href = "/dashboard";  // Redirect on success
+                    window.location.href = data.redirect;  // Redirect on success
                 } else {
-                    console.error("❌ Login failed:", data.error);
+                    console.error("❌ Login failed:", data.message);
                     document.querySelector("#login-error").textContent = "❌ Invalid credentials. Try again.";
                 }
             })
