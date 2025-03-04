@@ -618,13 +618,14 @@ def main():
                             metric="r2",
                             custom_hp={
                                 "xgboost": {  
-                                    "learning_rate": {"domain": (0.01, 0.1), "log": True},  # Constrain LR
-                                    "max_depth": {"domain": (3, 10), "init_value": 6},  # Ensure deeper trees
-                                    "n_estimators": {"domain": (100, 500), "low": 100, "high": 500, "init_value": 300},  # Require 100+ estimators
+                                    "learning_rate": {"domain": (0.01, 0.1), "log": True},  # Learning rate constraint
+                                    "max_depth": {"domain": (3, 10), "init_value": 6, "type": "int"},  # Ensure valid int values
+                                    "n_estimators": {"domain": (100, 500), "init_value": 300, "type": "int"},  # Require at least 100 trees
                                     "colsample_bytree": {"domain": (0.7, 1.0), "init_value": 0.85}  # Ensure sufficient feature selection
                                 }
                             }
                         )
+
 
 
                         st.write(f"AutoML Training Completed: Best Estimator - {automl_model.best_estimator}")
