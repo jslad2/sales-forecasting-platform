@@ -608,6 +608,7 @@ def main():
 
                         # Train AutoML Model
                         automl_model = AutoML()
+
                         automl_model.fit(
                             X_train=x_train,
                             y_train=y_train,
@@ -618,14 +619,13 @@ def main():
                             metric="r2",
                             custom_hp={
                                 "xgboost": {  
-                                    "learning_rate": {"domain": (0.01, 0.1), "log": True},  # Proper logarithmic scaling
-                                    "max_depth": {"domain": (3, 10)},  # Must use "domain" instead of "low/high"
-                                    "n_estimators": {"domain": (100, 500)},  # Must use "domain" for integer ranges
-                                    "colsample_bytree": {"domain": (0.7, 1.0)}  # Can remain a tuple
+                                    "learning_rate": {"domain": [0.01, 0.1], "log": True},  # Use a list instead of a tuple
+                                    "max_depth": {"domain": [3, 10]},  # Use a list for integer ranges
+                                    "n_estimators": {"domain": [100, 500]},  # Use a list for integer ranges
+                                    "colsample_bytree": {"domain": [0.7, 1.0]}  # Use a list for float ranges
                                 }
                             }
                         )
-
 
                         st.write(f"AutoML Training Completed: Best Estimator - {automl_model.best_estimator}")
 
