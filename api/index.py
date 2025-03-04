@@ -16,8 +16,11 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 # ✅ Initialize Flask App (Ensure Correct Paths)
-app = Flask(__name__)
-app.secret_key = os.urandom(24)  # Secure session key
+app = Flask(__name__, 
+            template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")), 
+            static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../static")))
+
+app.secret_key = "your_secret_key"  # Change this for security
 
 # ✅ Home Page
 @app.route('/')
