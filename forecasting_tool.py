@@ -614,14 +614,16 @@ def main():
                         task="regression",
                         time_budget=600,  
                         eval_method="cv",
-                        estimator_list=["xgboost", "lgbm", "rf"],  # Allow multiple models
+                        estimator_list=["xgboost", "lgbm", "rf"],  # Test multiple models
                         metric="r2",
-                        custom_hp={"xgboost": {  
-                            "learning_rate": (0.01, 0.1),  # Prevent extreme values  
-                            "max_depth": (3, 10),  # Ensure deep enough trees  
-                            "n_estimators": (100, 500),  # Require enough trees  
-                            "colsample_bytree": (0.7, 1.0)  # Ensure enough feature selection  
-                        }}
+                        custom_hp={
+                            "xgboost": {  
+                                "learning_rate": {"domain": (0.01, 0.1), "log": True},  # Prevent extreme overfitting
+                                "max_depth": {"domain": (3, 10)},  # Allow deep enough trees
+                                "n_estimators": {"domain": (100, 500)},  # Require at least 100 trees
+                                "colsample_bytree": {"domain": (0.7, 1.0)}  # Ensure enough feature selection
+                            }
+                        }
                     )
 
                         st.write(f"AutoML Training Completed: Best Estimator - {automl_model.best_estimator}")
