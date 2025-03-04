@@ -609,23 +609,23 @@ def main():
                         # Train AutoML Model
                         automl_model = AutoML()
                         automl_model.fit(
-                        X_train=x_train,
-                        y_train=y_train,
-                        task="regression",
-                        time_budget=600,  
-                        eval_method="cv",
-                        estimator_list=["xgboost", "lgbm", "rf"],  # Test multiple models
-                        metric="r2",
-                        custom_hp={
-                            "xgboost": {  
-                                "learning_rate": {"domain": (0.01, 0.1), "log": True},  # Prevent extreme overfitting
-                                "max_depth": {"domain": (3, 10)},  # Allow deep enough trees
-                                "n_estimators": {"domain": (100, 500)},  # Require at least 100 trees
-                                "colsample_bytree": {"domain": (0.7, 1.0)}  # Ensure enough feature selection
+                            X_train=x_train,
+                            y_train=y_train,
+                            task="regression",
+                            time_budget=600,  
+                            eval_method="cv",
+                            estimator_list=["xgboost", "lgbm", "rf"],  # Ensure multiple models are tested
+                            metric="r2",
+                            custom_hp={
+                                "xgboost": {  
+                                    "learning_rate": (0.01, 0.1),  # Prevent overfitting with high LR
+                                    "max_depth": (3, 10),  # Ensure deep enough trees for learning
+                                    "n_estimators": (100, 500),  # Require enough trees for stability
+                                    "colsample_bytree": (0.7, 1.0)  # Ensure sufficient feature selection
+                                }
                             }
-                        }
-                    )
-
+                        )
+                        
                         st.write(f"AutoML Training Completed: Best Estimator - {automl_model.best_estimator}")
 
                         # Feature Importance (if XGBoost is the best estimator)
