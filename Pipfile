@@ -33,6 +33,7 @@ pyparsing = "*"
 fonttools = "*"
 pydeck = "*"
 lightgbm = "==3.3.5"
+supabase = "*"
 
 [dev-packages]
 
