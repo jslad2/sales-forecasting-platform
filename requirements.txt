@@ -4,4 +4,3 @@ supabase
 werkzeug
 requests
 python-dotenv  # ✅ Required for .env variables
-requests
