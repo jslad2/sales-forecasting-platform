@@ -69,42 +69,21 @@ def forecasting_tool():
 
     return render_template('forecasting_tool.html', user_plan=user_plan)
 
-# ✅ Sales Dashboard Page (Restricted)
-@app.route('/sales-dashboard')
-def sales_dashboard():
-    if 'user' not in session:
-        return redirect(url_for('login'))
-    
-    conn = get_db_connection()
-    user = conn.execute("SELECT tier FROM users WHERE email = ?", (session['user'],)).fetchone()
-    conn.close()
-
-    if user and user['tier'] == 'pro':
-        return render_template('sales_dashboard.html', pro_user=True)
-    else:
-        return render_template('sales_dashboard.html', pro_user=False)
-
 # ✅ Self-Service Insights Page
 @app.route('/self-service-insights')
 def self_service_insights():
     return render_template('self_service_insights.html')
 
-# ✅ Dashboard Route (Checks Free vs. Pro)
+# ✅ Dashboard Route
 @app.route('/dashboard')
 def dashboard():
-    if 'user' not in session:
-        return redirect(url_for('login'))
+    if "user_email" not in session:
+        return redirect(url_for("login"))  # 🔐 Redirect if NOT logged in
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT tier FROM users WHERE email = ?", (session['user'],))
-    user = cursor.fetchone()
-    conn.close()
+    return render_template("dashboard.html", 
+                           user_email=session["user_email"], 
+                           user_plan=session["user_plan"])
 
-    if user and user['tier'] == 'pro':
-        return render_template('dashboard.html', pro_user=True)
-    else:
-        return render_template('dashboard.html', pro_user=False)
     
 # ✅ Register Route (Uses Supabase Auth)
 @app.route('/register', methods=['GET', 'POST'])
@@ -235,21 +214,21 @@ def update_password():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
+        email = request.form.get('email')
+        password = request.form.get('password')
 
         try:
             user = supabase.auth.sign_in_with_password({"email": email, "password": password})
 
             if user and "user" in user:
                 session["user_email"] = email
-                session["user_plan"] = user["user"]["app_metadata"].get("plan", "free")  # Default to free plan
+                session["user_plan"] = user["user"]["app_metadata"].get("plan", "free")
+                session["session_id"] = os.urandom(24).hex()  # Create a unique session ID
 
-                flash("✅ Login successful! Redirecting...", "success")
-                return redirect(url_for("forecasting_tool"))
+                return redirect(url_for("dashboard"))  # ✅ Redirect to dashboard
 
         except Exception as e:
-            flash("❌ Invalid login credentials. Please try again.", "danger")
+            flash("❌ Invalid login credentials. Please try again.", "error")
 
     return render_template("login.html")
 
@@ -281,14 +260,19 @@ def logout():
     flash("You have been logged out.", "info")
     return redirect(url_for('login'))
 
+# Check Auth
 @app.route('/check-auth')
 def check_auth():
     session_id = request.args.get("session_id")
+
+    # ✅ Debugging: Print session info
+    print(f"Stored session: {session.get('session_id')}, Received: {session_id}")
 
     if not session_id or session_id != session.get("session_id"):
         return jsonify({"error": "Invalid session"}), 401
 
     return jsonify({"status": "authenticated", "user_email": session["user_email"]})
+
 
 # ✅ Stripe Payment Route
 @app.route('/checkout/pro')

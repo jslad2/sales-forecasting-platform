@@ -25,12 +25,11 @@
                 <li><a href="{{ url_for('data_services') }}" class="nav-link">Data Services</a></li>
                 <li><a href="{{ url_for('pricing') }}" class="nav-link">Pricing</a></li>
                 <li><a href="{{ url_for('contact') }}" class="nav-link">Contact</a></li>
-                
-                {% if 'user_email' in session %}
-                    <li><a href="{{ url_for('forecasting_tool') }}" class="nav-link">Forecast Tool</a></li>
-                    <li><a href="{{ url_for('logout') }}" class="nav-link">Logout</a></li>
+                {% if session['user_email'] %}
+                    <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                    <a href="{{ url_for('logout') }}">Logout</a>
                 {% else %}
-                    <li><a href="{{ url_for('login') }}" class="nav-link">Login</a></li>
+                    <a href="{{ url_for('login') }}">Login</a>
                 {% endif %}
             </ul>
             
