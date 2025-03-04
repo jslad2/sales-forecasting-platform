@@ -34,6 +34,7 @@ fonttools = "*"
 pydeck = "*"
 lightgbm = "==3.3.5"
 supabase = "*"
+python-dotenv = "*"
 
 [dev-packages]
 
