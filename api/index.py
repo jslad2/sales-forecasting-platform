@@ -213,21 +213,6 @@ def update_password():
 
     return render_template("update_password.html", token=access_token)
 
-import os
-import requests
-from flask import Flask, request, jsonify, session, redirect, render_template
-
-# ✅ Initialize Flask App
-app = Flask(__name__, 
-            template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")), 
-            static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../static")))
-
-app.secret_key = "your_secret_key"  # Change this for security
-
-# ✅ Supabase Credentials (Ensure they exist)
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
 @app.route('/login', methods=['POST', 'GET'])
 def login():
     if request.method == 'POST':
