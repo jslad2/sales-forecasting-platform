@@ -78,13 +78,15 @@ def self_service_insights():
 # ✅ Dashboard Route
 @app.route('/dashboard')
 def dashboard():
-    if "user_email" not in session:
-        return redirect(url_for("login"))  # 🔐 Redirect if NOT logged in
+    print(f"Session Data: {session}")  # Debugging
 
-    return render_template("dashboard.html", 
-                           user_email=session["user_email"], 
-                           user_plan=session["user_plan"])
+    if 'user_email' not in session:
+        return redirect(url_for('login'))
 
+    # ✅ Handle missing user_plan by setting a default
+    user_plan = session.get("user_plan", "free")
+
+    return render_template('dashboard.html', user=session["user_email"], user_plan=user_plan)
     
 # ✅ Register Route (Uses Supabase Auth)
 @app.route('/register', methods=['GET', 'POST'])
@@ -211,6 +213,21 @@ def update_password():
 
     return render_template("update_password.html", token=access_token)
 
+import os
+import requests
+from flask import Flask, request, jsonify, session, redirect, render_template
+
+# ✅ Initialize Flask App
+app = Flask(__name__, 
+            template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")), 
+            static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../static")))
+
+app.secret_key = "your_secret_key"  # Change this for security
+
+# ✅ Supabase Credentials (Ensure they exist)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
 @app.route('/login', methods=['POST', 'GET'])
 def login():
     if request.method == 'POST':
@@ -252,25 +269,26 @@ def login():
             print(f"🔍 Supabase Response: {supabase_data}")  # Debugging log
 
             # ✅ Check for errors in response
-            if "error" in supabase_data:
-                return jsonify({"status": "error", "message": supabase_data["error"]["message"]}), 401
+            if response.status_code != 200 or "access_token" not in supabase_data:
+                error_message = supabase_data.get("error", {}).get("message", "Invalid login credentials")
+                print(f"❌ Supabase login failed: {error_message}")  # Debugging log
+                return jsonify({"status": "error", "message": error_message}), 401
 
-            if response.status_code == 200 and "access_token" in supabase_data:
-                user_data = supabase_data["user"]
+            # ✅ Extract user data
+            user_data = supabase_data["user"]
 
-                # ✅ Store session data securely
-                session["user_email"] = user_data["email"]
-                session["user_id"] = user_data["id"]
-                session["session_id"] = os.urandom(24).hex()  # Unique session ID
-                session["access_token"] = supabase_data["access_token"]
-                session["refresh_token"] = supabase_data["refresh_token"]
+            # ✅ Store session data securely
+            session["user_email"] = user_data["email"]
+            session["user_id"] = user_data["id"]
+            session["session_id"] = os.urandom(24).hex()  # Unique session ID
+            session["access_token"] = supabase_data["access_token"]
+            session["refresh_token"] = supabase_data["refresh_token"]
 
-                print(f"✅ Login successful! Session ID: {session['session_id']}")  # Debugging log
-                return jsonify({"status": "success", "redirect": "/dashboard"})  # Frontend handles redirect
+            # ✅ Store user's subscription plan
+            session["user_plan"] = user_data.get("app_metadata", {}).get("plan", "free")  # Default to 'free'
 
-            else:
-                print("❌ Supabase returned invalid credentials")  # Debugging log
-                return jsonify({"status": "error", "message": "Invalid login credentials"}), 401
+            print(f"✅ Login successful! Session ID: {session['session_id']}, Plan: {session['user_plan']}")  # Debugging log
+            return jsonify({"status": "success", "redirect": "/dashboard"})  # Frontend handles redirect
 
         except Exception as e:
             print(f"🔥 Login error: {str(e)}")  # Debugging log
