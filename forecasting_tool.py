@@ -616,16 +616,15 @@ def main():
                             eval_method="cv",
                             estimator_list=["xgboost", "lgbm", "rf"],  # Ensure multiple models are tested
                             metric="r2",
-                            hp_config={
+                            custom_hp={
                                 "xgboost": {  
                                     "learning_rate": {"domain": (0.01, 0.1), "log": True},  # Learning rate should be logarithmic
-                                    "max_depth": {"domain": [3, 4, 5, 6, 7, 8, 9, 10]},  # Must be a list of integers
-                                    "n_estimators": {"domain": [100, 200, 300, 400, 500]},  # Must be a list of discrete values
+                                    "max_depth": {"low": 3, "high": 10},  # Correct integer range
+                                    "n_estimators": {"low": 100, "high": 500},  # Correct integer range
                                     "colsample_bytree": {"domain": (0.7, 1.0)}  # Can remain a tuple
                                 }
                             }
                         )
-
 
                         st.write(f"AutoML Training Completed: Best Estimator - {automl_model.best_estimator}")
 
