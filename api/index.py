@@ -217,18 +217,26 @@ def login():
         email = request.form.get('email')
         password = request.form.get('password')
 
+        print(f"🔍 Attempting login for {email}")  # Debugging
+
         try:
             user = supabase.auth.sign_in_with_password({"email": email, "password": password})
 
             if user and "user" in user:
                 session["user_email"] = email
                 session["user_plan"] = user["user"]["app_metadata"].get("plan", "free")
-                session["session_id"] = os.urandom(24).hex()  # Create a unique session ID
+                session["session_id"] = os.urandom(24).hex()  # Generate unique session ID
 
-                return redirect(url_for("dashboard"))  # ✅ Redirect to dashboard
+                print(f"✅ Login successful for {email}, Redirecting to dashboard...")  # Debugging
+                return redirect(url_for("dashboard"))  # Redirect after login
+
+            else:
+                print("❌ Login failed: Invalid credentials")  # Debugging
+                flash("❌ Invalid login credentials. Please try again.", "error")
 
         except Exception as e:
-            flash("❌ Invalid login credentials. Please try again.", "error")
+            print(f"🔥 Login error: {str(e)}")  # Debugging
+            flash(f"❌ Error during login: {str(e)}", "error")
 
     return render_template("login.html")
 
