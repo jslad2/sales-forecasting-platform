@@ -273,19 +273,17 @@ def logout():
     flash("You have been logged out.", "info")
     return redirect(url_for('login'))
 
-# Check Auth
 @app.route('/check-auth')
 def check_auth():
+    print(f"🔍 Stored session: {session.get('session_id')}")  # Debugging
+
     session_id = request.args.get("session_id")
 
-    # ✅ Debugging: Print session info
-    print(f"Stored session: {session.get('session_id')}, Received: {session_id}")
-
     if not session_id or session_id != session.get("session_id"):
-        return jsonify({"error": "Invalid session"}), 401
+        print("❌ Invalid session detected")  # Debugging
+        return jsonify({"error": "Invalid session"}), 401  # Unauthorized
 
     return jsonify({"status": "authenticated", "user_email": session["user_email"]})
-
 
 # ✅ Stripe Payment Route
 @app.route('/checkout/pro')
