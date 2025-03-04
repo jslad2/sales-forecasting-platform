@@ -8,21 +8,24 @@ document.addEventListener("DOMContentLoaded", function () {
             const email = document.querySelector("#email").value;
             const password = document.querySelector("#password").value;
 
-            fetch("https://ewdilyhplzrxyrbtkmjy.supabase.co/auth/v1/token?grant_type=password", {
+            fetch("/login", {
                 method: "POST",
-                headers: {
-                    "apikey": "your-supabase-api-key",
-                    "Content-Type": "application/json"  // Ensure JSON format
-                },
-                body: JSON.stringify({
-                    email: "jslad13@gmail.com",
-                    password: "Armstr0ng1!"
-                })
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: email, password: password })
             })
             .then(response => response.json())
-            .then(data => console.log("Login Successful:", data))
-            .catch(error => console.error("Login Error:", error));
-            
+            .then(data => {
+                console.log("🔍 Login Response:", data);
+
+                if (data.status === "success") {
+                    console.log("✅ Redirecting to dashboard...");
+                    window.location.href = data.redirect;  // Redirect on success
+                } else {
+                    console.error("❌ Login failed:", data.message);
+                    document.querySelector("#login-error").textContent = "❌ Invalid credentials. Try again.";
+                }
+            })
+            .catch(error => console.error("❌ Error:", error));
         });
     }
 });
