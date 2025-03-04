@@ -22,6 +22,9 @@ from sklearn.model_selection import train_test_split, TimeSeriesSplit
 import plotly.graph_objects as go
 from statsmodels.tsa.stattools import acf
 import time
+import os
+from supabase import create_client, Client
+from dotenv import load_dotenv
 
 # Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
 st.set_page_config(layout="wide")
@@ -41,6 +44,66 @@ if theme == "Dark":
         unsafe_allow_html=True,
     )
 
+# ✅ Load environment variables from .env
+load_dotenv()
+
+# ✅ Ensure environment variables exist
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    st.error("❌ Supabase credentials are missing. Please check your .env file.")
+    st.stop()
+
+# ✅ Initialize Supabase Client
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+def get_user_subscription_level(user_id):
+    response = supabase.table("users").select("subscription_level").eq("id", user_id).execute()
+    if response.data:
+        return response.data[0].get("subscription_level", "free").lower()  # Ensure lowercase for consistency
+    return "free"
+
+def is_feature_available(subscription_level, feature):
+    subscription_levels = {
+        "Free": {
+            "Basic Forecasting": True,
+            "Best Model Selection": False,
+            "AutoML Hyperparameter Tuning": False,
+            "Custom Forecast Intervals": False,
+            "Scenario Planning & Demand Shocks": False,
+            "Business Impact Insights": False,
+            "Anomaly Detection": False,
+            "Alerts & Monitoring": False,
+            "Google Sheets & Excel Exports": False,
+            "Multi-User Access & API Integration": False
+        },
+        "basic": {
+            "Basic Forecasting": True,
+            "Best Model Selection": True,
+            "AutoML Hyperparameter Tuning": False,
+            "Custom Forecast Intervals": True,
+            "Scenario Planning & Demand Shocks": False,
+            "Business Impact Insights": True,
+            "Anomaly Detection": False,
+            "Alerts & Monitoring": False,
+            "Google Sheets & Excel Exports": True,
+            "Multi-User Access & API Integration": False
+        },
+        "premium": {
+            "Basic Forecasting": True,
+            "Best Model Selection": True,
+            "AutoML Hyperparameter Tuning": True,
+            "Custom Forecast Intervals": True,
+            "Scenario Planning & Demand Shocks": True,
+            "Business Impact Insights": True,
+            "Anomaly Detection": True,
+            "Alerts & Monitoring": True,
+            "Google Sheets & Excel Exports": True,
+            "Multi-User Access & API Integration": True
+        }
+    }
+    return subscription_levels.get(subscription_level, {}).get(feature, False)
 
 def check_stationarity(series):
     """
@@ -84,8 +147,6 @@ def preprocess_data(data, date_column, sales_column):
     except Exception as e:
         st.error(f"Error during data preprocessing: {e}")
         return None
-
-
 
 def detect_and_add_seasonalities(model, data):
     """
@@ -219,8 +280,7 @@ def main():
                     """,
                     unsafe_allow_html=True,
                 )
-    # ✅ Add the loading indicator BEFORE running main()
-            with st.spinner("🚀 AI is analyzing your data... Please wait."):
+
                 # ✅ Use Streamlit's Expander to Organize Data
                 with st.expander("📊 View Processed Data"):
                     # ✅ Adjust Column Widths Dynamically
@@ -807,19 +867,6 @@ def main():
                     "AutoML": "purple"
                 }
 
-
-                def display_model_leaderboard(results):
-                    """ Display model ranking by RMSE """
-                    model_comparison = pd.DataFrame([
-                        {"Model": model, "RMSE": metrics["RMSE"], "MAPE": metrics["MAPE"]}
-                        for model, metrics in results.items()
-                    ]).sort_values(by="RMSE")
-
-                    st.markdown("### 🏆 Model Performance Leaderboard")
-                    st.dataframe(model_comparison.style.highlight_min(subset=["RMSE", "MAPE"], color="lightgreen"))
-
-                display_model_leaderboard(results)
-
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(
                     x=train["ds"],
@@ -849,45 +896,6 @@ def main():
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
-                def plot_forecast_comparison(results, train):
-                    """ Interactive comparison of forecast models """
-
-                    fig = go.Figure()
-
-                    # Add historical data
-                    fig.add_trace(go.Scatter(
-                        x=train["ds"], y=train["y"], mode="lines", 
-                        name="Historical Data", line=dict(color="black", width=2)
-                    ))
-
-                    # Add forecasts from different models
-                    model_colors = {"Prophet": "blue", "ARIMA": "green", "XGBoost": "red", "AutoML": "purple"}
-                    
-                    for model, result in results.items():
-                        if "Forecast" in result and isinstance(result["Forecast"], pd.DataFrame):
-                            forecast_df = result["Forecast"]
-                            fig.add_trace(go.Scatter(
-                                x=forecast_df["ds"], y=forecast_df["yhat"], 
-                                mode="lines", name=f"{model} Forecast",
-                                line=dict(width=2, color=model_colors.get(model, "gray"))
-                            ))
-
-                    # Layout customization
-                    fig.update_layout(
-                        title="📊 Interactive Forecast Comparison",
-                        xaxis_title="Date",
-                        yaxis_title="Sales",
-                        template="plotly_white",
-                        hovermode="x unified",
-                        showlegend=True
-                    )
-
-                    return fig
-
-                # Use in Streamlit
-                st.plotly_chart(plot_forecast_comparison(results, train), use_container_width=True)
-
-
                 # 📥 Download Forecast Data
                 st.markdown("### 📥 Download Forecast Data")
                 if forecast_data is not None:
@@ -903,9 +911,6 @@ def main():
                         st.error(f"❌ Error generating download file: {e}")
                 else:
                     st.warning("⚠️ No forecast data available for download.")
-
-    # ✅ After completion, show success message
-            st.success("✅ Forecasting complete! View results below.")
 
         except Exception as e:
             st.error(f"Error processing file: {e}")
