@@ -612,7 +612,7 @@ def main():
                             X_train=x_train,
                             y_train=y_train,
                             task="regression",
-                            time_budget=300,  # Time budget for AutoML
+                            time_budget=800,  # Time budget for AutoML
                             eval_method=eval_method,  # Dynamically chosen evaluation method
                             estimator_list=["xgboost", "lgbm", "rf"]  # Focus on tree-based models
                         )
