@@ -4,7 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import re
-import requests 
+
 
 # ✅ Load environment variables from .env
 load_dotenv()
