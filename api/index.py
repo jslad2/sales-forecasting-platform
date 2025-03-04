@@ -4,6 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import re
+import requests
 
 # ✅ Load environment variables from .env
 load_dotenv()
@@ -210,40 +211,72 @@ def update_password():
 
     return render_template("update_password.html", token=access_token)
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['POST', 'GET'])
 def login():
     if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
-
-        print(f"🔍 Attempting login for {email}")  # Debugging
-
         try:
-            user_response = supabase.auth.sign_in_with_password({"email": email, "password": password})
-            print(f"🔍 Supabase Response: {user_response}")  # Debugging
+            # ✅ Ensure environment variables exist
+            if not SUPABASE_URL or not SUPABASE_KEY:
+                print("❌ Missing Supabase credentials!")
+                return jsonify({"status": "error", "message": "Server misconfiguration"}), 500
 
-            if user_response and "user" in user_response:
-                user_data = user_response["user"]
+            # ✅ Handle both `application/json` and `form-data`
+            if request.is_json:
+                data = request.get_json()
+                email = data.get("email")
+                password = data.get("password")
+            else:
+                email = request.form.get("email")
+                password = request.form.get("password")
 
-                # ✅ Store session data correctly
+            print(f"🔍 Attempting login for {email}")  # Debugging log
+
+            if not email or not password:
+                return jsonify({"status": "error", "message": "Missing email or password"}), 400
+
+            # ✅ Prepare Supabase API headers
+            headers = {
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",  # ✅ Fix authorization header
+                "Content-Type": "application/json"
+            }
+
+            # ✅ Send login request to Supabase
+            response = requests.post(
+                f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
+                json={"email": email, "password": password},
+                headers=headers
+            )
+
+            supabase_data = response.json()
+            print(f"🔍 Supabase Response: {supabase_data}")  # Debugging log
+
+            # ✅ Check for errors in response
+            if "error" in supabase_data:
+                return jsonify({"status": "error", "message": supabase_data["error"]["message"]}), 401
+
+            if response.status_code == 200 and "access_token" in supabase_data:
+                user_data = supabase_data["user"]
+
+                # ✅ Store session data securely
                 session["user_email"] = user_data["email"]
                 session["user_id"] = user_data["id"]
                 session["session_id"] = os.urandom(24).hex()  # Unique session ID
-                session["access_token"] = user_response["access_token"]  # Store the token
-                session["refresh_token"] = user_response["refresh_token"]
+                session["access_token"] = supabase_data["access_token"]
+                session["refresh_token"] = supabase_data["refresh_token"]
 
-                print(f"✅ Login successful! Session ID: {session['session_id']}")  # Debugging
-                return jsonify({"status": "success", "redirect": "/dashboard"})  # Respond with success
+                print(f"✅ Login successful! Session ID: {session['session_id']}")  # Debugging log
+                return jsonify({"status": "success", "redirect": "/dashboard"})  # Frontend handles redirect
 
             else:
-                print("❌ Supabase returned invalid credentials")  # Debugging
+                print("❌ Supabase returned invalid credentials")  # Debugging log
                 return jsonify({"status": "error", "message": "Invalid login credentials"}), 401
 
         except Exception as e:
-            print(f"🔥 Login error: {str(e)}")  # Debugging
-            return jsonify({"status": "error", "message": str(e)}), 500
+            print(f"🔥 Login error: {str(e)}")  # Debugging log
+            return jsonify({"status": "error", "message": "Internal server error"}), 500
 
-    return render_template("login.html")
+    return render_template("login.html")  # Render login page for GET requests
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
