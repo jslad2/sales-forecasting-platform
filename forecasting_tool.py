@@ -619,10 +619,10 @@ def main():
                             metric="r2",
                             custom_hp={
                                 "xgboost": {  
-                                    "learning_rate": {"domain": [0.01, 0.1], "log": True},  # Use a list instead of a tuple
-                                    "max_depth": {"domain": [3, 10]},  # Use a list for integer ranges
-                                    "n_estimators": {"domain": [100, 500]},  # Use a list for integer ranges
-                                    "colsample_bytree": {"domain": [0.7, 1.0]}  # Use a list for float ranges
+                                    "n_estimators": {"domain": 500},  # Fixed value
+                                    "max_depth": {"domain": 10},     # Fixed value
+                                    "learning_rate": {"domain": 0.1, "log": True},  # Log scaling
+                                    "colsample_bytree": {"domain": 1.0}  # Fixed value
                                 }
                             }
                         )
