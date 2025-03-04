@@ -609,13 +609,21 @@ def main():
                         # Train AutoML Model
                         automl_model = AutoML()
                         automl_model.fit(
-                            X_train=x_train,
-                            y_train=y_train,
-                            task="regression",
-                            time_budget=800,  # Time budget for AutoML
-                            eval_method=eval_method,  # Dynamically chosen evaluation method
-                            estimator_list=["xgboost", "lgbm", "rf"]  # Focus on tree-based models
-                        )
+                        X_train=x_train,
+                        y_train=y_train,
+                        task="regression",
+                        time_budget=600,  
+                        eval_method="cv",
+                        estimator_list=["xgboost", "lgbm", "rf"],  # Allow multiple models
+                        metric="r2",
+                        custom_hp={"xgboost": {  
+                            "learning_rate": (0.01, 0.1),  # Prevent extreme values  
+                            "max_depth": (3, 10),  # Ensure deep enough trees  
+                            "n_estimators": (100, 500),  # Require enough trees  
+                            "colsample_bytree": (0.7, 1.0)  # Ensure enough feature selection  
+                        }}
+                    )
+
                         st.write(f"AutoML Training Completed: Best Estimator - {automl_model.best_estimator}")
 
                         # Feature Importance (if XGBoost is the best estimator)
