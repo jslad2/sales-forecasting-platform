@@ -210,7 +210,6 @@ def update_password():
 
     return render_template("update_password.html", token=access_token)
 
-# ✅ Login Route (Uses Supabase Auth)
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -220,18 +219,24 @@ def login():
         print(f"🔍 Attempting login for {email}")  # Debugging
 
         try:
-            user = supabase.auth.sign_in_with_password({"email": email, "password": password})
+            user_response = supabase.auth.sign_in_with_password({"email": email, "password": password})
 
-            if user and "user" in user:
-                session["user_email"] = email
-                session["user_plan"] = user["user"]["app_metadata"].get("plan", "free")
-                session["session_id"] = os.urandom(24).hex()  # Generate unique session ID
+            print(f"🔍 Supabase Response: {user_response}")  # Debugging
 
-                print(f"✅ Login successful for {email}, Redirecting to dashboard...")  # Debugging
-                return redirect(url_for("dashboard"))  # Redirect after login
+            if user_response and "user" in user_response:
+                user_data = user_response["user"]
+
+                # ✅ Store session data
+                session["user_email"] = user_data["email"]
+                session["user_id"] = user_data["id"]
+                session["session_id"] = os.urandom(24).hex()  # Unique session ID
+
+                print(f"✅ Login successful! Session ID: {session['session_id']}")  # Debugging
+
+                return redirect(url_for("dashboard"))
 
             else:
-                print("❌ Login failed: Invalid credentials")  # Debugging
+                print("❌ Supabase returned invalid credentials")  # Debugging
                 flash("❌ Invalid login credentials. Please try again.", "error")
 
         except Exception as e:
