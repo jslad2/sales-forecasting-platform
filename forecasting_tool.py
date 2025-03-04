@@ -640,14 +640,6 @@ def main():
                         eval_method="cv",
                         estimator_list=["xgboost", "lgbm", "rf"],  # Ensure multiple models are tested
                         metric="r2",
-                        custom_hp={
-                            "xgboost": {  
-                                "n_estimators": {"low": 100, "high": 500},  # Allow AutoML to tune estimators
-                                "max_depth": {"low": 3, "high": 10},  # Allow tuning depth
-                                "learning_rate": {"domain": (0.01, 0.1), "log": True},  # Ensure proper scaling
-                                "colsample_bytree": {"domain": (0.7, 1.0)}  # Keep fixed
-                            }
-                        }
                     )
                     st.write(f"✅ AutoML Training Completed! Best Estimator: {automl_model.best_estimator}")
 
