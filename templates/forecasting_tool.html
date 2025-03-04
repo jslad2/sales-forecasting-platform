@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body class="forecasting-tool-page">
+
     <!-- Header -->
     <header>
         <nav>
@@ -17,14 +18,32 @@
         <div class="logo">SYNOVAAI</div>
     </header>
 
-    <!-- Embedded Streamlit App -->
-    <section class="streamlit-embed">
-        <iframe src="http://localhost:8502?embed=true" title="Forecasting Tool" width="100%" height="800px"></iframe>
+    <!-- Forecasting Tool -->
+    <section class="forecasting-tool-container">
+        <h2>AI Forecasting Tool</h2>
+        
+        {% if session['session_id'] %}
+            <p>Welcome! You are logged in as <strong>{{ session['user_email'] }}</strong>.</p>
+            
+            <!-- Embed Streamlit App with Session ID for Authentication -->
+            <iframe 
+                src="https://synovaai-forecasting.streamlit.app/?session_id={{ session['session_id'] }}" 
+                title="Forecasting Tool" 
+                width="100%" 
+                height="800px" 
+                style="border: none;">
+            </iframe>
+
+        {% else %}
+            <p>❌ You must be logged in to access this tool.</p>
+            <a href="{{ url_for('login') }}" class="login-button">🔐 Login Here</a>
+        {% endif %}
     </section>
 
     <!-- Footer -->
     <footer>
         <p>© 2025 SynovaAI. All rights reserved.</p>
     </footer>
+
 </body>
 </html>

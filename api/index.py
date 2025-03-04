@@ -57,20 +57,17 @@ def contact():
 def data_services():
     return render_template('data_services.html')
 
-# ✅ Forecasting Tool Page (Restricted)
 @app.route('/forecasting-tool')
 def forecasting_tool():
-    if 'user' not in session:
+    if 'user_email' not in session:
+        flash("❌ You must be logged in to access the forecasting tool.", "error")
         return redirect(url_for('login'))
-    
-    conn = get_db_connection()
-    user = conn.execute("SELECT tier FROM users WHERE email = ?", (session['user'],)).fetchone()
-    conn.close()
 
-    if user and user['tier'] == 'pro':
-        return render_template('forecasting_tool.html', pro_user=True)
-    else:
-        return render_template('forecasting_tool.html', pro_user=False)
+    # Retrieve user subscription level from Supabase
+    user_email = session.get("user_email")
+    user_plan = session.get("user_plan", "free")
+
+    return render_template('forecasting_tool.html', user_plan=user_plan)
 
 # ✅ Sales Dashboard Page (Restricted)
 @app.route('/sales-dashboard')
@@ -283,6 +280,15 @@ def logout():
     session.clear()
     flash("You have been logged out.", "info")
     return redirect(url_for('login'))
+
+@app.route('/check-auth')
+def check_auth():
+    session_id = request.args.get("session_id")
+
+    if not session_id or session_id != session.get("session_id"):
+        return jsonify({"error": "Invalid session"}), 401
+
+    return jsonify({"status": "authenticated", "user_email": session["user_email"]})
 
 # ✅ Stripe Payment Route
 @app.route('/checkout/pro')
