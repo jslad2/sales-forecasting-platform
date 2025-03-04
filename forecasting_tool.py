@@ -618,13 +618,14 @@ def main():
                             metric="r2",
                             custom_hp={
                                 "xgboost": {  
-                                    "learning_rate": {"domain": (0.01, 0.1), "log": True},  # Learning rate should be logarithmic
-                                    "max_depth": {"low": 3, "high": 10},  # Correct integer range
-                                    "n_estimators": {"low": 100, "high": 500},  # Correct integer range
+                                    "learning_rate": {"domain": (0.01, 0.1), "log": True},  # Proper logarithmic scaling
+                                    "max_depth": {"domain": (3, 10)},  # Must use "domain" instead of "low/high"
+                                    "n_estimators": {"domain": (100, 500)},  # Must use "domain" for integer ranges
                                     "colsample_bytree": {"domain": (0.7, 1.0)}  # Can remain a tuple
                                 }
                             }
                         )
+
 
                         st.write(f"AutoML Training Completed: Best Estimator - {automl_model.best_estimator}")
 
