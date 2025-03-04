@@ -4,6 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import re
+import requests 
 
 # ✅ Load environment variables from .env
 load_dotenv()
@@ -211,6 +212,11 @@ def update_password():
 def login():
     if request.method == 'POST':
         try:
+            # ✅ Ensure environment variables exist
+            if not SUPABASE_URL or not SUPABASE_KEY:
+                print("❌ Missing Supabase credentials!")
+                return jsonify({"status": "error", "message": "Server misconfiguration"}), 500
+
             # ✅ Handle both `application/json` and `form-data`
             if request.is_json:
                 data = request.get_json()
@@ -225,15 +231,26 @@ def login():
             if not email or not password:
                 return jsonify({"status": "error", "message": "Missing email or password"}), 400
 
+            # ✅ Prepare Supabase API headers
+            headers = {
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",  # ✅ Fix authorization header
+                "Content-Type": "application/json"
+            }
+
             # ✅ Send login request to Supabase
             response = requests.post(
                 f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
                 json={"email": email, "password": password},
-                headers={"apikey": SUPABASE_KEY, "Content-Type": "application/json"}
+                headers=headers
             )
 
             supabase_data = response.json()
             print(f"🔍 Supabase Response: {supabase_data}")  # Debugging log
+
+            # ✅ Check for errors in response
+            if "error" in supabase_data:
+                return jsonify({"status": "error", "message": supabase_data["error"]["message"]}), 401
 
             if response.status_code == 200 and "access_token" in supabase_data:
                 user_data = supabase_data["user"]
@@ -257,6 +274,7 @@ def login():
             return jsonify({"status": "error", "message": "Internal server error"}), 500
 
     return render_template("login.html")  # Render login page for GET requests
+
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
