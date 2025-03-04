@@ -807,7 +807,6 @@ def main():
                     "AutoML": "purple"
                 }
 
-                import pandas as pd
 
                 def display_model_leaderboard(results):
                     """ Display model ranking by RMSE """
@@ -907,7 +906,7 @@ def main():
 
     # ✅ After completion, show success message
             st.success("✅ Forecasting complete! View results below.")
-            
+
         except Exception as e:
             st.error(f"Error processing file: {e}")
 
