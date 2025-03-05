@@ -3,12 +3,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (loginForm) {
         loginForm.addEventListener("submit", function (e) {
-            e.preventDefault();  // Prevent form from reloading the page
+            e.preventDefault();
 
             const email = document.querySelector("#email").value;
             const password = document.querySelector("#password").value;
 
-            fetch("/login", {  // ✅ Use your Flask backend API
+            fetch("/login", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -17,15 +17,18 @@ document.addEventListener("DOMContentLoaded", function () {
             })
             .then(response => response.json())
             .then(data => {
+                console.log("Login Response:", data);
+                
                 if (data.status === "success") {
-                    console.log("✅ Login Successful:", data);
                     window.location.href = data.redirect;  // ✅ Redirect to dashboard
                 } else {
-                    console.error("❌ Login Failed:", data.message);
-                    document.querySelector("#error-message").innerText = data.message;  // Show error to user
+                    alert(data.message || "Login failed! Please try again.");
                 }
             })
-            .catch(error => console.error("🔥 Login Error:", error));
+            .catch(error => {
+                console.error("Login Error:", error);
+                alert("An error occurred. Please try again.");
+            });
         });
     }
 });
