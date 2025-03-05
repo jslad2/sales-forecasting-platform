@@ -23,15 +23,15 @@ app = Flask(__name__,
             template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")), 
             static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../static")))
 
+# ✅ Ensure SECRET_KEY is always set
+app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY", "super_secure_fallback_key")
 
-# ✅ Use Redis for production sessions
-app.config["SESSION_TYPE"] = "redis"
-app.config["SESSION_PERMANENT"] = True
-app.config["SESSION_USE_SIGNER"] = True
-app.config["SESSION_KEY_PREFIX"] = "synovaai_"
-app.config["SESSION_REDIS"] = redis.StrictRedis(host="your-redis-host", port=6379, decode_responses=True)
-app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY")  # Use env variable for security
+# ✅ Flask-Session Config
+app.config["SESSION_TYPE"] = "filesystem"  # Change to 'redis' if using Redis
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_USE_SIGNER"] = True  # Ensures cookies are signed
 
+# ✅ Initialize Flask-Session
 Session(app)
 
 # ✅ Home Page
