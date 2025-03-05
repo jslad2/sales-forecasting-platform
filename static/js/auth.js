@@ -22,14 +22,20 @@ document.addEventListener("DOMContentLoaded", function () {
             try {
                 console.log("🔍 Sending login request...");
 
-                const response = await fetch("/api/login", {  // ✅ Ensure this is POST
+                const response = await fetch("/api/login", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ email, password })
                 });
 
-                const data = await response.json();
-                console.log("✅ Login Response:", data);
+                let data;
+                try {
+                    data = await response.json();
+                } catch (error) {
+                    console.error("Failed to parse JSON response:", error);
+                    alert("❌ An unexpected error occurred. Please try again.");
+                    return;
+                }
 
                 if (response.ok && data.status === "success") {
                     alert("✅ Login successful! Redirecting...");

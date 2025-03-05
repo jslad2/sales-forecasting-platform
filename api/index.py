@@ -267,16 +267,19 @@ def update_password():
 def login_page():
     return render_template('login.html')
 
-@app.route('/api/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'GET':
-        return jsonify({"status": "error", "message": "Use POST for login"}), 405
-    try:
-        print(f"🔍 Request Content-Type: {request.content_type}")  # Debugging
-        print(f"🔍 Raw Request Data: {request.get_data()}")  # Debugging
+import logging
+from flask import request, jsonify
+import requests
 
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    try:
         # ✅ Ensure Content-Type is JSON
-        if request.content_type != "application/json":
+        if not request.is_json:
             return jsonify({"status": "error", "message": "Unsupported Media Type: Use 'application/json'"}), 415
 
         data = request.get_json()
@@ -289,7 +292,7 @@ def login():
         if not email or not password:
             return jsonify({"status": "error", "message": "Missing email or password"}), 400
 
-        print(f"🔍 Attempting login for {email}")
+        logger.debug(f"🔍 Attempting login for {email}")
 
         # ✅ Supabase authentication
         headers = {
@@ -305,11 +308,11 @@ def login():
         )
 
         supabase_data = response.json()
-        print(f"🔍 Supabase Response: {supabase_data}")
+        logger.debug(f"🔍 Supabase Response: {supabase_data}")
 
         # ✅ Handle authentication errors
         if response.status_code != 200 or "access_token" not in supabase_data:
-            error_message = supabase_data.get("error_description", "Invalid login credentials")
+            error_message = supabase_data.get("error_description", supabase_data.get("error", "Invalid login credentials"))
             return jsonify({"status": "error", "message": error_message}), 401
 
         # ✅ Extract user data
@@ -317,7 +320,7 @@ def login():
         user_metadata = user_data.get("user_metadata", {})
         user_tier = user_metadata.get("tier", "free")  # Default to 'free' if not set
 
-        print(f"✅ Login successful. User Tier: {user_tier}")
+        logger.debug(f"✅ Login successful. User Tier: {user_tier}")
 
         # ✅ Return access_token & tier for frontend
         return jsonify({
@@ -328,7 +331,7 @@ def login():
         })
 
     except Exception as e:
-        print(f"🔥 Login error: {str(e)}")
+        logger.error(f"🔥 Login error: {str(e)}")
         return jsonify({"status": "error", "message": "Internal server error"}), 500
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
