@@ -237,52 +237,77 @@ def update_password():
     return render_template("update_password.html", token=access_token, email=user_email)
 
 # ✅ Login Route (JWT-Based)
-@app.route('/login', methods=['POST'])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
     try:
-        # ✅ Ensure Content-Type is JSON
+        # ✅ Handle GET request (serve login page)
+        if request.method == 'GET':
+            return render_template('login.html')  # Ensure this template exists
+
+        # ✅ Ensure Content-Type is JSON for POST requests
         if request.content_type != "application/json":
+            print("❌ Unsupported Media Type:", request.content_type)  # Debugging
             return jsonify({"status": "error", "message": "Unsupported Media Type: Use 'application/json'"}), 415
 
-        # ✅ Handle JSON input properly
-        data = request.get_json()
+        # ✅ Debug: Log raw request data for troubleshooting
+        print(f"🔍 Request Content-Type: {request.content_type}")
+        print(f"🔍 Raw Request Data: {request.get_data()}")
+
+        # ✅ Attempt to parse JSON request
+        try:
+            data = request.get_json()
+        except Exception as json_error:
+            print(f"❌ JSON Parsing Error: {json_error}")  # Debugging
+            return jsonify({"status": "error", "message": "Invalid JSON format"}), 400
+
         if not data:
+            print("❌ Received empty JSON payload")  # Debugging
             return jsonify({"status": "error", "message": "Invalid JSON payload"}), 400
 
+        # ✅ Extract email and password
         email = data.get("email")
         password = data.get("password")
 
         if not email or not password:
+            print("❌ Missing email or password")  # Debugging
             return jsonify({"status": "error", "message": "Missing email or password"}), 400
 
         print(f"🔍 Attempting login for {email}")
 
-        # ✅ Send request to Supabase
+        # ✅ Prepare request headers for Supabase authentication
         headers = {
             "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}",
             "Content-Type": "application/json"
         }
 
+        # ✅ Send authentication request to Supabase
         response = requests.post(
             f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
             json={"email": email, "password": password},
             headers=headers
         )
 
-        supabase_data = response.json()
-        print(f"🔍 Supabase Response: {supabase_data}")  # Debugging log
+        # ✅ Debugging: Log full Supabase response
+        try:
+            supabase_data = response.json()
+        except Exception as json_parse_error:
+            print(f"❌ Error parsing Supabase response: {json_parse_error}")  # Debugging
+            return jsonify({"status": "error", "message": "Authentication service error"}), 500
 
-        # ✅ Check for errors
+        print(f"🔍 Supabase Response: {supabase_data}")
+
+        # ✅ Check for authentication errors
         if response.status_code != 200 or "access_token" not in supabase_data:
             error_message = supabase_data.get("error", {}).get("message", "Invalid login credentials")
-            print(f"❌ Supabase login failed: {error_message}")  # Debugging log
+            print(f"❌ Supabase login failed: {error_message}")  # Debugging
             return jsonify({"status": "error", "message": error_message}), 401
 
-        # ✅ Extract user data
-        user_data = supabase_data["user"]
+        # ✅ Extract user data (optional debugging)
+        user_data = supabase_data.get("user", {})
+        print(f"✅ User authenticated: {user_data.get('email', 'Unknown')}")
 
-        # ✅ Return access_token instead of using Flask session
+        # ✅ Return JSON response with JWT token and redirect path
         return jsonify({
             "status": "success",
             "redirect": "/dashboard",
