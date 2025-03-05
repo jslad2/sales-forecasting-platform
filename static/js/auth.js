@@ -2,11 +2,9 @@ document.addEventListener("DOMContentLoaded", function () {
     const loginForm = document.querySelector("#login-form");
 
     if (loginForm) {
-        console.log("✅ Login form found");  // Debugging
-
         loginForm.addEventListener("submit", async function (e) {
-            e.preventDefault();  // ✅ Prevent form from default GET submission
-            console.log("✅ Form submission prevented");  // Debugging
+            e.preventDefault();
+            console.log("✅ Form submission prevented, sending POST request...");
 
             const email = document.querySelector("#email").value.trim();
             const password = document.querySelector("#password").value.trim();
@@ -25,19 +23,18 @@ document.addEventListener("DOMContentLoaded", function () {
             try {
                 console.log("🔍 Sending login request...");
 
-                const response = await fetch("/api/login", {
-                    method: "POST",
+                const response = await fetch("/api/login", {  
+                    method: "POST",  
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ email, password })
                 });
-
-                console.log("🔍 Fetch request completed");  // Debugging
 
                 const data = await response.json();
                 console.log("✅ Login Response:", data);
 
                 if (response.ok && data.status === "success") {
                     alert("✅ Login successful! Redirecting...");
+                    localStorage.setItem("access_token", data.access_token);
                     window.location.href = data.redirect;
                 } else {
                     alert(`❌ Login failed: ${data.message || "Invalid credentials"}`);
@@ -53,6 +50,6 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
     } else {
-        console.error("❌ Login form not found");  // Debugging
+        console.log("⚠️ loginForm not found! JavaScript not running?");
     }
 });

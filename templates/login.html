@@ -12,7 +12,7 @@
     <div class="container d-flex justify-content-center align-items-center vh-100">
         <div class="card p-4 shadow-lg" style="max-width: 400px; width: 100%;">
             <h2 class="text-center">Login</h2>
-            
+
             <!-- ✅ Flash Messages (Show All) -->
             {% with messages = get_flashed_messages() %}
                 {% if messages %}
@@ -25,18 +25,21 @@
                     </div>
                 {% endif %}
             {% endwith %}
-            
-            <form id="login-form">  <!-- ✅ No action, so JavaScript handles it -->
+
+            <!-- ✅ No action so JavaScript handles it -->
+            <form id="login-form" novalidate>  
+                <input type="hidden" name="prevent-autofill" value="true">  <!-- Prevents unwanted submissions -->
+
                 <div class="mb-3">
                     <label for="email" class="form-label">Email:</label>
                     <input type="email" id="email" name="email" class="form-control" required autofocus>
                 </div>
-                
+
                 <div class="mb-3">
                     <label for="password" class="form-label">Password:</label>
                     <input type="password" id="password" name="password" class="form-control" required>
                 </div>
-            
+
                 <button type="submit" id="login-button" class="btn btn-primary w-100">Login</button>
             </form>            
 
@@ -48,6 +51,13 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/auth.js') }}"></script> <!-- ✅ Ensure this JavaScript file is loaded -->
+    
+    <!-- ✅ Debug log to confirm JavaScript execution -->
+    <script>
+        console.log("✅ login.html loaded, now loading auth.js...");
+    </script>
+
+    <!-- ✅ Ensure JavaScript is loaded at the end -->
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>  
 </body>
 </html>
