@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import re
 import requests
 from flask_session import Session
+import redis
 
 # ✅ Load environment variables from .env
 load_dotenv()
@@ -22,11 +23,16 @@ app = Flask(__name__,
             template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")), 
             static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../static")))
 
-app.secret_key = "your_secret_key"  # Change this for security
 
-app.config["SESSION_TYPE"] = "filesystem"  # Use "redis" for production
-app.config["SECRET_KEY"] = os.urandom(24)  # Secure session key
-Session(app)  # Initialize session handling
+# ✅ Use Redis for production sessions
+app.config["SESSION_TYPE"] = "redis"
+app.config["SESSION_PERMANENT"] = True
+app.config["SESSION_USE_SIGNER"] = True
+app.config["SESSION_KEY_PREFIX"] = "synovaai_"
+app.config["SESSION_REDIS"] = redis.StrictRedis(host="your-redis-host", port=6379, decode_responses=True)
+app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY")  # Use env variable for security
+
+Session(app)
 
 # ✅ Home Page
 @app.route('/')
