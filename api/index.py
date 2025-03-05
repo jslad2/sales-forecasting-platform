@@ -78,15 +78,19 @@ def self_service_insights():
 # ✅ Dashboard Route
 @app.route('/dashboard')
 def dashboard():
+    # ✅ Ensure user is logged in
     if "user_email" not in session:
-        return redirect(url_for('login'))  # Ensure user is logged in
+        print("❌ No user session found!")
+        return redirect(url_for("login"))
 
-    # ✅ Safely retrieve user_plan with a default value
-    user_plan = session.get("user_plan", "free")  # Defaults to 'free' if missing
+    # ✅ Get user session safely
+    user_email = session.get("user_email", "Unknown")
+    user_id = session.get("user_id", "Unknown")
+    user_plan = session.get("user_plan", "free")  # Default to 'free' if missing
 
-    print(f"🔍 Dashboard Access - User: {session['user_email']}, Plan: {user_plan}")  # Debugging
+    print(f"✅ Loading dashboard for {user_email} (Plan: {user_plan})")
 
-    return render_template("dashboard.html", user=session["user_email"], user_plan=user_plan)
+    return render_template("dashboard.html", user_email=user_email, user_plan=user_plan)
     
 # ✅ Register Route (Uses Supabase Auth)
 @app.route('/register', methods=['GET', 'POST'])
