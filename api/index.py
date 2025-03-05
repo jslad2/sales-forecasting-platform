@@ -267,8 +267,10 @@ def update_password():
 def login_page():
     return render_template('login.html')
 
-@app.route('/api/login', methods=['POST'])  # ✅ API for login requests
+@app.route('/api/login', methods=['GET', 'POST'])
 def login():
+    if request.method == 'GET':
+        return jsonify({"status": "error", "message": "Use POST for login"}), 405
     try:
         print(f"🔍 Request Content-Type: {request.content_type}")  # Debugging
         print(f"🔍 Raw Request Data: {request.get_data()}")  # Debugging
