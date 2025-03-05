@@ -5,3 +5,4 @@ werkzeug
 requests
 python-dotenv  # ✅ Required for .env variables
 requests
+flask_session

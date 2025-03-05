@@ -5,6 +5,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 import re
 import requests
+from flask_session import Session
 
 # ✅ Load environment variables from .env
 load_dotenv()
@@ -22,6 +23,10 @@ app = Flask(__name__,
             static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../static")))
 
 app.secret_key = "your_secret_key"  # Change this for security
+
+app.config["SESSION_TYPE"] = "filesystem"  # Use "redis" for production
+app.config["SECRET_KEY"] = os.urandom(24)  # Secure session key
+Session(app)  # Initialize session handling
 
 # ✅ Home Page
 @app.route('/')
