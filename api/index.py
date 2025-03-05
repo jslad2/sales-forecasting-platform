@@ -263,7 +263,11 @@ def update_password():
     return render_template("update_password.html", token=access_token, email=user_email)
 
 # ✅ Login Route (JWT-Based)
-@app.route('/login', methods=['POST'])
+@app.route('/login', methods=['GET'])  # ✅ Show login page
+def login_page():
+    return render_template('login.html')
+
+@app.route('/api/login', methods=['POST'])  # ✅ API for login requests
 def login():
     try:
         print(f"🔍 Request Content-Type: {request.content_type}")  # Debugging

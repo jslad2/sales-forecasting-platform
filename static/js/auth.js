@@ -20,12 +20,9 @@ document.addEventListener("DOMContentLoaded", function () {
             try {
                 console.log("🔍 Sending login request...");
 
-                const response = await fetch("/login", {
+                const response = await fetch("/api/login", {  // ✅ Change /login to /api/login
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json"
-                    },
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ email, password })
                 });
 
