@@ -2,8 +2,11 @@ document.addEventListener("DOMContentLoaded", function () {
     const loginForm = document.querySelector("#login-form");
 
     if (loginForm) {
+        console.log("✅ Login form found");  // Debugging
+
         loginForm.addEventListener("submit", async function (e) {
             e.preventDefault();  // ✅ Prevent form from default GET submission
+            console.log("✅ Form submission prevented");  // Debugging
 
             const email = document.querySelector("#email").value.trim();
             const password = document.querySelector("#password").value.trim();
@@ -28,14 +31,10 @@ document.addEventListener("DOMContentLoaded", function () {
                     body: JSON.stringify({ email, password })
                 });
 
-                let data;
-                try {
-                    data = await response.json();
-                } catch (error) {
-                    console.error("Failed to parse JSON response:", error);
-                    alert("❌ An unexpected error occurred. Please try again.");
-                    return;
-                }
+                console.log("🔍 Fetch request completed");  // Debugging
+
+                const data = await response.json();
+                console.log("✅ Login Response:", data);
 
                 if (response.ok && data.status === "success") {
                     alert("✅ Login successful! Redirecting...");
@@ -53,5 +52,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
             }
         });
+    } else {
+        console.error("❌ Login form not found");  // Debugging
     }
 });
