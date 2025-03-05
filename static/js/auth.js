@@ -1,7 +1,13 @@
+console.log("✅ auth.js is loaded and running!"); // Debugging log
+
 document.addEventListener("DOMContentLoaded", function () {
+    console.log("✅ DOM fully loaded, initializing login script...");
+
     const loginForm = document.querySelector("#login-form");
 
     if (loginForm) {
+        console.log("✅ Found login form! Adding event listener...");
+
         loginForm.addEventListener("submit", async function (e) {
             e.preventDefault();
             console.log("✅ Form submission prevented, sending POST request...");
