@@ -3,7 +3,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (loginForm) {
         loginForm.addEventListener("submit", async function (e) {
-            e.preventDefault();
+            e.preventDefault();  // ✅ Prevent form from default GET submission
 
             const email = document.querySelector("#email").value.trim();
             const password = document.querySelector("#password").value.trim();
@@ -22,8 +22,8 @@ document.addEventListener("DOMContentLoaded", function () {
             try {
                 console.log("🔍 Sending login request...");
 
-                const response = await fetch("/api/login", {  // ✅ Make sure this is POST
-                    method: "POST",  
+                const response = await fetch("/api/login", {  // ✅ Ensure this is POST
+                    method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ email, password })
                 });
