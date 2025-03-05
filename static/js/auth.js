@@ -5,8 +5,8 @@ document.addEventListener("DOMContentLoaded", function () {
         loginForm.addEventListener("submit", function (e) {
             e.preventDefault();
 
-            const email = document.querySelector("#email").value;
-            const password = document.querySelector("#password").value;
+            const email = document.querySelector("#email").value.trim();
+            const password = document.querySelector("#password").value.trim();
 
             fetch("/login", {
                 method: "POST",
@@ -17,18 +17,36 @@ document.addEventListener("DOMContentLoaded", function () {
             })
             .then(response => response.json())
             .then(data => {
-                console.log("Login Response:", data);
+                console.log("🔍 Login Response:", data);
                 
                 if (data.status === "success") {
-                    window.location.href = data.redirect;  // ✅ Redirect to dashboard
+                    // ✅ Store JWT token in localStorage
+                    localStorage.setItem("access_token", data.access_token);
+                    
+                    // ✅ Redirect to dashboard
+                    window.location.href = data.redirect;
                 } else {
-                    alert(data.message || "Login failed! Please try again.");
+                    showErrorMessage(data.message || "Login failed! Please try again.");
                 }
             })
             .catch(error => {
-                console.error("Login Error:", error);
-                alert("An error occurred. Please try again.");
+                console.error("🔥 Login Error:", error);
+                showErrorMessage("An unexpected error occurred. Please try again.");
             });
         });
     }
 });
+
+/**
+ * ✅ Display an error message properly
+ * @param {string} message - The error message to display
+ */
+function showErrorMessage(message) {
+    const errorContainer = document.querySelector("#error-message");
+    if (errorContainer) {
+        errorContainer.textContent = message;
+        errorContainer.style.display = "block";
+    } else {
+        alert(message);  // Fallback if no error container exists
+    }
+}

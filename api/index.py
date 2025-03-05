@@ -1,12 +1,12 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, jsonify, flash
+import jwt
+import datetime
+import re
+import requests
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
 from dotenv import load_dotenv
-import re
-import requests
-from flask_session import Session
-import redis
 
 # ✅ Load environment variables from .env
 load_dotenv()
@@ -18,21 +18,31 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
-# ✅ Initialize Flask App (Ensure Correct Paths)
+# ✅ Initialize Flask App
 app = Flask(__name__, 
             template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")), 
             static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../static")))
 
-# ✅ Ensure SECRET_KEY is always set
-app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY", "super_secure_fallback_key")
+# ✅ Ensure SECRET_KEY is set for JWT security
+SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "super_secure_fallback_key")
 
-# ✅ Flask-Session Config
-app.config["SESSION_TYPE"] = "filesystem"  # Change to 'redis' if using Redis
-app.config["SESSION_PERMANENT"] = False
-app.config["SESSION_USE_SIGNER"] = True  # Ensures cookies are signed
+# ✅ Function to Generate JWT Token
+def generate_jwt(user_email):
+    token = jwt.encode({
+        "email": user_email,
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(days=1)  # Expires in 1 day
+    }, SECRET_KEY, algorithm="HS256")
+    return token
 
-# ✅ Initialize Flask-Session
-Session(app)
+# ✅ Function to Verify JWT Token
+def verify_jwt(token):
+    try:
+        decoded = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        return decoded["email"]
+    except jwt.ExpiredSignatureError:
+        return None  # Expired token
+    except jwt.InvalidTokenError:
+        return None  # Invalid token
 
 # ✅ Home Page
 @app.route('/')
@@ -86,22 +96,19 @@ def forecasting_tool():
 def self_service_insights():
     return render_template('self_service_insights.html')
 
-# ✅ Dashboard Route
+# ✅ Dashboard Route (Protected with JWT)
 @app.route('/dashboard')
 def dashboard():
-    # ✅ Ensure user is logged in
-    if "user_email" not in session:
-        print("❌ No user session found!")
+    token = request.args.get("token")  # Get token from URL
+    if not token:
         return redirect(url_for("login"))
 
-    # ✅ Get user session safely
-    user_email = session.get("user_email", "Unknown")
-    user_id = session.get("user_id", "Unknown")
-    user_plan = session.get("user_plan", "free")  # Default to 'free' if missing
+    user_email = verify_jwt(token)
+    if not user_email:
+        flash("Session expired. Please log in again.", "error")
+        return redirect(url_for("login"))
 
-    print(f"✅ Loading dashboard for {user_email} (Plan: {user_plan})")
-
-    return render_template("dashboard.html", user_email=user_email, user_plan=user_plan)
+    return render_template("dashboard.html", user_email=user_email, user_plan="free")
     
 # ✅ Register Route (Uses Supabase Auth)
 @app.route('/register', methods=['GET', 'POST'])
@@ -146,18 +153,17 @@ def register():
 
 @app.route('/update-password', methods=['GET', 'POST'])
 def update_password():
-    """Handles password reset with Supabase"""
+    """Handles password reset with Supabase using JWT authentication"""
 
-    access_token = request.args.get('token')  # Capture the token from the URL
-    user_email = request.args.get("email") or session.get("reset_email")  # Retrieve email from session if missing
+    access_token = request.args.get('token')  # Capture JWT token from URL
+    user_email = request.args.get("email")  # Get email from request
 
     print(f"🔍 Received Token: {access_token}")  # Debugging
-    print("🔍 Request Arguments:", request.args)
-    print("🔍 Session Data:", session)
+    print(f"🔍 Received Email: {user_email}")  # Debugging
 
-    # ⚠️ Handle missing email properly instead of redirecting infinitely
-    if not user_email:
-        flash("Email is required for password reset.", "error")
+    # ✅ Ensure both email and token are provided
+    if not user_email or not access_token:
+        flash("❌ Email and token are required for password reset.", "error")
         return redirect(url_for("forgot_password"))
 
     if request.method == 'POST':
@@ -165,100 +171,88 @@ def update_password():
 
         # ✅ Validate password complexity
         if not password or len(password) < 8:
-            flash("Password must be at least 8 characters long.", "error")
-            return render_template("update_password.html", token=access_token)
+            flash("❌ Password must be at least 8 characters long.", "error")
+            return render_template("update_password.html", token=access_token, email=user_email)
         if not re.search(r"\d", password):
-            flash("Password must contain at least one digit.", "error")
-            return render_template("update_password.html", token=access_token)
+            flash("❌ Password must contain at least one digit.", "error")
+            return render_template("update_password.html", token=access_token, email=user_email)
         if not re.search(r"[A-Z]", password):
-            flash("Password must contain at least one uppercase letter.", "error")
-            return render_template("update_password.html", token=access_token)
+            flash("❌ Password must contain at least one uppercase letter.", "error")
+            return render_template("update_password.html", token=access_token, email=user_email)
+        if not re.search(r"[!@#$%^&*]", password):  # Ensure at least one special character
+            flash("❌ Password must contain at least one special character (!@#$%^&*).", "error")
+            return render_template("update_password.html", token=access_token, email=user_email)
 
         try:
-            print(f"🔍 Attempting sign-in with recovery token: {access_token}")
+            print(f"🔍 Verifying OTP with token: {access_token}")
 
-            # ✅ Authenticate user with Supabase using recovery token
-            session_response = supabase.auth.sign_in_with_otp({
+            # ✅ Step 1: Verify OTP (JWT Recovery Token)
+            otp_response = supabase.auth.verify_otp({
                 "email": user_email,
                 "token": access_token,
-                "type": "recovery"  # ✅ Explicitly define type to ensure correct authentication
+                "type": "recovery"  # ✅ Use "recovery" to verify reset token
             })
 
-            # 🔍 Debugging: Print the full session response
-            print("🔍 Full Session Response:", session_response)
+            print("🔍 OTP Verification Response:", otp_response)  # Debugging
 
-            # ✅ Ensure response is valid and extract user email
-            if not isinstance(session_response, dict):
-                flash("Invalid response format from authentication. Please try again.", "error")
+            # ✅ Ensure response contains a valid JWT access token
+            if "access_token" not in otp_response:
+                flash("❌ Verification failed. The reset token may be invalid or expired.", "error")
                 return redirect(url_for("forgot_password"))
 
-            if "user" not in session_response or not session_response["user"]:
-                flash("Authentication failed. Your reset token may be invalid or expired.", "error")
-                return redirect(url_for("forgot_password"))
+            jwt_access_token = otp_response["access_token"]  # Extract JWT
 
-            authenticated_user = session_response["user"]
+            print(f"✅ Authenticated JWT: {jwt_access_token}")
 
-            if "email" not in authenticated_user:
-                flash("Session authentication failed. Please request a new password reset.", "error")
-                return redirect(url_for("forgot_password"))
+            # ✅ Step 2: Update Password Using JWT
+            headers = {
+                "Authorization": f"Bearer {jwt_access_token}",  # Use JWT for authentication
+                "apikey": SUPABASE_KEY,
+                "Content-Type": "application/json",
+            }
 
-            user_email = authenticated_user["email"]  # ✅ Keep the validated email
+            update_response = requests.put(
+                f"{SUPABASE_URL}/auth/v1/user",
+                json={"password": password},
+                headers=headers,
+            )
 
-            print(f"✅ Authenticated User Email: {user_email}")
+            update_data = update_response.json()
+            print("🔍 Password Update Response:", update_data)  # Debugging
 
-            # ✅ Update password after successful authentication
-            user_update_response = supabase.auth.update_user({"password": password})
+            # ✅ Ensure password update was successful
+            if update_response.status_code != 200:
+                error_message = update_data.get("message", "Unknown error")
+                flash(f"❌ Password update failed: {error_message}", "error")
+                return render_template("update_password.html", token=access_token, email=user_email)
 
-            # 🔍 Debugging: Print the response from the password update
-            print("🔍 User Update Response:", user_update_response)
-
-            # ✅ Ensure the update was successful
-            if not isinstance(user_update_response, dict) or "error" in user_update_response:
-                error_message = user_update_response.get("error", {}).get("message", "Unknown error")
-                flash(f"Password update failed: {error_message}", "error")
-                return render_template("update_password.html", token=access_token)
-
-            flash("Password updated successfully! You can now log in.", "success")
+            flash("✅ Password updated successfully! You can now log in.", "success")
             return redirect(url_for("login"))
 
         except Exception as e:
             print("🔥 Exception Occurred:", str(e))  # Debugging
-            flash(f"Error updating password: {str(e)}", "error")
-            return redirect(url_for("forgot_password"))  # Redirect to forgot password on failure
+            flash(f"❌ Error updating password: {str(e)}", "error")
+            return redirect(url_for("forgot_password"))  # Redirect on failure
 
-    return render_template("update_password.html", token=access_token)
+    return render_template("update_password.html", token=access_token, email=user_email)
 
+# ✅ Login Route (JWT-Based)
 @app.route('/login', methods=['POST', 'GET'])
 def login():
     if request.method == 'POST':
         try:
-            # ✅ Ensure environment variables exist
-            if not SUPABASE_URL or not SUPABASE_KEY:
-                print("❌ Missing Supabase credentials!")
-                return jsonify({"status": "error", "message": "Server misconfiguration"}), 500
-
-            # ✅ Handle both `application/json` and `form-data`
-            if request.is_json:
-                data = request.get_json()
-                email = data.get("email")
-                password = data.get("password")
-            else:
-                email = request.form.get("email")
-                password = request.form.get("password")
-
-            print(f"🔍 Attempting login for {email}")  # Debugging log
+            email = request.json.get("email")
+            password = request.json.get("password")
 
             if not email or not password:
                 return jsonify({"status": "error", "message": "Missing email or password"}), 400
 
-            # ✅ Prepare Supabase API headers
+            # ✅ Authenticate with Supabase
             headers = {
                 "apikey": SUPABASE_KEY,
-                "Authorization": f"Bearer {SUPABASE_KEY}",  # ✅ Fix authorization header
+                "Authorization": f"Bearer {SUPABASE_KEY}",
                 "Content-Type": "application/json"
             }
-
-            # ✅ Send login request to Supabase
             response = requests.post(
                 f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
                 json={"email": email, "password": password},
@@ -266,89 +260,88 @@ def login():
             )
 
             supabase_data = response.json()
-            print(f"🔍 Supabase Response: {supabase_data}")  # Debugging log
-
-            # ✅ Check for errors in response
             if response.status_code != 200 or "access_token" not in supabase_data:
-                error_message = supabase_data.get("error", {}).get("message", "Invalid login credentials")
-                print(f"❌ Supabase login failed: {error_message}")  # Debugging log
-                return jsonify({"status": "error", "message": error_message}), 401
+                return jsonify({"status": "error", "message": "Invalid login credentials"}), 401
 
-            # ✅ Extract user data
-            user_data = supabase_data["user"]
+            # ✅ Generate JWT instead of session
+            token = generate_jwt(email)
 
-            # ✅ Store session data securely
-            session["user_email"] = user_data["email"]
-            session["user_id"] = user_data["id"]
-            session["session_id"] = os.urandom(24).hex()  # Unique session ID
-            session["access_token"] = supabase_data["access_token"]
-            session["refresh_token"] = supabase_data["refresh_token"]
-
-            # ✅ Store user's subscription plan
-            session["user_plan"] = user_data.get("app_metadata", {}).get("plan", "free")  # Default to 'free'
-
-            print(f"✅ Login successful! Session ID: {session['session_id']}, Plan: {session['user_plan']}")  # Debugging log
-            return jsonify({"status": "success", "redirect": "/dashboard"})  # Frontend handles redirect
+            return jsonify({"status": "success", "token": token, "redirect": "/dashboard"})
 
         except Exception as e:
-            print(f"🔥 Login error: {str(e)}")  # Debugging log
-            return jsonify({"status": "error", "message": "Internal server error"}), 500
+            return jsonify({"status": "error", "message": str(e)}), 500
 
-    return render_template("login.html")  # Render login page for GET requests
+    return render_template("login.html")
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'POST':
         email = request.form.get('email')
 
+        if not email:
+            flash("❌ Email is required to reset your password.", "error")
+            return redirect(url_for("forgot_password"))
+
         try:
-            # ✅ Store email in session for later retrieval
-            session["reset_email"] = email  
+            print(f"🔍 Sending password reset request for: {email}")  # Debugging Log
 
             # ✅ Supabase Password Reset Request
             response = supabase.auth.reset_password_for_email(email)
 
-            flash("Check your email for a password reset link.", "success")
+            # ✅ Validate Supabase Response
+            if isinstance(response, dict) and "error" in response:
+                error_message = response["error"].get("message", "Unknown error")
+                print(f"❌ Supabase Error: {error_message}")  # Debugging Log
+                flash(f"❌ Password reset failed: {error_message}", "error")
+                return redirect(url_for("forgot_password"))
+
+            flash("📩 Check your email for a password reset link.", "success")
             return redirect(url_for('login'))
 
         except Exception as e:
-            flash(f"Error: {str(e)}", "error")
+            print(f"🔥 Exception in forgot-password: {str(e)}")  # Debugging Log
+            flash("❌ An error occurred. Please try again later.", "error")
             return redirect(url_for("forgot_password"))
 
     return render_template('forgot_password.html')
 
-# ✅ Logout Route
+# ✅ Logout Route (Clears Frontend JWT)
 @app.route('/logout')
 def logout():
-    session.clear()
-    flash("You have been logged out.", "info")
-    return redirect(url_for('login'))
+    return redirect(url_for("home"))
 
+# ✅ Check Auth Route (JWT-Based)
 @app.route('/check-auth')
 def check_auth():
-    print(f"🔍 Stored session: {session.get('session_id')}")  # Debugging
+    token = request.args.get("token")  # Get token from request
 
-    session_id = request.args.get("session_id")
+    if not token:
+        print("❌ No token provided")  # Debugging
+        return jsonify({"error": "Unauthorized"}), 401
 
-    if not session_id or session_id != session.get("session_id"):
-        print("❌ Invalid session detected")  # Debugging
-        return jsonify({"error": "Invalid session"}), 401  # Unauthorized
+    user_email = verify_jwt(token)
+    
+    if not user_email:
+        print("❌ Invalid or expired token")  # Debugging
+        return jsonify({"error": "Invalid token"}), 401
 
-    return jsonify({"status": "authenticated", "user_email": session["user_email"]})
+    print(f"✅ Authenticated User: {user_email}")  # Debugging
+    return jsonify({"status": "authenticated", "user_email": user_email})
 
 # ✅ Stripe Payment Route
 @app.route('/checkout/pro')
 def checkout_pro():
     return redirect("https://buy.stripe.com/eVa00j89SeIM9hKeUU")
 
-# ✅ Serve Static Files
+# ✅ Serve Static Files (JS, Images, General Static Files)
 @app.route('/static/<path:filename>')
-def serve_static(filename):
+def serve_static_files(filename):
     return send_from_directory(os.path.join(app.root_path, "static"), filename)
 
+# ✅ Serve CSS Files Separately (Optional)
 @app.route('/css/<path:filename>')
-def serve_css(filename):
-    return send_from_directory(os.path.join(app.root_path, "static/css"), filename)
+def serve_css_files(filename):
+    return send_from_directory(os.path.join(app.root_path, "static", "css"), filename)
 
 # ✅ Security Headers
 @app.after_request
