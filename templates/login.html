@@ -13,19 +13,23 @@
         <div class="card p-4 shadow-lg" style="max-width: 400px; width: 100%;">
             <h2 class="text-center">Login</h2>
             
-            <!-- Flash Messages -->
+            <!-- ✅ Flash Messages (Show All) -->
             {% with messages = get_flashed_messages() %}
                 {% if messages %}
                     <div class="alert alert-danger" role="alert">
-                        {{ messages[0] }}
+                        <ul class="mb-0">
+                            {% for message in messages %}
+                                <li>{{ message }}</li>
+                            {% endfor %}
+                        </ul>
                     </div>
                 {% endif %}
             {% endwith %}
             
-            <form method="POST" action="{{ url_for('login') }}">
+            <form id="login-form"> 
                 <div class="mb-3">
                     <label for="email" class="form-label">Email:</label>
-                    <input type="email" id="email" name="email" class="form-control" required>
+                    <input type="email" id="email" name="email" class="form-control" required autofocus> <!-- ✅ Auto-focus -->
                 </div>
                 
                 <div class="mb-3">
@@ -33,7 +37,7 @@
                     <input type="password" id="password" name="password" class="form-control" required>
                 </div>
 
-                <button type="submit" class="btn btn-primary w-100">Login</button>
+                <button type="submit" id="login-button" class="btn btn-primary w-100">Login</button> <!-- ✅ Added ID -->
             </form>
 
             <div class="text-center mt-3">
@@ -44,5 +48,6 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script> <!-- ✅ Ensure this JavaScript file is loaded -->
 </body>
 </html>

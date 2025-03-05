@@ -4,39 +4,48 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - SynovaAI</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body class="dashboard-page">
 
-    <!-- Header -->
-    <header>
-        <nav>
-            <a href="{{ url_for('home') }}">Home</a>
-            <a href="{{ url_for('data_services') }}">Data Services</a>
-            <a href="{{ url_for('pricing') }}">Pricing</a>
-            <a href="{{ url_for('logout') }}">Logout</a>
-        </nav>
-        <div class="logo">SYNOVAAI</div>
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+</head>
+<body class="dashboard-page bg-light">
+
+    <!-- Header Navigation -->
+    <header class="bg-dark text-white p-3">
+        <div class="container d-flex justify-content-between align-items-center">
+            <div class="logo fw-bold fs-4">SYNOVAAI</div>
+            <nav>
+                <a href="{{ url_for('home') }}" class="text-white me-3">Home</a>
+                <a href="{{ url_for('data_services') }}" class="text-white me-3">Data Services</a>
+                <a href="{{ url_for('pricing') }}" class="text-white me-3">Pricing</a>
+                <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm">Logout</a>
+            </nav>
+        </div>
     </header>
 
-    <!-- Dashboard Welcome Section -->
-    <section class="dashboard-container">
-        <h2>Welcome, {{ user_email }}!</h2>
-        <p>Your Subscription: <strong>{{ user_plan }}</strong></p>
+    <!-- Dashboard Content -->
+    <section class="dashboard-container container d-flex flex-column align-items-center text-center mt-5">
+        <h2>Welcome, <span class="text-primary">{{ user_email }}</span>!</h2>
+        <p>Your Subscription: <strong>{{ user_plan.capitalize() }}</strong></p>
 
-        <!-- Links -->
-        <div class="dashboard-links">
-            <a href="{{ url_for('forecasting_tool') }}" class="dashboard-button">📊 Access Forecasting Tool</a>
+        <!-- Dashboard Links -->
+        <div class="mt-4">
+            <a href="{{ url_for('forecasting_tool') }}" class="btn btn-primary btn-lg mb-3">📊 Access Forecasting Tool</a>
+
             {% if user_plan == "free" %}
-                <a href="{{ url_for('pricing') }}" class="dashboard-button">🚀 Upgrade to Premium</a>
+                <a href="{{ url_for('pricing') }}" class="btn btn-warning btn-lg">🚀 Upgrade to Premium</a>
             {% endif %}
         </div>
     </section>
 
     <!-- Footer -->
-    <footer>
+    <footer class="text-center bg-dark text-white p-3 mt-5">
         <p>© 2025 SynovaAI. All rights reserved.</p>
     </footer>
+
+    <!-- Bootstrap Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
 
 </body>
 </html>

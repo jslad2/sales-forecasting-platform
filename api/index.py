@@ -100,15 +100,30 @@ def self_service_insights():
 @app.route('/dashboard')
 def dashboard():
     token = request.args.get("token")  # Get token from URL
+
     if not token:
+        flash("Unauthorized access. Please log in.", "error")
         return redirect(url_for("login"))
 
+    # ✅ Verify JWT Token
     user_email = verify_jwt(token)
+
     if not user_email:
         flash("Session expired. Please log in again.", "error")
         return redirect(url_for("login"))
 
-    return render_template("dashboard.html", user_email=user_email, user_plan="free")
+    # ✅ Retrieve user plan from Supabase
+    try:
+        response = supabase.table("users").select("plan").eq("email", user_email).single().execute()
+        user_plan = response.get("data", {}).get("plan", "free")  # Default to "free" if no plan found
+    except Exception as e:
+        print(f"❌ Error fetching user plan: {e}")  # Debugging
+        user_plan = "free"  # Fallback to free plan
+
+    print(f"✅ User authenticated: {user_email}, Plan: {user_plan}")
+
+    return render_template("dashboard.html", user_email=user_email, user_plan=user_plan)
+
     
 # ✅ Register Route (Uses Supabase Auth)
 @app.route('/register', methods=['GET', 'POST'])
@@ -117,30 +132,41 @@ def register():
         email = request.form.get('email')
         password = request.form.get('password')
 
+        errors = []
+
         # ✅ Password validation rules
-        if len(password) < 8:  # Minimum length
-            flash("Password must be at least 8 characters long.")
-            return redirect(url_for("register"))
+        if len(password) < 8:
+            errors.append("Password must be at least 8 characters long.")
+        if not re.search(r"\d", password):
+            errors.append("Password must contain at least one number.")
+        if not re.search(r"[A-Z]", password):
+            errors.append("Password must contain at least one uppercase letter.")
+        if not re.search(r"[!@#$%^&*]", password):
+            errors.append("Password must contain at least one special character (!@#$%^&*).")
 
-        if not re.search(r"\d", password):  # At least one digit
-            flash("Password must contain at least one number.")
-            return redirect(url_for("register"))
-
-        if not re.search(r"[A-Z]", password):  # At least one uppercase letter
-            flash("Password must contain at least one uppercase letter.")
-            return redirect(url_for("register"))
-
-        if not re.search(r"[!@#$%^&*]", password):  # At least one special character
-            flash("Password must contain at least one special character (!@#$%^&*).")
+        # ✅ Show all validation errors at once
+        if errors:
+            for error in errors:
+                flash(error, "error")
             return redirect(url_for("register"))
 
         # ✅ Attempt to register the user
         try:
-            response = supabase.auth.sign_up({"email": email, "password": password})
+            response = supabase.auth.sign_up({
+                "email": email,
+                "password": password
+            })
 
+            # ✅ Check if signup failed
             if "error" in response and response["error"]:
                 flash(f"Registration failed: {response['error']['message']}", "error")
                 return redirect(url_for("register"))
+
+            # ✅ Store default 'tier' metadata
+            user_id = response["user"]["id"]
+            supabase.auth.update_user({
+                "data": {"tier": "free"}
+            }, user_id=user_id)
 
             flash("Check your email to confirm your account.", "success")
             return redirect(url_for("login"))
@@ -237,85 +263,66 @@ def update_password():
     return render_template("update_password.html", token=access_token, email=user_email)
 
 # ✅ Login Route (JWT-Based)
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['POST'])
 def login():
     try:
-        # ✅ Handle GET request (serve login page)
-        if request.method == 'GET':
-            return render_template('login.html')  # Ensure this template exists
+        print(f"🔍 Request Content-Type: {request.content_type}")  # Debugging
+        print(f"🔍 Raw Request Data: {request.get_data()}")  # Debugging
 
-        # ✅ Ensure Content-Type is JSON for POST requests
+        # ✅ Ensure Content-Type is JSON
         if request.content_type != "application/json":
-            print("❌ Unsupported Media Type:", request.content_type)  # Debugging
             return jsonify({"status": "error", "message": "Unsupported Media Type: Use 'application/json'"}), 415
 
-        # ✅ Debug: Log raw request data for troubleshooting
-        print(f"🔍 Request Content-Type: {request.content_type}")
-        print(f"🔍 Raw Request Data: {request.get_data()}")
-
-        # ✅ Attempt to parse JSON request
-        try:
-            data = request.get_json()
-        except Exception as json_error:
-            print(f"❌ JSON Parsing Error: {json_error}")  # Debugging
-            return jsonify({"status": "error", "message": "Invalid JSON format"}), 400
-
+        data = request.get_json()
         if not data:
-            print("❌ Received empty JSON payload")  # Debugging
             return jsonify({"status": "error", "message": "Invalid JSON payload"}), 400
 
-        # ✅ Extract email and password
         email = data.get("email")
         password = data.get("password")
 
         if not email or not password:
-            print("❌ Missing email or password")  # Debugging
             return jsonify({"status": "error", "message": "Missing email or password"}), 400
 
         print(f"🔍 Attempting login for {email}")
 
-        # ✅ Prepare request headers for Supabase authentication
+        # ✅ Supabase authentication
         headers = {
             "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}",
             "Content-Type": "application/json"
         }
 
-        # ✅ Send authentication request to Supabase
         response = requests.post(
             f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
             json={"email": email, "password": password},
             headers=headers
         )
 
-        # ✅ Debugging: Log full Supabase response
-        try:
-            supabase_data = response.json()
-        except Exception as json_parse_error:
-            print(f"❌ Error parsing Supabase response: {json_parse_error}")  # Debugging
-            return jsonify({"status": "error", "message": "Authentication service error"}), 500
-
+        supabase_data = response.json()
         print(f"🔍 Supabase Response: {supabase_data}")
 
-        # ✅ Check for authentication errors
+        # ✅ Handle authentication errors
         if response.status_code != 200 or "access_token" not in supabase_data:
-            error_message = supabase_data.get("error", {}).get("message", "Invalid login credentials")
-            print(f"❌ Supabase login failed: {error_message}")  # Debugging
+            error_message = supabase_data.get("error_description", "Invalid login credentials")
             return jsonify({"status": "error", "message": error_message}), 401
 
-        # ✅ Extract user data (optional debugging)
-        user_data = supabase_data.get("user", {})
-        print(f"✅ User authenticated: {user_data.get('email', 'Unknown')}")
+        # ✅ Extract user data
+        user_data = supabase_data["user"]
+        user_metadata = user_data.get("user_metadata", {})
+        user_tier = user_metadata.get("tier", "free")  # Default to 'free' if not set
 
-        # ✅ Return JSON response with JWT token and redirect path
+        print(f"✅ Login successful. User Tier: {user_tier}")
+
+        # ✅ Return access_token & tier for frontend
         return jsonify({
             "status": "success",
             "redirect": "/dashboard",
-            "access_token": supabase_data["access_token"]
+            "access_token": supabase_data["access_token"],
+            "tier": user_tier
         })
 
     except Exception as e:
-        print(f"🔥 Login error: {str(e)}")  # Debugging log
+        print(f"🔥 Login error: {str(e)}")
         return jsonify({"status": "error", "message": "Internal server error"}), 500
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
