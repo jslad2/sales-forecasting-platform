@@ -139,9 +139,11 @@ def token_required(f):
 def dashboard():
     try:
         user_info = request.user  # Get user info from JWT
-        logger.debug(f"✅ User {user_info['email']} accessed dashboard.")
+        user_plan = user_info.get("tier", "free")  # Default to "free" if missing
 
-        return render_template('dashboard.html', user_info=user_info)
+        logger.debug(f"✅ User {user_info['email']} accessed dashboard. Subscription: {user_plan}")
+
+        return render_template('dashboard.html', user_info=user_info, user_plan=user_plan)
 
     except Exception as e:
         logger.exception("🔥 Error loading dashboard")
