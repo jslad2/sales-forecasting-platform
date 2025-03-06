@@ -39,24 +39,27 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const data = await response.json();
             console.log("✅ Login Response:", data);
-
             if (response.ok && data.status === "success") {
                 alert("✅ Login successful! Redirecting...");
-
+            
                 // ✅ Store JWT token in localStorage
                 localStorage.setItem("access_token", data.access_token);
-
-                // ✅ Verify token before redirecting
+            
+                // ✅ Attach JWT to cookies (Optional)
+                document.cookie = `access_token=${data.access_token}; path=/; Secure`;
+            
+                // ✅ Verify token BEFORE redirecting
                 const tokenValid = await verifyToken();
                 if (tokenValid) {
-                    window.location.href = data.redirect; // ✅ Redirect to dashboard
+                    window.location.href = data.redirect;  // ✅ Redirect to dashboard only if valid
                 } else {
                     alert("⚠️ Session expired. Please log in again.");
-                    window.location.href = "/login";
+                    localStorage.removeItem("access_token");  // ✅ Remove invalid token
+                    window.location.href = "/login";  // ✅ Redirect back to login
                 }
             } else {
                 alert(`❌ Login failed: ${data.message || "Invalid credentials"}`);
-            }
+            }            
         } catch (error) {
             console.error("🔥 Login Error:", error);
             alert("❌ An error occurred. Please try again.");
@@ -87,14 +90,25 @@ async function checkAuth() {
         return;
     }
 
-    const tokenValid = await verifyToken();
-    if (!tokenValid) {
-        console.warn("❌ Token is invalid. Logging out.");
-        alert("⚠️ Session expired. Please log in again.");
+    try {
+        console.log("🔍 Verifying JWT token...");
+        const response = await fetch("/api/verify-token", {
+            method: "GET",
+            headers: { "Authorization": `Bearer ${token}` }  // ✅ Attach JWT
+        });
+
+        if (!response.ok) {
+            console.warn("❌ Invalid or expired token. Redirecting to login.");
+            localStorage.removeItem("access_token");
+            window.location.href = "/login";
+        } else {
+            console.log("✅ JWT verified. Access granted.");
+        }
+    } catch (error) {
+        console.error("🔥 Error verifying token:", error);
+        alert("❌ Authentication error. Please log in again.");
         localStorage.removeItem("access_token");
         window.location.href = "/login";
-    } else {
-        console.log("✅ JWT verified. Access granted.");
     }
 }
 

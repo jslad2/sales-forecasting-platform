@@ -109,17 +109,20 @@ def self_service_insights():
 def token_required(f):
     """Decorator to ensure JWT authentication is required for routes."""
     def decorated_function(*args, **kwargs):
-        token = request.headers.get("Authorization")  # ✅ Fetch from headers, NOT cookies
+        token = request.cookies.get("access_token") or request.headers.get("Authorization")
 
-        if not token or "Bearer" not in token:
+        if not token:
             logger.warning("❌ Unauthorized: No JWT token provided.")
             return redirect(url_for('login_page'))
 
         try:
+            if token.startswith("Bearer "):
+                token = token.split(" ")[1]  # Extract token if "Bearer <token>"
+
             # ✅ Decode and validate the JWT
-            token = token.split(" ")[1]  # Remove "Bearer "
             payload = pyjwt.decode(token, SECRET_KEY, algorithms=["HS256"])
             request.user = payload  # Store user info in request context
+
         except pyjwt.ExpiredSignatureError:
             logger.warning("❌ Unauthorized: JWT token expired.")
             return redirect(url_for('login_page'))
