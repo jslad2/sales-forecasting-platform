@@ -33,22 +33,29 @@ SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "super_secure_fallback_key")
 
 # ✅ Function to Generate JWT Token
 def generate_jwt(user_email):
-    token = jwt.encode({
+    token = pyjwt.encode({
         "email": user_email,
         "exp": datetime.datetime.utcnow() + datetime.timedelta(days=1)  # Expires in 1 day
     }, SECRET_KEY, algorithm="HS256")
     return token
 
 # ✅ Function to Verify JWT Token
-def verify_jwt(token):
-    try:
-        decoded = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        return decoded["email"]
-    except jwt.ExpiredSignatureError:
-        return None  # Expired token
-    except jwt.InvalidTokenError:
-        return None  # Invalid token
+def verify_jwt():
+    """Extract and verify JWT from headers."""
+    auth_header = request.headers.get("Authorization")
+    
+    if not auth_header or "Bearer" not in auth_header:
+        return jsonify({"error": "Unauthorized"}), 401  # ✅ Return error JSON instead of None
 
+    try:
+        token = auth_header.split(" ")[1]  # Extract token
+        decoded_token = pyjwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        return decoded_token  # ✅ Return user data
+    except pyjwt.ExpiredSignatureError:
+        return jsonify({"error": "JWT token expired"}), 401
+    except pyjwt.InvalidTokenError:
+        return jsonify({"error": "Invalid JWT token"}), 401
+    
 # ✅ Home Page
 @app.route('/')
 def home():
@@ -86,15 +93,12 @@ def data_services():
 
 @app.route('/forecasting-tool')
 def forecasting_tool():
-    if 'user_email' not in session:
+    user_info = verify_jwt()
+    if not user_info:
         flash("❌ You must be logged in to access the forecasting tool.", "error")
         return redirect(url_for('login'))
-
-    # Retrieve user subscription level from Supabase
-    user_email = session.get("user_email")
-    user_plan = session.get("user_plan", "free")
-
-    return render_template('forecasting_tool.html', user_plan=user_plan)
+    
+    return render_template('forecasting_tool.html')
 
 # ✅ Self-Service Insights Page
 @app.route('/self-service-insights')
@@ -105,20 +109,21 @@ def self_service_insights():
 def token_required(f):
     """Decorator to ensure JWT authentication is required for routes."""
     def decorated_function(*args, **kwargs):
-        token = request.cookies.get("access_token") or request.headers.get("Authorization")
+        token = request.headers.get("Authorization")  # ✅ Fetch from headers, NOT cookies
 
-        if not token:
+        if not token or "Bearer" not in token:
             logger.warning("❌ Unauthorized: No JWT token provided.")
             return redirect(url_for('login_page'))
 
         try:
             # ✅ Decode and validate the JWT
-            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            token = token.split(" ")[1]  # Remove "Bearer "
+            payload = pyjwt.decode(token, SECRET_KEY, algorithms=["HS256"])
             request.user = payload  # Store user info in request context
-        except jwt.ExpiredSignatureError:
+        except pyjwt.ExpiredSignatureError:
             logger.warning("❌ Unauthorized: JWT token expired.")
             return redirect(url_for('login_page'))
-        except jwt.InvalidTokenError:
+        except pyjwt.InvalidTokenError:
             logger.warning("❌ Unauthorized: Invalid JWT token.")
             return redirect(url_for('login_page'))
 
@@ -310,41 +315,50 @@ def login():
             headers=headers
         )
 
-        logger.debug(f"🔍 Supabase Response: {supabase_response.text}")
+        logger.debug(f"🔍 Supabase Raw Response: {supabase_response.text}")
 
         try:
             supabase_data = supabase_response.json()
         except ValueError:
+            logger.error("❌ Supabase did not return valid JSON.")
             return jsonify({"status": "error", "message": "Invalid response from authentication server"}), 500
 
+        # ✅ Handle authentication errors
         if supabase_response.status_code != 200 or "access_token" not in supabase_data:
             error_message = supabase_data.get("error_description", supabase_data.get("error", "Invalid login credentials"))
+            logger.warning(f"❌ Authentication failed: {error_message}")
             return jsonify({"status": "error", "message": error_message}), 401
 
         user_data = supabase_data.get("user", {})
         user_metadata = user_data.get("user_metadata", {})
+
+        # ✅ Check if email is verified before issuing JWT
+        if not user_data.get("email_confirmed_at"):
+            logger.warning("❌ Login failed: Email not verified.")
+            return jsonify({"status": "error", "message": "Email not verified. Please check your inbox."}), 403
+
         user_tier = user_metadata.get("tier", "free")
 
         # ✅ Generate JWT Token
-        payload = {
-            "sub": user_data.get("id"),
-            "email": user_data.get("email"),
-            "tier": user_tier,
-            "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=2)  # Expires in 2 hours
-        }
-        jwt_token = pyjwt.encode(payload, SECRET_KEY, algorithm="HS256")
+        jwt_token = generate_jwt(user_data.get("email"))
 
         logger.debug(f"✅ Login successful. JWT issued.")
 
         return jsonify({
             "status": "success",
             "redirect": "/dashboard",
-            "access_token": jwt_token
+            "access_token": jwt_token,
+            "tier": user_tier
         })
+
+    except requests.exceptions.RequestException as req_error:
+        logger.error(f"🔥 Network error during Supabase request: {str(req_error)}")
+        return jsonify({"status": "error", "message": "Authentication service unavailable"}), 503
 
     except Exception as e:
         logger.exception("🔥 Unexpected server error during login process.")
         return jsonify({"status": "error", "message": "Internal server error"}), 500
+
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():

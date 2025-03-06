@@ -43,11 +43,17 @@ document.addEventListener("DOMContentLoaded", function () {
             if (response.ok && data.status === "success") {
                 alert("✅ Login successful! Redirecting...");
 
-                // ✅ Store JWT token securely
+                // ✅ Store JWT token in localStorage
                 localStorage.setItem("access_token", data.access_token);
-                document.cookie = `access_token=${data.access_token}; path=/; Secure; HttpOnly`;
 
-                window.location.href = data.redirect; // ✅ Redirect to dashboard
+                // ✅ Verify token before redirecting
+                const tokenValid = await verifyToken();
+                if (tokenValid) {
+                    window.location.href = data.redirect; // ✅ Redirect to dashboard
+                } else {
+                    alert("⚠️ Session expired. Please log in again.");
+                    window.location.href = "/login";
+                }
             } else {
                 alert(`❌ Login failed: ${data.message || "Invalid credentials"}`);
             }
@@ -81,6 +87,28 @@ async function checkAuth() {
         return;
     }
 
+    const tokenValid = await verifyToken();
+    if (!tokenValid) {
+        console.warn("❌ Token is invalid. Logging out.");
+        alert("⚠️ Session expired. Please log in again.");
+        localStorage.removeItem("access_token");
+        window.location.href = "/login";
+    } else {
+        console.log("✅ JWT verified. Access granted.");
+    }
+}
+
+/**
+ * ✅ Function to verify the stored JWT token with the backend
+ */
+async function verifyToken() {
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+        console.warn("❌ No JWT token found.");
+        return false;
+    }
+
     try {
         console.log("🔍 Verifying JWT token...");
         const response = await fetch("/api/verify-token", {
@@ -89,16 +117,33 @@ async function checkAuth() {
         });
 
         if (!response.ok) {
-            console.warn("❌ Invalid or expired token. Redirecting to login.");
-            localStorage.removeItem("access_token");
-            window.location.href = "/login";
-        } else {
-            console.log("✅ JWT verified. Access granted.");
+            console.warn("❌ Invalid or expired token.");
+            return false;
         }
+
+        console.log("✅ Token is valid.");
+        return true;
     } catch (error) {
         console.error("🔥 Error verifying token:", error);
-        alert("❌ Authentication error. Please log in again.");
-        localStorage.removeItem("access_token");
-        window.location.href = "/login";
+        return false;
     }
+}
+
+/**
+ * ✅ Wrapper function to send authenticated API requests
+ */
+async function fetchWithAuth(url, options = {}) {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+        console.warn("❌ No JWT token found. Redirecting to login.");
+        window.location.href = "/login";
+        return;
+    }
+
+    options.headers = {
+        ...options.headers,
+        "Authorization": `Bearer ${token}`
+    };
+
+    return fetch(url, options);
 }
