@@ -359,6 +359,29 @@ def login():
         logger.exception("🔥 Unexpected server error during login process.")
         return jsonify({"status": "error", "message": "Internal server error"}), 500
 
+@app.route('/api/verify-token', methods=['GET'])
+def verify_token():
+    """Verifies if the provided JWT token is valid"""
+    auth_header = request.headers.get("Authorization")
+
+    if not auth_header or "Bearer" not in auth_header:
+        logger.warning("❌ No JWT token provided.")
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
+    try:
+        token = auth_header.split(" ")[1]  # Extract token after "Bearer"
+        decoded_token = pyjwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        
+        logger.debug("✅ JWT verified successfully.")
+        return jsonify({"status": "success", "user": decoded_token})
+
+    except pyjwt.ExpiredSignatureError:
+        logger.warning("❌ JWT token expired.")
+        return jsonify({"status": "error", "message": "Token expired"}), 401
+
+    except pyjwt.InvalidTokenError:
+        logger.warning("❌ Invalid JWT token.")
+        return jsonify({"status": "error", "message": "Invalid token"}), 401
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
