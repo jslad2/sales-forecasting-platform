@@ -21,10 +21,10 @@
     <header>
         <nav>
             <ul class="nav-links">
-                <li><a href="{{ url_for('home') }}">Home</a></li>
-                <li><a href="{{ url_for('data_services') }}">Data Services</a></li>
-                <li><a href="{{ url_for('pricing') }}">Pricing</a></li>
-                <li><a href="{{ url_for('contact') }}">Contact</a></li>
+                <li><a href="{{ url_for('home') }}" class="nav-link">Home</a></li>
+                <li><a href="{{ url_for('data_services') }}" class="nav-link">Data Services</a></li>
+                <li><a href="{{ url_for('pricing') }}" class="nav-link">Pricing</a></li>
+                <li><a href="{{ url_for('contact') }}" class="nav-link">Contact</a></li>
                 <li id="auth-buttons"> <!-- Dynamic Auth Buttons Here --> </li>
             </ul>
         </nav>      
@@ -44,7 +44,6 @@
     <section id="tools-overview" class="data-services">
         <h2>Unlock the Potential of Your Data</h2>
         <div class="service-grid">
-            <!-- Forecasting Service -->
             <a href="{{ url_for('data_services') }}#forecasting" class="service-card-link">
                 <div class="service-card">
                     <img src="static/images/forecasting-icon.png" alt="Forecasting Icon" loading="lazy">
@@ -52,8 +51,6 @@
                     <p>Generate accurate, actionable sales forecasts using AI-driven predictive analytics.</p>
                 </div>
             </a>
-            
-            <!-- Dashboard Service -->
             <a href="{{ url_for('data_services') }}#dashboards" class="service-card-link">
                 <div class="service-card">
                     <img src="static/images/dashboard-icon.png" alt="Dashboard Icon" loading="lazy">
@@ -61,8 +58,6 @@
                     <p>Visualize your data with real-time, interactive dashboards tailored to your needs.</p>
                 </div>
             </a>
-            
-            <!-- Support & Consulting -->
             <a href="{{ url_for('data_services') }}#consulting" class="service-card-link">
                 <div class="service-card">
                     <img src="static/images/support-icon.png" alt="Support & Consulting Icon" loading="lazy">
@@ -85,7 +80,7 @@
         </div>
     </footer>
 
-    <!-- JavaScript to Ensure Cards Show Properly -->
+    <!-- JavaScript -->
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             const navLinks = document.querySelectorAll(".nav-link");
@@ -113,12 +108,43 @@
                     topButton.style.opacity = "0";
                 }
             };
+
+            // ✅ Update Auth Buttons
+            updateAuthButtons();
         });
 
         function scrollToTop() {
             window.scrollTo({ top: 0, behavior: "smooth" });
         }
+
+        /**
+         * ✅ Dynamically updates login/logout buttons based on authentication status
+         */
+        function updateAuthButtons() {
+            const authContainer = document.querySelector("#auth-buttons");
+            if (!authContainer) return;
+
+            const token = localStorage.getItem("access_token");
+
+            if (token) {
+                authContainer.innerHTML = `<a href="/dashboard" class="auth-link">Dashboard</a>
+                                           <a href="#" onclick="logout()" class="auth-link">Logout</a>`;
+            } else {
+                authContainer.innerHTML = `<a href="/login" class="auth-link">Login</a>`;
+            }
+        }
+
+        /**
+         * ✅ Logout Function (Removes JWT & Redirects)
+         */
+        function logout() {
+            localStorage.removeItem("access_token");
+            window.location.href = "/login";
+        }
     </script>
+
+    <!-- ✅ Load auth.js at the bottom -->
+    <script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>
 
 </body>
 </html>
