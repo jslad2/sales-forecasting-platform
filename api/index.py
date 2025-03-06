@@ -1,5 +1,5 @@
 import os
-import jwt
+import jwt as pyjwt  # ✅ Renaming it to avoid conflicts
 import datetime
 import re
 import requests
@@ -332,7 +332,7 @@ def login():
             "tier": user_tier,
             "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=2)  # Expires in 2 hours
         }
-        jwt_token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+        jwt_token = pyjwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
         logger.debug(f"✅ Login successful. JWT issued.")
 
