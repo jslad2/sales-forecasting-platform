@@ -150,7 +150,9 @@
 <!-- JavaScript -->
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // Highlight Active Page in Navigation
+        console.log("✅ Data Services Page Loaded");
+
+        // ✅ Highlight Active Page in Navigation
         const navLinks = document.querySelectorAll(".nav-link");
         const currentPage = window.location.pathname;
 
@@ -162,13 +164,13 @@
             }
         });
 
-        // Smooth Scroll to Top
+        // ✅ Smooth Scroll to Top
         function scrollToTop() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         document.querySelector(".top-button").addEventListener("click", scrollToTop);
 
-        // Show "Back to Top" Button on Scroll
+        // ✅ Show "Back to Top" Button on Scroll
         window.addEventListener("scroll", function() {
             let backToTop = document.querySelector(".top-button");
             if (window.scrollY > 100) {
@@ -178,7 +180,7 @@
             }
         });
 
-        // Animate Service Cards on Scroll
+        // ✅ Animate Service Cards on Scroll
         let cards = document.querySelectorAll(".service-card");
         let observer = new IntersectionObserver(entries => {
             entries.forEach(entry => {
@@ -190,10 +192,109 @@
 
         cards.forEach(card => observer.observe(card));
 
-        // Fallback for browsers that don't support IntersectionObserver
+        // ✅ Fallback for browsers that don't support IntersectionObserver
         if (!('IntersectionObserver' in window)) {
-            console.warn("IntersectionObserver not supported!");
+            console.warn("⚠ IntersectionObserver not supported!");
             document.querySelectorAll(".service-card").forEach(card => card.classList.add("show"));
+        }
+
+        // ✅ Ensure Navbar Updates Correctly Based on Authentication
+        updateNavbar();
+    });
+
+    /**
+     * ✅ Function to Check Authentication (Protects Restricted Pages)
+     */
+    async function checkAuth() {
+        const token = localStorage.getItem("access_token");
+
+        if (!token) {
+            console.warn("❌ No JWT token found.");
+            
+            // 🔹 Only redirect if the page is protected
+            const protectedPages = ["/dashboard", "/profile", "/account-settings"];
+            if (protectedPages.includes(window.location.pathname)) {
+                alert("⚠ Session expired. Please log in again.");
+                window.location.href = "/login";
+            }
+            return;
+        }
+
+        try {
+            console.log("🔍 Verifying JWT token...");
+            const response = await fetch("/api/verify-token", {
+                method: "GET",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+
+            if (!response.ok) {
+                console.warn("❌ Invalid or expired token.");
+                localStorage.removeItem("access_token");
+
+                // Redirect only if the page is protected
+                if (protectedPages.includes(window.location.pathname)) {
+                    window.location.href = "/login";
+                }
+            } else {
+                console.log("✅ JWT verified. Access granted.");
+            }
+        } catch (error) {
+            console.error("🔥 Error verifying token:", error);
+            localStorage.removeItem("access_token");
+
+            if (protectedPages.includes(window.location.pathname)) {
+                window.location.href = "/login";
+            }
+        }
+    }
+
+    /**
+     * ✅ Function to Update Navbar (Handles Login/Logout)
+     */
+    function updateNavbar() {
+        console.log("🔍 Checking authentication for navbar...");
+        
+        const authButtons = document.getElementById("auth-buttons");
+        if (!authButtons) return;
+
+        const token = localStorage.getItem("access_token");
+
+        if (token) {
+            console.log("✅ User is logged in.");
+            authButtons.innerHTML = `
+                <a href="/dashboard" class="dashboard-btn">Dashboard</a>
+                <a href="#" class="logout-btn" onclick="logout()">Logout</a>
+            `;
+        } else {
+            console.log("❌ No user token found.");
+            
+            // Ensure login button appears correctly
+            authButtons.innerHTML = `<a href="/login" class="login-btn">Login</a>`;
+        }
+    }
+
+    /**
+     * ✅ Logout Function
+     */
+    function logout() {
+        console.log("🚪 Logging out...");
+        localStorage.removeItem("access_token");
+        document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC"; // ✅ Remove cookie
+        updateNavbar(); // ✅ Update navbar immediately
+        window.location.href = "/";  // ✅ Redirect to homepage
+    }
+
+</script>
+
+<!-- ✅ Load Central Authentication Logic -->
+<script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>
+
+<!-- ✅ Ensure Authentication is Checked Only on Protected Pages -->
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const protectedPages = ["/dashboard", "/profile", "/account-settings"];
+        if (protectedPages.includes(window.location.pathname)) {
+            checkAuth();  // ✅ Enforce authentication on protected pages
         }
     });
 </script>

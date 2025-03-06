@@ -90,8 +90,9 @@ async function checkAuth() {
     if (!token) {
         console.warn("❌ No JWT token found.");
         
-        // 🔹 Only redirect to login if the user is on a protected page
-        if (window.location.pathname !== "/") {
+        // 🔹 Only redirect on protected pages
+        const protectedPages = ["/dashboard", "/profile", "/account-settings"];
+        if (protectedPages.includes(window.location.pathname)) {
             alert("⚠️ Session expired. Please log in again.");
             window.location.href = "/login";
         }
@@ -109,8 +110,8 @@ async function checkAuth() {
             console.warn("❌ Invalid or expired token.");
             localStorage.removeItem("access_token");
 
-            // 🔹 Only redirect if the user is NOT on the homepage
-            if (window.location.pathname !== "/") {
+            // Redirect only if the page is protected
+            if (protectedPages.includes(window.location.pathname)) {
                 window.location.href = "/login";
             }
         } else {
@@ -119,8 +120,8 @@ async function checkAuth() {
     } catch (error) {
         console.error("🔥 Error verifying token:", error);
         localStorage.removeItem("access_token");
-        
-        if (window.location.pathname !== "/") {
+
+        if (protectedPages.includes(window.location.pathname)) {
             window.location.href = "/login";
         }
     }

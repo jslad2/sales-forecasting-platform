@@ -5,11 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Contact - SynovaAI</title>
     <meta name="description" content="Contact SynovaAI to learn more about our predictive analytics solutions.">
+    
     <!-- Open Graph Meta Tags for SEO -->
     <meta property="og:title" content="Contact - SynovaAI">
     <meta property="og:description" content="Contact SynovaAI to learn more about our predictive analytics solutions.">
     <meta property="og:image" content="{{ url_for('static', filename='images/og-image.png') }}">
     <meta property="og:url" content="https://www.synovaai.com/contact">
+    
     <!-- Stylesheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
@@ -69,7 +71,6 @@
             </form>
         </section>
 
-
     </div>
 
     <!-- Back to Top Button -->
@@ -80,9 +81,12 @@
         <p>&copy; 2025 SynovaAI. All rights reserved.</p>
     </footer>
 
-    <!-- JavaScript to Ensure Cards Show Properly -->
+    <!-- ✅ JavaScript -->
     <script>
         document.addEventListener("DOMContentLoaded", function() {
+            console.log("✅ Contact Page Loaded");
+
+            // ✅ Highlight Active Page in Navigation
             const navLinks = document.querySelectorAll(".nav-link");
             const currentPage = window.location.pathname;
 
@@ -94,25 +98,98 @@
                 }
             });
 
-            // Reveal Service Cards on Load
-            document.querySelectorAll(".service-card").forEach(card => {
-                card.classList.add("show");
-            });
+            // ✅ Ensure Navbar Updates Based on Authentication
+            updateNavbar();
 
-            // Scroll to Top Button Logic
+            // ✅ Scroll to Top Button Logic
             window.onscroll = function() {
                 const topButton = document.querySelector(".top-button");
                 if (document.body.scrollTop > 300 || document.documentElement.scrollTop > 300) {
-                    topButton.style.opacity = "1";
+                    topButton.style.display = "block";
                 } else {
-                    topButton.style.opacity = "0";
+                    topButton.style.display = "none";
                 }
             };
         });
 
+        /**
+         * ✅ Scroll to Top Function
+         */
         function scrollToTop() {
             window.scrollTo({ top: 0, behavior: "smooth" });
         }
+
+        /**
+         * ✅ Form Validation for Contact Page
+         */
+        function validateForm() {
+            const name = document.getElementById("name").value.trim();
+            const email = document.getElementById("email").value.trim();
+            const message = document.getElementById("message").value.trim();
+
+            if (!name || !email || !message) {
+                alert("⚠ Please fill in all fields.");
+                return false;
+            }
+
+            // ✅ Basic Email Format Validation
+            const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+            if (!emailPattern.test(email)) {
+                alert("⚠ Please enter a valid email address.");
+                return false;
+            }
+
+            return true;
+        }
+
+        /**
+         * ✅ Function to Update Navbar (Handles Login/Logout)
+         */
+        function updateNavbar() {
+            console.log("🔍 Checking authentication for navbar...");
+            
+            const authButtons = document.getElementById("auth-buttons");
+            if (!authButtons) return;
+
+            const token = localStorage.getItem("access_token");
+
+            if (token) {
+                console.log("✅ User is logged in.");
+                authButtons.innerHTML = `
+                    <a href="/dashboard" class="dashboard-btn">Dashboard</a>
+                    <a href="#" class="logout-btn" onclick="logout()">Logout</a>
+                `;
+            } else {
+                console.log("❌ No user token found.");
+                
+                // Ensure login button appears correctly
+                authButtons.innerHTML = `<a href="/login" class="login-btn">Login</a>`;
+            }
+        }
+
+        /**
+         * ✅ Logout Function
+         */
+        function logout() {
+            console.log("🚪 Logging out...");
+            localStorage.removeItem("access_token");
+            document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC"; // ✅ Remove cookie
+            updateNavbar(); // ✅ Update navbar immediately
+            window.location.href = "/";  // ✅ Redirect to homepage
+        }
+    </script>
+
+    <!-- ✅ Load Central Authentication Logic -->
+    <script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>
+
+    <!-- ✅ Ensure Authentication is Checked Only on Protected Pages -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const protectedPages = ["/dashboard", "/profile", "/account-settings"];
+            if (protectedPages.includes(window.location.pathname)) {
+                checkAuth();  // ✅ Enforce authentication on protected pages
+            }
+        });
     </script>
 
 </body>
