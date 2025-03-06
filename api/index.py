@@ -267,14 +267,6 @@ def update_password():
 def login_page():
     return render_template('login.html')
 
-import logging
-from flask import request, jsonify
-import requests
-
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
 @app.route('/api/login', methods=['POST'])
 def login():
     try:
