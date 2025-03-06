@@ -1,3 +1,6 @@
+alert("✅ auth.js is running!");
+console.log("✅ auth.js is loaded and executing!");
+
 document.addEventListener("DOMContentLoaded", function () {
     console.log("✅ auth.js is loaded and running!");
 
@@ -11,7 +14,7 @@ document.addEventListener("DOMContentLoaded", function () {
     console.log("✅ Found login form! Adding event listener...");
 
     loginForm.addEventListener("submit", async function (e) {
-        e.preventDefault();  // ✅ This prevents GET request!
+        e.preventDefault(); // ✅ This prevents GET request!
         console.log("✅ Form submission prevented, sending POST request...");
 
         const email = document.querySelector("#email").value.trim();
