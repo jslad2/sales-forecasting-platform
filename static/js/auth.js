@@ -1,10 +1,12 @@
 document.addEventListener("DOMContentLoaded", function () {
     console.log("✅ auth.js is loaded and running!");
 
+    updateNavbar(); // ✅ Ensure navbar updates on page load
+
     const loginForm = document.querySelector("#login-form");
 
     if (!loginForm) {
-        console.warn("❌ loginForm not found. JavaScript might not be running!");
+        console.warn("❌ loginForm not found. Checking authentication...");
         checkAuth();  // ✅ Auto-check authentication if user is already logged in
         return;
     }
@@ -43,10 +45,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (response.ok && data.status === "success") {
                 alert("✅ Login successful! Redirecting...");
-                
+
                 // ✅ Store JWT token in localStorage
                 localStorage.setItem("access_token", data.access_token);
-                
+
                 // ✅ Attach JWT to cookies (Optional)
                 document.cookie = `access_token=${data.access_token}; path=/; Secure`;
 
@@ -77,8 +79,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (window.location.pathname === "/dashboard") {
         checkAuth();
     }
-
-    updateNavbar(); // ✅ Ensure navbar updates on page load
 });
 
 /**
@@ -104,6 +104,7 @@ async function checkAuth() {
         if (!response.ok) {
             console.warn("❌ Invalid or expired token. Redirecting to login.");
             localStorage.removeItem("access_token");
+            updateNavbar(); // ✅ Ensure navbar updates on logout
             window.location.href = "/login";
         } else {
             console.log("✅ JWT verified. Access granted.");
@@ -112,6 +113,7 @@ async function checkAuth() {
         console.error("🔥 Error verifying token:", error);
         alert("❌ Authentication error. Please log in again.");
         localStorage.removeItem("access_token");
+        updateNavbar();
         window.location.href = "/login";
     }
 }
@@ -173,6 +175,8 @@ function updateNavbar() {
     console.log("🔍 Checking authentication for navbar...");
     
     const authButtons = document.getElementById("auth-buttons");
+    if (!authButtons) return;
+
     const token = localStorage.getItem("access_token");
 
     if (token) {
@@ -194,5 +198,6 @@ function logout() {
     console.log("🚪 Logging out...");
     localStorage.removeItem("access_token");
     document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC"; // ✅ Remove cookie
+    updateNavbar(); // ✅ Update navbar immediately
     window.location.href = "/";  // ✅ Redirect to homepage
 }
