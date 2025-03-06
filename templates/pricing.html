@@ -4,9 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pricing - AI-Powered Forecasting</title>
-    <link rel="stylesheet" href="static/css/style.css">
+
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="Choose the right AI-powered forecasting plan for your business. Start for free or upgrade to Pro for full access.">
+    
+    <!-- Open Graph Meta Tags for SEO -->
+    <meta property="og:title" content="Pricing - AI-Powered Forecasting">
+    <meta property="og:description" content="Choose the right AI-powered forecasting plan for your business. Start for free or upgrade to Pro for full access.">
+    <meta property="og:image" content="{{ url_for('static', filename='images/og-image.png') }}">
+    <meta property="og:url" content="https://www.synovaai.com/pricing">
+    
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
+<body class="pricing-page">
 
     <!-- Header -->
     <header>
@@ -22,11 +33,13 @@
         <div class="logo">SYNOVAAI</div>
     </header>
 
-    <!-- Header -->
-    <header>
-        <h1>Choose Your Plan</h1>
-        <p>Start with our free tier or upgrade to unlock full features.</p>
-    </header>
+    <!-- Hero Section -->
+    <section class="hero">
+        <article class="hero-text">
+            <h1>Choose Your Plan</h1>
+            <p>Start with our free tier or upgrade to unlock full features.</p>
+        </article>
+    </section>
 
     <!-- Pricing Table -->
     <section class="pricing-container">
@@ -55,10 +68,101 @@
         </div>
     </section>
 
+    <!-- Back to Top Button -->
+    <button onclick="scrollToTop()" class="top-button" aria-label="Back to Top">⬆ Back to Top</button>
+
     <!-- Footer -->
     <footer>
         <p>&copy; 2025 SynovaAI. All rights reserved.</p>
     </footer>
+
+    <!-- ✅ JavaScript -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            console.log("✅ Pricing Page Loaded");
+
+            // ✅ Highlight Active Page in Navigation
+            const navLinks = document.querySelectorAll(".nav-link");
+            const currentPage = window.location.pathname;
+
+            navLinks.forEach(link => {
+                if (link.getAttribute("href") === currentPage) {
+                    link.classList.add("active");
+                } else {
+                    link.classList.remove("active");
+                }
+            });
+
+            // ✅ Ensure Navbar Updates Based on Authentication
+            updateNavbar();
+
+            // ✅ Scroll to Top Button Logic
+            window.onscroll = function() {
+                const topButton = document.querySelector(".top-button");
+                if (document.body.scrollTop > 300 || document.documentElement.scrollTop > 300) {
+                    topButton.style.display = "block";
+                } else {
+                    topButton.style.display = "none";
+                }
+            };
+        });
+
+        /**
+         * ✅ Scroll to Top Function
+         */
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+
+        /**
+         * ✅ Function to Update Navbar (Handles Login/Logout)
+         */
+        function updateNavbar() {
+            console.log("🔍 Checking authentication for navbar...");
+            
+            const authButtons = document.getElementById("auth-buttons");
+            if (!authButtons) return;
+
+            const token = localStorage.getItem("access_token");
+
+            if (token) {
+                console.log("✅ User is logged in.");
+                authButtons.innerHTML = `
+                    <a href="/dashboard" class="dashboard-btn">Dashboard</a>
+                    <a href="#" class="logout-btn" onclick="logout()">Logout</a>
+                `;
+            } else {
+                console.log("❌ No user token found.");
+                
+                // Ensure login button appears correctly
+                authButtons.innerHTML = `<a href="/login" class="login-btn">Login</a>`;
+            }
+        }
+
+        /**
+         * ✅ Logout Function
+         */
+        function logout() {
+            console.log("🚪 Logging out...");
+            localStorage.removeItem("access_token");
+            document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC"; // ✅ Remove cookie
+            updateNavbar(); // ✅ Update navbar immediately
+            window.location.href = "/";  // ✅ Redirect to homepage
+        }
+    </script>
+
+    <!-- ✅ Load Central Authentication Logic -->
+    <script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>
+
+    <!-- ✅ Ensure Authentication is Checked Only on Protected Pages -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const protectedPages = ["/dashboard", "/profile", "/account-settings"];
+            if (protectedPages.includes(window.location.pathname)) {
+                checkAuth();  // ✅ Enforce authentication on protected pages
+            }
+        });
+    </script>
 
 </body>
 </html>
