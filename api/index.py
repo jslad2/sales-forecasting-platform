@@ -102,33 +102,42 @@ def self_service_insights():
     return render_template('self_service_insights.html')
 
 # ✅ Dashboard Route (Protected with JWT)
-@app.route('/dashboard')
+def token_required(f):
+    """Decorator to ensure JWT authentication is required for routes."""
+    def decorated_function(*args, **kwargs):
+        token = request.cookies.get("access_token") or request.headers.get("Authorization")
+
+        if not token:
+            logger.warning("❌ Unauthorized: No JWT token provided.")
+            return redirect(url_for('login_page'))
+
+        try:
+            # ✅ Decode and validate the JWT
+            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            request.user = payload  # Store user info in request context
+        except jwt.ExpiredSignatureError:
+            logger.warning("❌ Unauthorized: JWT token expired.")
+            return redirect(url_for('login_page'))
+        except jwt.InvalidTokenError:
+            logger.warning("❌ Unauthorized: Invalid JWT token.")
+            return redirect(url_for('login_page'))
+
+        return f(*args, **kwargs)
+    
+    return decorated_function
+
+@app.route('/dashboard', methods=['GET'])
+@token_required
 def dashboard():
-    token = request.args.get("token")  # Get token from URL
-
-    if not token:
-        flash("Unauthorized access. Please log in.", "error")
-        return redirect(url_for("login"))
-
-    # ✅ Verify JWT Token
-    user_email = verify_jwt(token)
-
-    if not user_email:
-        flash("Session expired. Please log in again.", "error")
-        return redirect(url_for("login"))
-
-    # ✅ Retrieve user plan from Supabase
     try:
-        response = supabase.table("users").select("plan").eq("email", user_email).single().execute()
-        user_plan = response.get("data", {}).get("plan", "free")  # Default to "free" if no plan found
+        user_info = request.user  # Get user info from JWT
+        logger.debug(f"✅ User {user_info['email']} accessed dashboard.")
+
+        return render_template('dashboard.html', user_info=user_info)
+
     except Exception as e:
-        print(f"❌ Error fetching user plan: {e}")  # Debugging
-        user_plan = "free"  # Fallback to free plan
-
-    print(f"✅ User authenticated: {user_email}, Plan: {user_plan}")
-
-    return render_template("dashboard.html", user_email=user_email, user_plan=user_plan)
-
+        logger.exception("🔥 Error loading dashboard")
+        return render_template('500.html'), 500
     
 # ✅ Register Route (Uses Supabase Auth)
 @app.route('/register', methods=['GET', 'POST'])
@@ -277,26 +286,18 @@ def login():
     try:
         logger.debug("🔍 Received login request.")
 
-        # ✅ Ensure Content-Type is JSON
         if not request.is_json:
-            logger.warning("❌ Unsupported Media Type: Request is not JSON.")
             return jsonify({"status": "error", "message": "Unsupported Media Type: Use 'application/json'"}), 415
 
         data = request.get_json()
-        if not data:
-            logger.warning("❌ Invalid JSON payload received.")
-            return jsonify({"status": "error", "message": "Invalid JSON payload"}), 400
-
         email = data.get("email")
         password = data.get("password")
 
         if not email or not password:
-            logger.warning("❌ Missing email or password.")
             return jsonify({"status": "error", "message": "Missing email or password"}), 400
 
         logger.debug(f"🔍 Attempting login for {email}")
 
-        # ✅ Supabase authentication request
         headers = {
             "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -309,40 +310,37 @@ def login():
             headers=headers
         )
 
-        # ✅ Log full response before processing
-        logger.debug(f"🔍 Supabase Raw Response: {supabase_response.text}")
+        logger.debug(f"🔍 Supabase Response: {supabase_response.text}")
 
-        # ✅ Ensure Supabase response is JSON
         try:
             supabase_data = supabase_response.json()
         except ValueError:
-            logger.error("❌ Supabase did not return valid JSON.")
             return jsonify({"status": "error", "message": "Invalid response from authentication server"}), 500
 
-        # ✅ Handle authentication errors
         if supabase_response.status_code != 200 or "access_token" not in supabase_data:
             error_message = supabase_data.get("error_description", supabase_data.get("error", "Invalid login credentials"))
-            logger.warning(f"❌ Authentication failed: {error_message}")
             return jsonify({"status": "error", "message": error_message}), 401
 
-        # ✅ Extract user data
         user_data = supabase_data.get("user", {})
         user_metadata = user_data.get("user_metadata", {})
-        user_tier = user_metadata.get("tier", "free")  # Default to 'free' if not set
+        user_tier = user_metadata.get("tier", "free")
 
-        logger.debug(f"✅ Login successful. User Tier: {user_tier}")
+        # ✅ Generate JWT Token
+        payload = {
+            "sub": user_data.get("id"),
+            "email": user_data.get("email"),
+            "tier": user_tier,
+            "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=2)  # Expires in 2 hours
+        }
+        jwt_token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
-        # ✅ Return access_token & tier for frontend
+        logger.debug(f"✅ Login successful. JWT issued.")
+
         return jsonify({
             "status": "success",
             "redirect": "/dashboard",
-            "access_token": supabase_data["access_token"],
-            "tier": user_tier
+            "access_token": jwt_token
         })
-
-    except requests.exceptions.RequestException as req_error:
-        logger.error(f"🔥 Network error during Supabase request: {str(req_error)}")
-        return jsonify({"status": "error", "message": "Authentication service unavailable"}), 503
 
     except Exception as e:
         logger.exception("🔥 Unexpected server error during login process.")

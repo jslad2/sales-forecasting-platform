@@ -4,14 +4,14 @@ document.addEventListener("DOMContentLoaded", function () {
     const loginForm = document.querySelector("#login-form");
 
     if (!loginForm) {
-        console.log("❌ loginForm not found. JavaScript might not be running!");
+        console.warn("❌ loginForm not found. JavaScript might not be running!");
         return;
     }
 
     console.log("✅ Found login form! Adding event listener...");
 
     loginForm.addEventListener("submit", async function (e) {
-        e.preventDefault(); // ✅ This prevents GET request!
+        e.preventDefault(); // ✅ Prevents default form submission.
         console.log("✅ Form submission prevented, sending POST request...");
 
         const email = document.querySelector("#email").value.trim();
@@ -42,8 +42,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (response.ok && data.status === "success") {
                 alert("✅ Login successful! Redirecting...");
+
+                // ✅ Store JWT token securely
                 localStorage.setItem("access_token", data.access_token);
-                window.location.href = data.redirect;
+                document.cookie = `access_token=${data.access_token}; path=/; Secure; HttpOnly`;
+
+                window.location.href = data.redirect; // ✅ Redirect to dashboard
             } else {
                 alert(`❌ Login failed: ${data.message || "Invalid credentials"}`);
             }
@@ -57,4 +61,44 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         }
     });
+
+    // ✅ Auto-check authentication on protected pages
+    if (window.location.pathname === "/dashboard") {
+        checkAuth();
+    }
 });
+
+/**
+ * ✅ Function to check if the user is authenticated (JWT exists)
+ */
+async function checkAuth() {
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+        console.warn("❌ No JWT token found. Redirecting to login.");
+        alert("⚠️ Session expired. Please log in again.");
+        window.location.href = "/login";
+        return;
+    }
+
+    try {
+        console.log("🔍 Verifying JWT token...");
+        const response = await fetch("/api/verify-token", {
+            method: "GET",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+            console.warn("❌ Invalid or expired token. Redirecting to login.");
+            localStorage.removeItem("access_token");
+            window.location.href = "/login";
+        } else {
+            console.log("✅ JWT verified. Access granted.");
+        }
+    } catch (error) {
+        console.error("🔥 Error verifying token:", error);
+        alert("❌ Authentication error. Please log in again.");
+        localStorage.removeItem("access_token");
+        window.location.href = "/login";
+    }
+}
