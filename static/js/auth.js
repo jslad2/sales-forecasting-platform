@@ -1,6 +1,3 @@
-alert("✅ auth.js is running!");
-console.log("✅ auth.js is loaded and executing!");
-
 document.addEventListener("DOMContentLoaded", function () {
     console.log("✅ auth.js is loaded and running!");
 

@@ -7,6 +7,7 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify, f
 from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
 from dotenv import load_dotenv
+import logging
 
 # ✅ Load environment variables from .env
 load_dotenv()
@@ -22,6 +23,10 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 app = Flask(__name__, 
             template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")), 
             static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../static")))
+
+# ✅ Configure logging properly
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 # ✅ Ensure SECRET_KEY is set for JWT security
 SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "super_secure_fallback_key")
@@ -270,45 +275,58 @@ def login_page():
 @app.route('/api/login', methods=['POST'])
 def login():
     try:
+        logger.debug("🔍 Received login request.")
+
         # ✅ Ensure Content-Type is JSON
         if not request.is_json:
+            logger.warning("❌ Unsupported Media Type: Request is not JSON.")
             return jsonify({"status": "error", "message": "Unsupported Media Type: Use 'application/json'"}), 415
 
         data = request.get_json()
         if not data:
+            logger.warning("❌ Invalid JSON payload received.")
             return jsonify({"status": "error", "message": "Invalid JSON payload"}), 400
 
         email = data.get("email")
         password = data.get("password")
 
         if not email or not password:
+            logger.warning("❌ Missing email or password.")
             return jsonify({"status": "error", "message": "Missing email or password"}), 400
 
         logger.debug(f"🔍 Attempting login for {email}")
 
-        # ✅ Supabase authentication
+        # ✅ Supabase authentication request
         headers = {
             "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}",
             "Content-Type": "application/json"
         }
 
-        response = requests.post(
+        supabase_response = requests.post(
             f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
             json={"email": email, "password": password},
             headers=headers
         )
 
-        supabase_data = response.json()
-        logger.debug(f"🔍 Supabase Response: {supabase_data}")
+        # ✅ Log full response before processing
+        logger.debug(f"🔍 Supabase Raw Response: {supabase_response.text}")
+
+        # ✅ Ensure Supabase response is JSON
+        try:
+            supabase_data = supabase_response.json()
+        except ValueError:
+            logger.error("❌ Supabase did not return valid JSON.")
+            return jsonify({"status": "error", "message": "Invalid response from authentication server"}), 500
 
         # ✅ Handle authentication errors
-        if response.status_code != 200 or "access_token" not in supabase_data:
+        if supabase_response.status_code != 200 or "access_token" not in supabase_data:
             error_message = supabase_data.get("error_description", supabase_data.get("error", "Invalid login credentials"))
+            logger.warning(f"❌ Authentication failed: {error_message}")
             return jsonify({"status": "error", "message": error_message}), 401
 
         # ✅ Extract user data
-        user_data = supabase_data["user"]
+        user_data = supabase_data.get("user", {})
         user_metadata = user_data.get("user_metadata", {})
         user_tier = user_metadata.get("tier", "free")  # Default to 'free' if not set
 
@@ -322,8 +340,12 @@ def login():
             "tier": user_tier
         })
 
+    except requests.exceptions.RequestException as req_error:
+        logger.error(f"🔥 Network error during Supabase request: {str(req_error)}")
+        return jsonify({"status": "error", "message": "Authentication service unavailable"}), 503
+
     except Exception as e:
-        logger.error(f"🔥 Login error: {str(e)}")
+        logger.exception("🔥 Unexpected server error during login process.")
         return jsonify({"status": "error", "message": "Internal server error"}), 500
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
