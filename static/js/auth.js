@@ -88,9 +88,13 @@ async function checkAuth() {
     const token = localStorage.getItem("access_token");
 
     if (!token) {
-        console.warn("❌ No JWT token found. Redirecting to login.");
-        alert("⚠️ Session expired. Please log in again.");
-        window.location.href = "/login";
+        console.warn("❌ No JWT token found.");
+        
+        // 🔹 Only redirect to login if the user is on a protected page
+        if (window.location.pathname !== "/") {
+            alert("⚠️ Session expired. Please log in again.");
+            window.location.href = "/login";
+        }
         return;
     }
 
@@ -98,23 +102,27 @@ async function checkAuth() {
         console.log("🔍 Verifying JWT token...");
         const response = await fetch("/api/verify-token", {
             method: "GET",
-            headers: { "Authorization": `Bearer ${token}` }  // ✅ Attach JWT
+            headers: { "Authorization": `Bearer ${token}` }
         });
 
         if (!response.ok) {
-            console.warn("❌ Invalid or expired token. Redirecting to login.");
+            console.warn("❌ Invalid or expired token.");
             localStorage.removeItem("access_token");
-            updateNavbar(); // ✅ Ensure navbar updates on logout
-            window.location.href = "/login";
+
+            // 🔹 Only redirect if the user is NOT on the homepage
+            if (window.location.pathname !== "/") {
+                window.location.href = "/login";
+            }
         } else {
             console.log("✅ JWT verified. Access granted.");
         }
     } catch (error) {
         console.error("🔥 Error verifying token:", error);
-        alert("❌ Authentication error. Please log in again.");
         localStorage.removeItem("access_token");
-        updateNavbar();
-        window.location.href = "/login";
+        
+        if (window.location.pathname !== "/") {
+            window.location.href = "/login";
+        }
     }
 }
 
@@ -154,9 +162,14 @@ async function verifyToken() {
  */
 async function fetchWithAuth(url, options = {}) {
     const token = localStorage.getItem("access_token");
+
     if (!token) {
-        console.warn("❌ No JWT token found. Redirecting to login.");
-        window.location.href = "/login";
+        console.warn("❌ No JWT token found.");
+
+        // 🔹 Prevent redirect on homepage
+        if (window.location.pathname !== "/") {
+            window.location.href = "/login";
+        }
         return;
     }
 
@@ -187,6 +200,8 @@ function updateNavbar() {
         `;
     } else {
         console.log("❌ No user token found.");
+        
+        // 🔹 Ensure login button appears correctly
         authButtons.innerHTML = `<a href="/login" class="login-btn">Login</a>`;
     }
 }
