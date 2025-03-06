@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (!loginForm) {
         console.warn("❌ loginForm not found. JavaScript might not be running!");
+        checkAuth();  // ✅ Auto-check authentication if user is already logged in
         return;
     }
 
@@ -39,15 +40,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const data = await response.json();
             console.log("✅ Login Response:", data);
+
             if (response.ok && data.status === "success") {
                 alert("✅ Login successful! Redirecting...");
-            
+                
                 // ✅ Store JWT token in localStorage
                 localStorage.setItem("access_token", data.access_token);
-            
+                
                 // ✅ Attach JWT to cookies (Optional)
                 document.cookie = `access_token=${data.access_token}; path=/; Secure`;
-            
+
                 // ✅ Verify token BEFORE redirecting
                 const tokenValid = await verifyToken();
                 if (tokenValid) {
@@ -75,6 +77,8 @@ document.addEventListener("DOMContentLoaded", function () {
     if (window.location.pathname === "/dashboard") {
         checkAuth();
     }
+
+    updateNavbar(); // ✅ Ensure navbar updates on page load
 });
 
 /**
@@ -160,4 +164,35 @@ async function fetchWithAuth(url, options = {}) {
     };
 
     return fetch(url, options);
+}
+
+/**
+ * ✅ Updates the navbar dynamically based on authentication state
+ */
+function updateNavbar() {
+    console.log("🔍 Checking authentication for navbar...");
+    
+    const authButtons = document.getElementById("auth-buttons");
+    const token = localStorage.getItem("access_token");
+
+    if (token) {
+        console.log("✅ User is logged in.");
+        authButtons.innerHTML = `
+            <a href="/dashboard" class="dashboard-btn">Dashboard</a>
+            <a href="#" class="logout-btn" onclick="logout()">Logout</a>
+        `;
+    } else {
+        console.log("❌ No user token found.");
+        authButtons.innerHTML = `<a href="/login" class="login-btn">Login</a>`;
+    }
+}
+
+/**
+ * ✅ Logout function to clear JWT and redirect to login
+ */
+function logout() {
+    console.log("🚪 Logging out...");
+    localStorage.removeItem("access_token");
+    document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC"; // ✅ Remove cookie
+    window.location.href = "/";  // ✅ Redirect to homepage
 }
