@@ -27,7 +27,7 @@
             {% endwith %}
 
             <!-- ✅ No action so JavaScript handles it -->
-            <form id="login-form" novalidate>  
+            <form id="login-form" method="POST" action="/api/login" novalidate>  
                 <input type="hidden" name="prevent-autofill" value="true">  <!-- Prevents unwanted submissions -->
 
                 <div class="mb-3">
