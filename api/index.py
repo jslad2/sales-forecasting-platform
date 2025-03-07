@@ -8,6 +8,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import logging
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 # ✅ Load environment variables from .env
 load_dotenv()
@@ -18,6 +20,8 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+SENDGRID_SENDER = os.getenv("SENDGRID_SENDER")
 
 # ✅ Initialize Flask App
 app = Flask(__name__, 
@@ -82,9 +86,45 @@ def success():
     return render_template('success.html')
 
 # ✅ Contact Page
-@app.route('/contact')
+@app.route("/contact", methods=["GET", "POST"])
 def contact():
-    return render_template('contact.html')
+    if request.method == "POST":
+        name = request.form.get("name")
+        email = request.form.get("email")
+        message_body = request.form.get("message")
+
+        if not name or not email or not message_body:
+            flash("⚠ Please fill in all fields.", "error")
+            return redirect(url_for("contact"))
+
+        # ✅ Construct Email
+        message = Mail(
+            from_email=SENDGRID_SENDER,  # Now using verified @synovaai.com email
+            to_emails="contact@synovaai.io",  # Replace with your receiving email
+            subject="New Contact Form Submission - SynovaAI",
+            html_content=f"""
+            <p><strong>Name:</strong> {name}</p>
+            <p><strong>Email:</strong> {email}</p>
+            <p><strong>Message:</strong> {message_body}</p>
+            """
+        )
+
+        try:
+            sg = SendGridAPIClient(SENDGRID_API_KEY)
+            response = sg.send(message)
+
+            if response.status_code in [200, 202]:
+                flash("✅ Your message has been sent successfully!", "success")
+            else:
+                flash("❌ Failed to send message. Please try again later.", "error")
+
+        except Exception as e:
+            print("SendGrid Error:", e)
+            flash("❌ Error sending email. Please try again later.", "error")
+
+        return redirect(url_for("contact"))
+
+    return render_template("contact.html")
 
 # ✅ Data Services Page
 @app.route('/data-services')

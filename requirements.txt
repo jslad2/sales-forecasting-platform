@@ -6,3 +6,4 @@ requests
 python-dotenv  # ✅ Required for .env variables
 requests
 pyjwt
+sendgrid
