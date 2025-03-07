@@ -85,20 +85,6 @@ def pricing():
 def success():
     return render_template('success.html')
 
-# ✅ Contact Page
-from flask import Flask, render_template, request, flash, redirect, url_for
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email
-import os
-
-app = Flask(__name__)
-app.secret_key = "your_secret_key"  # Ensure you set a secret key for sessions
-
-# ✅ Load environment variables
-SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-SENDGRID_SENDER = os.getenv("SENDGRID_SENDER")  # Verified sender (e.g., contact@synovaai.com)
-
-
 @app.route("/contact", methods=["GET", "POST"])
 def contact():
     if request.method == "POST":
