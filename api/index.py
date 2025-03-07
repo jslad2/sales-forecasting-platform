@@ -9,7 +9,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 import logging
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email  
+from sendgrid.helpers.mail import Mail, Email, To, ReplyTo  
 
 # ✅ Load environment variables from .env
 load_dotenv()
@@ -22,11 +22,6 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 SENDGRID_SENDER = os.getenv("SENDGRID_SENDER")
-
-# ✅ Debugging: Print API Key (First 5 chars for security)
-sendgrid_key = os.getenv("SENDGRID_API_KEY")
-print(f"🔍 DEBUG: SENDGRID_API_KEY (First 5 chars): {sendgrid_key[:5] if sendgrid_key else 'None'}")
-
 
 # ✅ Initialize Flask App
 app = Flask(__name__, 
@@ -101,6 +96,9 @@ def contact():
         if not name or not email or not message_body:
             flash("⚠ Please fill in all fields.", "error")
             return redirect(url_for("contact"))
+        
+        print(f"🔍 DEBUG: SENDGRID_API_KEY (First 5 chars): {SENDGRID_API_KEY[:5] if SENDGRID_API_KEY else 'None'}")
+        print(f"🔍 DEBUG: SENDGRID_SENDER: {SENDGRID_SENDER}")
 
         # ✅ Construct Email with Reply-To Header
         message = Mail(
@@ -115,7 +113,7 @@ def contact():
         )
 
         # ✅ Set "Reply-To" to the sender's email so you can reply directly
-        message.reply_to = Email(email)
+        message.reply_to = ReplyTo(email)
 
         try:
             sg = SendGridAPIClient(SENDGRID_API_KEY)
