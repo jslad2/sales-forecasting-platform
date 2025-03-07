@@ -9,7 +9,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 import logging
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+from sendgrid.helpers.mail import Mail, Email  
 
 # ✅ Load environment variables from .env
 load_dotenv()
