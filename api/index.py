@@ -23,6 +23,11 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 SENDGRID_SENDER = os.getenv("SENDGRID_SENDER")
 
+# ✅ Debugging: Print API Key (First 5 chars for security)
+sendgrid_key = os.getenv("SENDGRID_API_KEY")
+print(f"🔍 DEBUG: SENDGRID_API_KEY (First 5 chars): {sendgrid_key[:5] if sendgrid_key else 'None'}")
+
+
 # ✅ Initialize Flask App
 app = Flask(__name__, 
             template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")), 
