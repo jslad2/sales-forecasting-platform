@@ -86,40 +86,62 @@ def success():
     return render_template('success.html')
 
 # ✅ Contact Page
+from flask import Flask, render_template, request, flash, redirect, url_for
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Email
+import os
+
+app = Flask(__name__)
+app.secret_key = "your_secret_key"  # Ensure you set a secret key for sessions
+
+# ✅ Load environment variables
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+SENDGRID_SENDER = os.getenv("SENDGRID_SENDER")  # Verified sender (e.g., contact@synovaai.com)
+
+
 @app.route("/contact", methods=["GET", "POST"])
 def contact():
     if request.method == "POST":
-        name = request.form.get("name")
-        email = request.form.get("email")
-        message_body = request.form.get("message")
+        name = request.form.get("name").strip()
+        email = request.form.get("email").strip()
+        message_body = request.form.get("message").strip()
 
+        # ✅ Validate Required Fields
         if not name or not email or not message_body:
             flash("⚠ Please fill in all fields.", "error")
             return redirect(url_for("contact"))
 
-        # ✅ Construct Email
+        # ✅ Construct Email with Reply-To Header
         message = Mail(
-            from_email=SENDGRID_SENDER,  # Now using verified @synovaai.com email
-            to_emails="contact@synovaai.io",  # Replace with your receiving email
+            from_email=SENDGRID_SENDER,  # Must be a verified sender email
+            to_emails="jslad13@gmail.com",  # Replace with your actual receiving email
             subject="New Contact Form Submission - SynovaAI",
             html_content=f"""
-            <p><strong>Name:</strong> {name}</p>
-            <p><strong>Email:</strong> {email}</p>
-            <p><strong>Message:</strong> {message_body}</p>
+                <p><strong>Name:</strong> {name}</p>
+                <p><strong>Email:</strong> {email}</p>
+                <p><strong>Message:</strong> {message_body}</p>
             """
         )
+
+        # ✅ Set "Reply-To" to the sender's email so you can reply directly
+        message.reply_to = Email(email)
 
         try:
             sg = SendGridAPIClient(SENDGRID_API_KEY)
             response = sg.send(message)
 
+            # ✅ Log SendGrid Response
+            print(f"SendGrid Response Code: {response.status_code}")
+            print(f"Response Body: {response.body}")
+
+            # ✅ Handle API Responses
             if response.status_code in [200, 202]:
                 flash("✅ Your message has been sent successfully!", "success")
             else:
-                flash("❌ Failed to send message. Please try again later.", "error")
+                flash(f"❌ Failed to send message. Error {response.status_code}.", "error")
 
         except Exception as e:
-            print("SendGrid Error:", e)
+            print(f"❌ SendGrid Error: {e}")
             flash("❌ Error sending email. Please try again later.", "error")
 
         return redirect(url_for("contact"))
