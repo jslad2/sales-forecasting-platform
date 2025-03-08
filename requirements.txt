@@ -7,3 +7,6 @@ python-dotenv  # ✅ Required for .env variables
 requests
 pyjwt
 sendgrid
+google-auth
+google-auth-oauthlib
+google-auth-httplib2

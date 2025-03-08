@@ -9,7 +9,9 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 import logging
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, ReplyTo  
+from sendgrid.helpers.mail import Mail, Email, To, ReplyTo
+from google.oauth2 import service_account
+
 # ✅ Load environment variables from .env
 load_dotenv()
 
@@ -27,6 +29,24 @@ RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY")
 
 RECAPTCHA_PROJECT_ID = "1741395134509"
 
+# Load Service Account Credentials (OAuth2 Token)
+SERVICE_ACCOUNT_FILE = "api/recaptcha-service-account.json"
+credentials = service_account.Credentials.from_service_account_file(
+    SERVICE_ACCOUNT_FILE,
+    scopes=["https://www.googleapis.com/auth/cloud-platform"]
+)
+
+def get_oauth_token():
+    """
+    Retrieves an OAuth2 access token using the service account.
+    """
+    try:
+        auth_request = requests.Request()
+        credentials.refresh(auth_request)
+        return credentials.token
+    except Exception as e:
+        print(f"❌ ERROR: Failed to get OAuth2 token: {e}")
+        return None
 
 # ✅ Initialize Flask App
 app = Flask(__name__, 
@@ -97,63 +117,55 @@ def contact():
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip()
         message_body = request.form.get("message", "").strip()
-        recaptcha_token = request.form.get("g-recaptcha-response", "").strip()
+        recaptcha_response = request.form.get("g-recaptcha-response", "").strip()
 
-        # ✅ Debugging Logs
-        print(f"🔍 DEBUG: Received reCAPTCHA Token: {recaptcha_token}")
+        print(f"🔍 DEBUG: Received reCAPTCHA Token: {recaptcha_response}")
 
         # ✅ Validate Required Fields
         if not name or not email or not message_body:
             flash("⚠ Please fill in all fields.", "error")
             return redirect(request.referrer or url_for("contact"))
 
-        if not recaptcha_token:
+        if not recaptcha_response:
             print("❌ ERROR: Missing reCAPTCHA response from the form")
             flash("⚠ reCAPTCHA not completed. Please verify you are not a robot.", "error")
             return redirect(request.referrer or url_for("contact"))
 
-        # ✅ Get OAuth2 Access Token
-        try:
-            auth_response = requests.get(
-                "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
-                headers={"Metadata-Flavor": "Google"},
-                timeout=5
-            ).json()
-            access_token = auth_response.get("access_token")
-            if not access_token:
-                raise Exception("Failed to retrieve access token.")
-        except Exception as e:
-            print(f"❌ ERROR: Failed to get OAuth2 token: {e}")
-            flash("❌ Authentication error. Please try again.", "error")
+        # ✅ Get OAuth2 Token
+        OAUTH_ACCESS_TOKEN = get_oauth_token()
+        if not OAUTH_ACCESS_TOKEN:
+            flash("❌ Authentication error. Please try again later.", "error")
             return redirect(request.referrer or url_for("contact"))
 
-        # ✅ Verify reCAPTCHA with Google Enterprise API
-        recaptcha_url = f"https://recaptchaenterprise.googleapis.com/v1/projects/{RECAPTCHA_PROJECT_ID}/assessments"
+        # ✅ Verify reCAPTCHA via Google API
+        recaptcha_url = f"https://recaptchaenterprise.googleapis.com/v1/projects/{PROJECT_ID}/assessments"
         recaptcha_payload = {
             "event": {
-                "token": recaptcha_token,
+                "token": recaptcha_response,
                 "expectedAction": "submit_form",
                 "siteKey": RECAPTCHA_SITE_KEY
             }
         }
+        recaptcha_headers = {
+            "Authorization": f"Bearer {OAUTH_ACCESS_TOKEN}",
+            "Content-Type": "application/json"
+        }
 
         try:
-            headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
-            recaptcha_result = requests.post(recaptcha_url, json=recaptcha_payload, headers=headers, timeout=5).json()
+            recaptcha_result = requests.post(recaptcha_url, json=recaptcha_payload, headers=recaptcha_headers, timeout=5).json()
             print(f"🔍 DEBUG: reCAPTCHA API Response: {recaptcha_result}")
 
-            # ✅ Validate reCAPTCHA Response
-            token_props = recaptcha_result.get("tokenProperties", {})
-            if not token_props.get("valid"):
-                print(f"❌ DEBUG: reCAPTCHA Failed - Invalid Token")
+            # ✅ Check if reCAPTCHA validation was successful
+            if not recaptcha_result.get("tokenProperties", {}).get("valid", False):
+                print("❌ ERROR: reCAPTCHA validation failed.")
                 flash("❌ reCAPTCHA verification failed. Please try again.", "error")
                 return redirect(request.referrer or url_for("contact"))
 
-            # ✅ Check reCAPTCHA Risk Score
+            # ✅ Check risk score (ensure it's above threshold, e.g., 0.5)
             risk_score = recaptcha_result.get("riskAnalysis", {}).get("score", 0)
             if risk_score < 0.5:
-                print(f"⚠ WARNING: Low reCAPTCHA Score ({risk_score}) - Possible Bot")
-                flash("⚠ Suspicious activity detected. Please try again later.", "error")
+                print(f"⚠ WARNING: reCAPTCHA returned low score: {risk_score}")
+                flash("⚠ reCAPTCHA flagged this as suspicious activity. Please try again.", "error")
                 return redirect(request.referrer or url_for("contact"))
 
         except requests.exceptions.RequestException as e:
@@ -163,7 +175,7 @@ def contact():
 
         # ✅ Construct and send email via SendGrid
         message = Mail(
-            from_email=SENDGRID_SENDER,
+            from_email="no-reply@synovaai.io",
             to_emails="jslad13@gmail.com",
             subject="New Contact Form Submission - SynovaAI",
             html_content=f"""
@@ -178,7 +190,6 @@ def contact():
             sg = SendGridAPIClient(SENDGRID_API_KEY)
             response = sg.send(message)
 
-            # ✅ Debugging SendGrid Response
             print(f"📨 DEBUG: SendGrid Response Code: {response.status_code}")
             response_body = response.body.decode('utf-8') if response.body else "No Content"
             print(f"📨 DEBUG: SendGrid Response Body: {response_body}")
