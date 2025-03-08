@@ -32,8 +32,9 @@ app = Flask(__name__,
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-# ✅ Ensure SECRET_KEY is set for JWT security
+# ✅ Use a Secure Flask Secret Key
 SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "super_secure_fallback_key")
+app.config["SECRET_KEY"] = SECRET_KEY  # ✅ Set the secret key
 
 # ✅ Function to Generate JWT Token
 def generate_jwt(user_email):
