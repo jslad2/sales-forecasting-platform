@@ -97,20 +97,24 @@
             <form method="POST" action="{{ url_for('contact') }}" onsubmit="return validateForm()">
                 <label for="name">Name:</label>
                 <input type="text" id="name" name="name" required aria-describedby="name-help">
-
+            
                 <label for="email">Email:</label>
                 <input type="email" id="email" name="email" required aria-describedby="email-help">
-
+            
                 <label for="message">Message:</label>
                 <textarea id="message" name="message" required aria-describedby="message-help"></textarea>
-
-                <!-- ✅ Centered reCAPTCHA Widget -->
+            
+                <!-- ✅ reCAPTCHA v2 Checkbox -->
                 <div class="recaptcha-container">
                     <div class="g-recaptcha" data-sitekey="6LfWMu0qAAAAAKgHKuX38Qjtp5k4EgF6FjpkaIRd"></div>
                 </div>
-
+            
+                <!-- ✅ Hidden input to store reCAPTCHA token -->
+                <input type="hidden" id="g-recaptcha-response" name="g-recaptcha-response">
+            
                 <button type="submit">Send Message</button>
             </form>
+            
         </section>
 
     </div>
@@ -152,11 +156,11 @@
         /**
          * ✅ Form Validation for Contact Page (Including reCAPTCHA)
          */
-        function validateForm() {
+         function validateForm() {
             const name = document.getElementById("name").value.trim();
             const email = document.getElementById("email").value.trim();
             const message = document.getElementById("message").value.trim();
-            const recaptchaResponse = document.querySelector(".g-recaptcha-response").value;
+            const recaptchaResponse = document.getElementById("g-recaptcha-response").value;  // ✅ Ensure correct selector
 
             console.log("🔍 DEBUG: Captcha Token Before Submission:", recaptchaResponse);
 
@@ -180,6 +184,7 @@
 
             return true;
         }
+
 
         /**
          * ✅ Function to Update Navbar (Handles Login/Logout)

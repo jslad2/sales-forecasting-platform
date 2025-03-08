@@ -107,10 +107,11 @@ def contact():
             return redirect(request.referrer or url_for("contact"))
 
         if not recaptcha_response:
+            print("❌ ERROR: Missing reCAPTCHA response from the form")
             flash("⚠ reCAPTCHA not completed. Please verify you are not a robot.", "error")
             return redirect(request.referrer or url_for("contact"))
 
-        # ✅ Verify reCAPTCHA with Standard reCAPTCHA API
+        # ✅ Verify reCAPTCHA with Google API
         recaptcha_url = "https://www.google.com/recaptcha/api/siteverify"
         recaptcha_payload = {
             "secret": RECAPTCHA_SECRET_KEY,
@@ -118,21 +119,19 @@ def contact():
         }
 
         try:
-            recaptcha_result = requests.post(recaptcha_url, data=recaptcha_payload).json()
+            recaptcha_result = requests.post(recaptcha_url, data=recaptcha_payload, timeout=5).json()
             print(f"🔍 DEBUG: reCAPTCHA API Response: {recaptcha_result}")
 
             # ✅ Check if reCAPTCHA validation was successful
             if not recaptcha_result.get("success"):
-                flash("❌ reCAPTCHA verification failed. Please try again.", "error")
+                error_codes = recaptcha_result.get("error-codes", [])
+                print(f"❌ DEBUG: reCAPTCHA Failed. Errors: {error_codes}")
+
+                flash(f"❌ reCAPTCHA verification failed: {', '.join(error_codes)}", "error")
                 return redirect(request.referrer or url_for("contact"))
 
-            # ✅ (Optional) Check reCAPTCHA Score for v3
-            if "score" in recaptcha_result and recaptcha_result["score"] < 0.5:
-                flash("⚠ reCAPTCHA score too low, suspected bot activity.", "error")
-                return redirect(request.referrer or url_for("contact"))
-
-        except Exception as e:
-            print(f"❌ ERROR: reCAPTCHA Request Failed: {e}")
+        except requests.exceptions.RequestException as e:
+            print(f"❌ ERROR: reCAPTCHA API Request Failed: {e}")
             flash("❌ reCAPTCHA validation error. Please try again.", "error")
             return redirect(request.referrer or url_for("contact"))
 
@@ -147,7 +146,6 @@ def contact():
                 <p><strong>Message:</strong> {message_body}</p>
             """
         )
-
         message.reply_to = ReplyTo(email)
 
         try:
@@ -170,7 +168,7 @@ def contact():
 
         return redirect(request.referrer or url_for("contact"))
 
-    return render_template("contact.html", recaptcha_site_key=RECAPTCHA_SITE_KEY)
+    return render_template("contact.html", recaptcha_site_key=RECAPTCHA_SECRET_KEY)
 
 # ✅ Data Services Page
 @app.route('/data-services')
