@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 import logging
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, ReplyTo  
-
 # ✅ Load environment variables from .env
 load_dotenv()
 
