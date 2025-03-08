@@ -92,18 +92,30 @@ def contact():
         name = request.form.get("name").strip()
         email = request.form.get("email").strip()
         message_body = request.form.get("message").strip()
+        recaptcha_response = request.form.get("g-recaptcha-response")  # ✅ Get reCAPTCHA token
 
         # ✅ Validate Required Fields
         if not name or not email or not message_body:
             flash("⚠ Please fill in all fields.", "error")
             return redirect(url_for("contact"))
-        
-        print(f"🔍 DEBUG: SENDGRID_API_KEY (First 5 chars): {SENDGRID_API_KEY[:5] if SENDGRID_API_KEY else 'None'}")
-        print(f"🔍 DEBUG: SENDGRID_SENDER: {SENDGRID_SENDER}")
+
+        # ✅ Verify reCAPTCHA
+        recaptcha_secret = os.getenv("RECAPTCHA_SECRET_KEY")
+        recaptcha_url = "https://www.google.com/recaptcha/api/siteverify"
+        recaptcha_data = {"secret": recaptcha_secret, "response": recaptcha_response}
+        recaptcha_result = requests.post(recaptcha_url, data=recaptcha_data).json()
+
+        if not recaptcha_result.get("success"):
+            flash("❌ reCAPTCHA verification failed. Please try again.", "error")
+            return redirect(url_for("contact"))
+
+        # ✅ Debugging Prints
+        print(f"🔍 DEBUG: SENDGRID_API_KEY (First 5 chars): {os.getenv('SENDGRID_API_KEY')[:5] if os.getenv('SENDGRID_API_KEY') else 'None'}")
+        print(f"🔍 DEBUG: SENDGRID_SENDER: {os.getenv('SENDGRID_SENDER')}")
 
         # ✅ Construct Email with Reply-To Header
         message = Mail(
-            from_email=SENDGRID_SENDER,  # Must be a verified sender email
+            from_email=os.getenv("SENDGRID_SENDER"),  # Must be a verified sender email
             to_emails="jslad13@gmail.com",  # Replace with your actual receiving email
             subject="New Contact Form Submission - SynovaAI",
             html_content=f"""
@@ -117,7 +129,7 @@ def contact():
         message.reply_to = ReplyTo(email)
 
         try:
-            sg = SendGridAPIClient(SENDGRID_API_KEY)
+            sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
             response = sg.send(message)
 
             # ✅ Log SendGrid Response
