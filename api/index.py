@@ -27,7 +27,7 @@ SENDGRID_SENDER = os.getenv("SENDGRID_SENDER")
 RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY")
 RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY")
 
-RECAPTCHA_PROJECT_ID = "1741395134509"
+PROJECT_ID = "1741395134509"
 
 # Load Service Account Credentials (OAuth2 Token)
 SERVICE_ACCOUNT_FILE = "api/recaptcha-service-account.json"
