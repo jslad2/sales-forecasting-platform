@@ -110,30 +110,24 @@ def contact():
             flash("⚠ reCAPTCHA not completed. Please verify you are not a robot.", "error")
             return redirect(request.referrer or url_for("contact"))
 
-        # ✅ Verify reCAPTCHA with Google reCAPTCHA Enterprise API
-        recaptcha_url = f"https://recaptchaenterprise.googleapis.com/v1/projects/{GOOGLE_PROJECT_ID}/assessments?key={RECAPTCHA_SECRET_KEY}"
-
+        # ✅ Verify reCAPTCHA with Standard reCAPTCHA API
+        recaptcha_url = "https://www.google.com/recaptcha/api/siteverify"
         recaptcha_payload = {
-            "event": {
-                "token": recaptcha_response,
-                "siteKey": RECAPTCHA_SITE_KEY,
-                "expectedAction": "submit_form"  # ✅ Ensure this action is set in reCAPTCHA settings
-            }
+            "secret": RECAPTCHA_SECRET_KEY,
+            "response": recaptcha_response
         }
 
         try:
-            recaptcha_result = requests.post(recaptcha_url, json=recaptcha_payload).json()
+            recaptcha_result = requests.post(recaptcha_url, data=recaptcha_payload).json()
             print(f"🔍 DEBUG: reCAPTCHA API Response: {recaptcha_result}")
 
             # ✅ Check if reCAPTCHA validation was successful
-            token_properties = recaptcha_result.get("tokenProperties", {})
-            if not token_properties.get("valid", False):
+            if not recaptcha_result.get("success"):
                 flash("❌ reCAPTCHA verification failed. Please try again.", "error")
                 return redirect(request.referrer or url_for("contact"))
 
             # ✅ (Optional) Check reCAPTCHA Score for v3
-            risk_analysis = recaptcha_result.get("riskAnalysis", {})
-            if "score" in risk_analysis and risk_analysis["score"] < 0.5:
+            if "score" in recaptcha_result and recaptcha_result["score"] < 0.5:
                 flash("⚠ reCAPTCHA score too low, suspected bot activity.", "error")
                 return redirect(request.referrer or url_for("contact"))
 
