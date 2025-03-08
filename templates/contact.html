@@ -14,6 +14,9 @@
     
     <!-- Stylesheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <!-- ✅ Google reCAPTCHA Script -->
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 </head>
 <body class="contact-page">
 
@@ -66,6 +69,9 @@
 
                 <label for="message">Message:</label>
                 <textarea id="message" name="message" required aria-describedby="message-help"></textarea>
+
+                <!-- ✅ Google reCAPTCHA Widget -->
+                <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
 
                 <button type="submit">Send Message</button>
             </form>
@@ -120,12 +126,13 @@
         }
 
         /**
-         * ✅ Form Validation for Contact Page
+         * ✅ Form Validation for Contact Page (Including reCAPTCHA)
          */
         function validateForm() {
             const name = document.getElementById("name").value.trim();
             const email = document.getElementById("email").value.trim();
             const message = document.getElementById("message").value.trim();
+            const recaptchaResponse = document.querySelector(".g-recaptcha-response").value;
 
             if (!name || !email || !message) {
                 alert("⚠ Please fill in all fields.");
@@ -136,6 +143,12 @@
             const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
             if (!emailPattern.test(email)) {
                 alert("⚠ Please enter a valid email address.");
+                return false;
+            }
+
+            // ✅ Validate reCAPTCHA
+            if (!recaptchaResponse) {
+                alert("⚠ Please complete the reCAPTCHA challenge.");
                 return false;
             }
 

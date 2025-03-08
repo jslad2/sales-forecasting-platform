@@ -88,6 +88,8 @@ def success():
 
 @app.route("/contact", methods=["GET", "POST"])
 def contact():
+    recaptcha_site_key = os.getenv("RECAPTCHA_SITE_KEY")  # ✅ Pass to HTML
+
     if request.method == "POST":
         name = request.form.get("name").strip()
         email = request.form.get("email").strip()
@@ -109,10 +111,6 @@ def contact():
             flash("❌ reCAPTCHA verification failed. Please try again.", "error")
             return redirect(url_for("contact"))
 
-        # ✅ Debugging Prints
-        print(f"🔍 DEBUG: SENDGRID_API_KEY (First 5 chars): {os.getenv('SENDGRID_API_KEY')[:5] if os.getenv('SENDGRID_API_KEY') else 'None'}")
-        print(f"🔍 DEBUG: SENDGRID_SENDER: {os.getenv('SENDGRID_SENDER')}")
-
         # ✅ Construct Email with Reply-To Header
         message = Mail(
             from_email=os.getenv("SENDGRID_SENDER"),  # Must be a verified sender email
@@ -132,10 +130,6 @@ def contact():
             sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
             response = sg.send(message)
 
-            # ✅ Log SendGrid Response
-            print(f"SendGrid Response Code: {response.status_code}")
-            print(f"Response Body: {response.body}")
-
             # ✅ Handle API Responses
             if response.status_code in [200, 202]:
                 flash("✅ Your message has been sent successfully!", "success")
@@ -148,7 +142,7 @@ def contact():
 
         return redirect(url_for("contact"))
 
-    return render_template("contact.html")
+    return render_template("contact.html", recaptcha_site_key=recaptcha_site_key)
 
 # ✅ Data Services Page
 @app.route('/data-services')
