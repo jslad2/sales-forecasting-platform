@@ -25,7 +25,8 @@ SENDGRID_SENDER = os.getenv("SENDGRID_SENDER")
 RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY")
 RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY")
 
-GOOGLE_PROJECT_ID="synovaai-1741395134509"
+RECAPTCHA_PROJECT_ID = "1741395134509"
+
 
 # ✅ Initialize Flask App
 app = Flask(__name__, 
@@ -96,38 +97,63 @@ def contact():
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip()
         message_body = request.form.get("message", "").strip()
-        recaptcha_response = request.form.get("g-recaptcha-response", "").strip()
+        recaptcha_token = request.form.get("g-recaptcha-response", "").strip()
 
         # ✅ Debugging Logs
-        print(f"🔍 DEBUG: Received reCAPTCHA Token: {recaptcha_response}")
+        print(f"🔍 DEBUG: Received reCAPTCHA Token: {recaptcha_token}")
 
         # ✅ Validate Required Fields
         if not name or not email or not message_body:
             flash("⚠ Please fill in all fields.", "error")
             return redirect(request.referrer or url_for("contact"))
 
-        if not recaptcha_response:
+        if not recaptcha_token:
             print("❌ ERROR: Missing reCAPTCHA response from the form")
             flash("⚠ reCAPTCHA not completed. Please verify you are not a robot.", "error")
             return redirect(request.referrer or url_for("contact"))
 
-        # ✅ Verify reCAPTCHA with Google API
-        recaptcha_url = "https://www.google.com/recaptcha/api/siteverify"
+        # ✅ Get OAuth2 Access Token
+        try:
+            auth_response = requests.get(
+                "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
+                headers={"Metadata-Flavor": "Google"},
+                timeout=5
+            ).json()
+            access_token = auth_response.get("access_token")
+            if not access_token:
+                raise Exception("Failed to retrieve access token.")
+        except Exception as e:
+            print(f"❌ ERROR: Failed to get OAuth2 token: {e}")
+            flash("❌ Authentication error. Please try again.", "error")
+            return redirect(request.referrer or url_for("contact"))
+
+        # ✅ Verify reCAPTCHA with Google Enterprise API
+        recaptcha_url = f"https://recaptchaenterprise.googleapis.com/v1/projects/{RECAPTCHA_PROJECT_ID}/assessments"
         recaptcha_payload = {
-            "secret": RECAPTCHA_SECRET_KEY,
-            "response": recaptcha_response
+            "event": {
+                "token": recaptcha_token,
+                "expectedAction": "submit_form",
+                "siteKey": RECAPTCHA_SITE_KEY
+            }
         }
 
         try:
-            recaptcha_result = requests.post(recaptcha_url, data=recaptcha_payload, timeout=5).json()
+            headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
+            recaptcha_result = requests.post(recaptcha_url, json=recaptcha_payload, headers=headers, timeout=5).json()
             print(f"🔍 DEBUG: reCAPTCHA API Response: {recaptcha_result}")
 
-            # ✅ Check if reCAPTCHA validation was successful
-            if not recaptcha_result.get("success"):
-                error_codes = recaptcha_result.get("error-codes", [])
-                print(f"❌ DEBUG: reCAPTCHA Failed. Errors: {error_codes}")
+            # ✅ Validate reCAPTCHA Response
+            token_props = recaptcha_result.get("tokenProperties", {})
+            if not token_props.get("valid"):
+                print(f"❌ DEBUG: reCAPTCHA Failed - Invalid Token")
+                flash("❌ reCAPTCHA verification failed. Please try again.", "error")
+                return redirect(request.referrer or url_for("contact"))
 
-                flash(f"❌ reCAPTCHA verification failed: {', '.join(error_codes)}", "error")
+            # ✅ Check reCAPTCHA Risk Score
+            risk_score = recaptcha_result.get("riskAnalysis", {}).get("score", 0)
+            if risk_score < 0.5:
+                print(f"⚠ WARNING: Low reCAPTCHA Score ({risk_score}) - Possible Bot")
+                flash("⚠ Suspicious activity detected. Please try again later.", "error")
                 return redirect(request.referrer or url_for("contact"))
 
         except requests.exceptions.RequestException as e:
@@ -168,7 +194,7 @@ def contact():
 
         return redirect(request.referrer or url_for("contact"))
 
-    return render_template("contact.html", recaptcha_site_key=RECAPTCHA_SECRET_KEY)
+    return render_template("contact.html", recaptcha_site_key=RECAPTCHA_SITE_KEY)
 
 # ✅ Data Services Page
 @app.route('/data-services')
