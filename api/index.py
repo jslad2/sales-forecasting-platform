@@ -25,6 +25,8 @@ SENDGRID_SENDER = os.getenv("SENDGRID_SENDER")
 RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY")
 RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY")
 
+GOOGLE_PROJECT_ID="synovaai-1741395134509"
+
 # ✅ Initialize Flask App
 app = Flask(__name__, 
             template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")), 
@@ -90,8 +92,6 @@ def success():
 
 @app.route("/contact", methods=["GET", "POST"])
 def contact():
-    recaptcha_site_key = os.getenv("RECAPTCHA_SITE_KEY")
-
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip()
@@ -101,7 +101,7 @@ def contact():
         # ✅ Debugging Logs
         print(f"🔍 DEBUG: Received reCAPTCHA Token: {recaptcha_response}")
 
-        # ✅ Check required fields
+        # ✅ Validate Required Fields
         if not name or not email or not message_body:
             flash("⚠ Please fill in all fields.", "error")
             return redirect(request.referrer or url_for("contact"))
@@ -110,27 +110,39 @@ def contact():
             flash("⚠ reCAPTCHA not completed. Please verify you are not a robot.", "error")
             return redirect(request.referrer or url_for("contact"))
 
-        # ✅ Verify reCAPTCHA Token
-        recaptcha_url = "https://www.google.com/recaptcha/api/siteverify"
+        # ✅ Verify reCAPTCHA with Google reCAPTCHA Enterprise API
+        recaptcha_url = f"https://recaptchaenterprise.googleapis.com/v1/projects/{GOOGLE_PROJECT_ID}/assessments?key={RECAPTCHA_SECRET_KEY}"
+
         recaptcha_payload = {
-            "secret": RECAPTCHA_SECRET_KEY,
-            "response": recaptcha_response
+            "event": {
+                "token": recaptcha_response,
+                "siteKey": RECAPTCHA_SITE_KEY,
+                "expectedAction": "submit_form"  # ✅ Ensure this action is set in reCAPTCHA settings
+            }
         }
 
-        recaptcha_result = requests.post(recaptcha_url, data=recaptcha_payload).json()
-        print(f"🔍 DEBUG: reCAPTCHA API Response: {recaptcha_result}")
+        try:
+            recaptcha_result = requests.post(recaptcha_url, json=recaptcha_payload).json()
+            print(f"🔍 DEBUG: reCAPTCHA API Response: {recaptcha_result}")
 
-        # ✅ Handle reCAPTCHA Verification Failure
-        if not recaptcha_result.get("success"):
-            flash("❌ reCAPTCHA verification failed. Please try again.", "error")
+            # ✅ Check if reCAPTCHA validation was successful
+            token_properties = recaptcha_result.get("tokenProperties", {})
+            if not token_properties.get("valid", False):
+                flash("❌ reCAPTCHA verification failed. Please try again.", "error")
+                return redirect(request.referrer or url_for("contact"))
+
+            # ✅ (Optional) Check reCAPTCHA Score for v3
+            risk_analysis = recaptcha_result.get("riskAnalysis", {})
+            if "score" in risk_analysis and risk_analysis["score"] < 0.5:
+                flash("⚠ reCAPTCHA score too low, suspected bot activity.", "error")
+                return redirect(request.referrer or url_for("contact"))
+
+        except Exception as e:
+            print(f"❌ ERROR: reCAPTCHA Request Failed: {e}")
+            flash("❌ reCAPTCHA validation error. Please try again.", "error")
             return redirect(request.referrer or url_for("contact"))
 
-        # ✅ (Optional) Check reCAPTCHA v3 Score
-        if "score" in recaptcha_result and recaptcha_result["score"] < 0.5:
-            flash("⚠ reCAPTCHA score too low, suspected bot activity.", "error")
-            return redirect(request.referrer or url_for("contact"))
-
-        # ✅ Construct and send email
+        # ✅ Construct and send email via SendGrid
         message = Mail(
             from_email=SENDGRID_SENDER,
             to_emails="jslad13@gmail.com",
@@ -142,7 +154,7 @@ def contact():
             """
         )
 
-        message.reply_to = ReplyTo(email)  # ✅ Allow direct reply to sender
+        message.reply_to = ReplyTo(email)
 
         try:
             sg = SendGridAPIClient(SENDGRID_API_KEY)
@@ -153,7 +165,6 @@ def contact():
             response_body = response.body.decode('utf-8') if response.body else "No Content"
             print(f"📨 DEBUG: SendGrid Response Body: {response_body}")
 
-            # ✅ Handle Email Send Result
             if response.status_code in [200, 202]:
                 flash("✅ Your message has been sent successfully!", "success")
             else:
@@ -165,7 +176,7 @@ def contact():
 
         return redirect(request.referrer or url_for("contact"))
 
-    return render_template("contact.html", recaptcha_site_key=recaptcha_site_key)
+    return render_template("contact.html", recaptcha_site_key=RECAPTCHA_SITE_KEY)
 
 # ✅ Data Services Page
 @app.route('/data-services')
