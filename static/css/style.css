@@ -827,3 +827,10 @@ footer {
         height: auto; /* Maintain aspect ratio */
     }
 }
+
+/* Center the reCAPTCHA */
+.g-recaptcha {
+    display: flex;
+    justify-content: center;
+    margin: 15px auto;
+}
