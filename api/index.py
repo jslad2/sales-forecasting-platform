@@ -1,5 +1,5 @@
 import os
-import jwt as pyjwt  # ✅ Renaming it to avoid conflicts
+import jwt as pyjwt  # ✅ Renaming to avoid conflicts
 import datetime
 import re
 import requests
@@ -20,8 +20,11 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# ✅ Load API Keys from Environment Variables
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 SENDGRID_SENDER = os.getenv("SENDGRID_SENDER")
+RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY")
+RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY")
 
 # ✅ Initialize Flask App
 app = Flask(__name__, 
