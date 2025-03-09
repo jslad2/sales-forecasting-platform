@@ -33,12 +33,28 @@ PROJECT_ID = "1741395134509"
 # ✅ Load Service Account Credentials from Environment Variable
 SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 
+print(f"🔍 DEBUG: Raw SERVICE_ACCOUNT_JSON: {SERVICE_ACCOUNT_JSON[:100]}...")  # Print first 100 chars
+
 if SERVICE_ACCOUNT_JSON:
-    credentials_info = json.loads(SERVICE_ACCOUNT_JSON)
-    credentials = service_account.Credentials.from_service_account_info(
-        credentials_info,
-        scopes=["https://www.googleapis.com/auth/cloud-platform"]
-    )
+    try:
+        # ✅ Ensure it's properly formatted JSON
+        credentials_info = json.loads(SERVICE_ACCOUNT_JSON)
+        print("✅ JSON loaded successfully.")
+
+        # ✅ Check if it's a dictionary
+        if isinstance(credentials_info, dict):
+            credentials = service_account.Credentials.from_service_account_info(
+                credentials_info,
+                scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            )
+            print("✅ Service account credentials loaded successfully!")
+        else:
+            print("❌ ERROR: Parsed JSON is not a dictionary!")
+            credentials = None
+
+    except json.JSONDecodeError as e:
+        print(f"❌ ERROR: JSON decoding failed: {e}")
+        credentials = None
 else:
     print("❌ ERROR: Service account credentials not found in environment variables.")
     credentials = None
