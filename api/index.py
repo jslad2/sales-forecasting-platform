@@ -47,30 +47,35 @@ SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 
 if SERVICE_ACCOUNT_JSON:
     try:
-        logger.debug(f"🔍 DEBUG: Raw SERVICE_ACCOUNT_JSON (first 100 chars): {SERVICE_ACCOUNT_JSON[:100]}...")
+        print(f"🔍 DEBUG: Raw SERVICE_ACCOUNT_JSON (first 100 chars): {SERVICE_ACCOUNT_JSON[:100]}...")
 
-        # Convert the string into a dictionary
+        # Unescape the JSON string
+        SERVICE_ACCOUNT_JSON = SERVICE_ACCOUNT_JSON.encode("utf-8").decode("unicode_escape")
+
+        # Parse JSON
         credentials_info = json.loads(SERVICE_ACCOUNT_JSON)
+        print(f"🔍 DEBUG: Parsed JSON type: {type(credentials_info)}")
+        print(f"🔍 DEBUG: Parsed JSON content: {credentials_info}")
 
-        # Check if it's a dictionary before using it
         if isinstance(credentials_info, dict):
             credentials = service_account.Credentials.from_service_account_info(
                 credentials_info,
                 scopes=["https://www.googleapis.com/auth/cloud-platform"]
             )
-            logger.info("✅ Service account credentials loaded successfully!")
+            print("✅ Service account credentials loaded successfully!")
         else:
-            logger.error(f"❌ ERROR: Parsed JSON is not a dictionary! Type: {type(credentials_info)}")
+            print(f"❌ ERROR: Parsed JSON is not a dictionary! Type: {type(credentials_info)}")
             credentials = None
 
     except json.JSONDecodeError as e:
-        logger.error(f"❌ ERROR: JSON decoding failed: {e}")
+        print(f"❌ ERROR: JSON decoding failed: {e}")
+        print(f"🔍 DEBUG: JSON string: {SERVICE_ACCOUNT_JSON}")
         credentials = None
     except Exception as e:
-        logger.error(f"❌ ERROR: Unexpected error while parsing JSON: {e}")
+        print(f"❌ ERROR: Unexpected error while parsing JSON: {e}")
         credentials = None
 else:
-    logger.error("❌ ERROR: Service account credentials not found in environment variables.")
+    print("❌ ERROR: Service account credentials not found in environment variables.")
     credentials = None
 
 def get_oauth_token():
