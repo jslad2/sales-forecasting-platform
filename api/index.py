@@ -30,44 +30,63 @@ RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY")
 
 PROJECT_ID = "1741395134509"
 
-# ✅ Load JSON from environment variable
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+# Validate required environment variables
+required_env_vars = ["SUPABASE_URL", "SUPABASE_KEY", "SENDGRID_API_KEY", "SENDGRID_SENDER", "RECAPTCHA_SITE_KEY", "RECAPTCHA_SECRET_KEY", "GOOGLE_APPLICATION_CREDENTIALS_JSON"]
+
+for var in required_env_vars:
+    if not os.getenv(var):
+        logger.error(f"❌ ERROR: Missing required environment variable: {var}")
+        raise ValueError(f"Missing required environment variable: {var}")
+
+# Load service account credentials
 SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 
 if SERVICE_ACCOUNT_JSON:
     try:
-        print(f"🔍 DEBUG: Raw SERVICE_ACCOUNT_JSON (first 100 chars): {SERVICE_ACCOUNT_JSON[:100]}...")
+        logger.debug(f"🔍 DEBUG: Raw SERVICE_ACCOUNT_JSON (first 100 chars): {SERVICE_ACCOUNT_JSON[:100]}...")
 
-        # ✅ Convert the string into a dictionary
+        # Convert the string into a dictionary
         credentials_info = json.loads(SERVICE_ACCOUNT_JSON)
 
-        # ✅ Check if it's a dictionary before using it
+        # Check if it's a dictionary before using it
         if isinstance(credentials_info, dict):
             credentials = service_account.Credentials.from_service_account_info(
                 credentials_info,
                 scopes=["https://www.googleapis.com/auth/cloud-platform"]
             )
-            print("✅ Service account credentials loaded successfully!")
+            logger.info("✅ Service account credentials loaded successfully!")
         else:
-            print(f"❌ ERROR: Parsed JSON is not a dictionary! Type: {type(credentials_info)}")
+            logger.error(f"❌ ERROR: Parsed JSON is not a dictionary! Type: {type(credentials_info)}")
             credentials = None
 
     except json.JSONDecodeError as e:
-        print(f"❌ ERROR: JSON decoding failed: {e}")
+        logger.error(f"❌ ERROR: JSON decoding failed: {e}")
+        credentials = None
+    except Exception as e:
+        logger.error(f"❌ ERROR: Unexpected error while parsing JSON: {e}")
         credentials = None
 else:
-    print("❌ ERROR: Service account credentials not found in environment variables.")
+    logger.error("❌ ERROR: Service account credentials not found in environment variables.")
     credentials = None
 
 def get_oauth_token():
     """
     Retrieves an OAuth2 access token using the service account.
     """
+    if credentials is None:
+        logger.error("❌ ERROR: Credentials are not initialized.")
+        return None
+
     try:
         auth_request = requests.Request()
         credentials.refresh(auth_request)
         return credentials.token
     except Exception as e:
-        print(f"❌ ERROR: Failed to get OAuth2 token: {e}")
+        logger.error(f"❌ ERROR: Failed to get OAuth2 token: {e}")
         return None
 
 # ✅ Initialize Flask App
