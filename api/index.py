@@ -42,21 +42,21 @@ for var in required_env_vars:
         logger.error(f"❌ ERROR: Missing required environment variable: {var}")
         raise ValueError(f"Missing required environment variable: {var}")
 
-# Load environment variable
+# ✅ Load JSON from environment variable
 SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 
 if SERVICE_ACCOUNT_JSON:
     try:
         print(f"🔍 DEBUG: Raw SERVICE_ACCOUNT_JSON (first 100 chars): {SERVICE_ACCOUNT_JSON[:100]}...")
 
-        # Unescape the JSON string
-        SERVICE_ACCOUNT_JSON = SERVICE_ACCOUNT_JSON.encode("utf-8").decode("unicode_escape")
-
-        # Parse JSON
+        # ✅ Convert the string into a dictionary
         credentials_info = json.loads(SERVICE_ACCOUNT_JSON)
-        print(f"🔍 DEBUG: Parsed JSON type: {type(credentials_info)}")
-        print(f"🔍 DEBUG: Parsed JSON content: {credentials_info}")
 
+        # ✅ Fix `\n` in private key
+        if "private_key" in credentials_info:
+            credentials_info["private_key"] = credentials_info["private_key"].replace("\\n", "\n")
+
+        # ✅ Ensure it's a dictionary before using it
         if isinstance(credentials_info, dict):
             credentials = service_account.Credentials.from_service_account_info(
                 credentials_info,
@@ -69,10 +69,6 @@ if SERVICE_ACCOUNT_JSON:
 
     except json.JSONDecodeError as e:
         print(f"❌ ERROR: JSON decoding failed: {e}")
-        print(f"🔍 DEBUG: JSON string: {SERVICE_ACCOUNT_JSON}")
-        credentials = None
-    except Exception as e:
-        print(f"❌ ERROR: Unexpected error while parsing JSON: {e}")
         credentials = None
 else:
     print("❌ ERROR: Service account credentials not found in environment variables.")
