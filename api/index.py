@@ -12,6 +12,8 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, ReplyTo
 from google.oauth2 import service_account
 import json
+import base64
+
 
 # ✅ Load environment variables from .env
 load_dotenv()
@@ -34,51 +36,27 @@ PROJECT_ID = "1741395134509"
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Validate required environment variables
-required_env_vars = ["SUPABASE_URL", "SUPABASE_KEY", "SENDGRID_API_KEY", "SENDGRID_SENDER", "RECAPTCHA_SITE_KEY", "RECAPTCHA_SECRET_KEY", "GOOGLE_APPLICATION_CREDENTIALS_JSON"]
+# Decode Base64 before loading as JSON
+SERVICE_ACCOUNT_JSON_BASE64 = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_BASE64")  # Updated ENV key
 
-for var in required_env_vars:
-    if not os.getenv(var):
-        logger.error(f"❌ ERROR: Missing required environment variable: {var}")
-        raise ValueError(f"Missing required environment variable: {var}")
-
-# ✅ Load JSON from environment variable
-SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
-
-if SERVICE_ACCOUNT_JSON:
+if SERVICE_ACCOUNT_JSON_BASE64:
     try:
-        print(f"🔍 DEBUG: Raw SERVICE_ACCOUNT_JSON (first 100 chars): {SERVICE_ACCOUNT_JSON[:100]}...")
-
-        # ✅ Convert JSON string into a dictionary
-        credentials_info = json.loads(SERVICE_ACCOUNT_JSON)
-
-        # ✅ Fix the `private_key` to properly restore newlines
-        if "private_key" in credentials_info:
-            credentials_info["private_key"] = credentials_info["private_key"].replace("\\n", "\n")
-
-        # ✅ Ensure it's a dictionary before using it
-        if isinstance(credentials_info, dict):
-            credentials = service_account.Credentials.from_service_account_info(
-                credentials_info,
-                scopes=["https://www.googleapis.com/auth/cloud-platform"]
-            )
-            print("✅ Service account credentials loaded successfully!")
-        else:
-            print(f"❌ ERROR: Parsed JSON is not a dictionary! Type: {type(credentials_info)}")
-            credentials = None
-
+        SERVICE_ACCOUNT_JSON = json.loads(
+            base64.b64decode(SERVICE_ACCOUNT_JSON_BASE64).decode("utf-8")
+        )
+        credentials = service_account.Credentials.from_service_account_info(
+            SERVICE_ACCOUNT_JSON,
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
+        print("✅ Service account credentials loaded successfully!")
     except json.JSONDecodeError as e:
         print(f"❌ ERROR: JSON decoding failed: {e}")
-        credentials = None
+    except Exception as e:
+        print(f"❌ ERROR: Failed to load service account credentials: {e}")
 else:
     print("❌ ERROR: Service account credentials not found in environment variables.")
-    credentials = None
-
 
 def get_oauth_token():
-    """
-    Retrieves an OAuth2 access token using the service account.
-    """
     if credentials is None:
         logger.error("❌ ERROR: Credentials are not initialized.")
         return None
