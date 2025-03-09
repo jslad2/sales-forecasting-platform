@@ -1,5 +1,3 @@
 .vercel
 .env
 "".env"
-# Ignore Service Account JSON
-api/recaptcha-service-account.json

@@ -11,6 +11,7 @@ import logging
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, ReplyTo
 from google.oauth2 import service_account
+import json
 
 # ✅ Load environment variables from .env
 load_dotenv()
@@ -29,12 +30,18 @@ RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY")
 
 PROJECT_ID = "1741395134509"
 
-# Load Service Account Credentials (OAuth2 Token)
-SERVICE_ACCOUNT_FILE = "api/recaptcha-service-account.json"
-credentials = service_account.Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE,
-    scopes=["https://www.googleapis.com/auth/cloud-platform"]
-)
+# ✅ Load Service Account Credentials from Environment Variable
+SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+
+if SERVICE_ACCOUNT_JSON:
+    credentials_info = json.loads(SERVICE_ACCOUNT_JSON)
+    credentials = service_account.Credentials.from_service_account_info(
+        credentials_info,
+        scopes=["https://www.googleapis.com/auth/cloud-platform"]
+    )
+else:
+    print("❌ ERROR: Service account credentials not found in environment variables.")
+    credentials = None
 
 def get_oauth_token():
     """
