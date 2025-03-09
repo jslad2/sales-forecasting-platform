@@ -30,18 +30,17 @@ RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY")
 
 PROJECT_ID = "1741395134509"
 
-# ✅ Load Service Account Credentials from Environment Variable
+# ✅ Load JSON from environment variable
 SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
-
-print(f"🔍 DEBUG: Raw SERVICE_ACCOUNT_JSON: {SERVICE_ACCOUNT_JSON[:100]}...")  # Print first 100 chars
 
 if SERVICE_ACCOUNT_JSON:
     try:
-        # ✅ Ensure it's properly formatted JSON
-        credentials_info = json.loads(SERVICE_ACCOUNT_JSON)
-        print("✅ JSON loaded successfully.")
+        print(f"🔍 DEBUG: Raw SERVICE_ACCOUNT_JSON (first 100 chars): {SERVICE_ACCOUNT_JSON[:100]}...")
 
-        # ✅ Check if it's a dictionary
+        # ✅ Convert the string into a dictionary
+        credentials_info = json.loads(SERVICE_ACCOUNT_JSON)
+
+        # ✅ Check if it's a dictionary before using it
         if isinstance(credentials_info, dict):
             credentials = service_account.Credentials.from_service_account_info(
                 credentials_info,
@@ -49,7 +48,7 @@ if SERVICE_ACCOUNT_JSON:
             )
             print("✅ Service account credentials loaded successfully!")
         else:
-            print("❌ ERROR: Parsed JSON is not a dictionary!")
+            print(f"❌ ERROR: Parsed JSON is not a dictionary! Type: {type(credentials_info)}")
             credentials = None
 
     except json.JSONDecodeError as e:
