@@ -49,10 +49,10 @@ if SERVICE_ACCOUNT_JSON:
     try:
         print(f"🔍 DEBUG: Raw SERVICE_ACCOUNT_JSON (first 100 chars): {SERVICE_ACCOUNT_JSON[:100]}...")
 
-        # ✅ Convert the string into a dictionary
+        # ✅ Convert JSON string into a dictionary
         credentials_info = json.loads(SERVICE_ACCOUNT_JSON)
 
-        # ✅ Fix `\n` in private key
+        # ✅ Fix the `private_key` to properly restore newlines
         if "private_key" in credentials_info:
             credentials_info["private_key"] = credentials_info["private_key"].replace("\\n", "\n")
 
@@ -73,6 +73,7 @@ if SERVICE_ACCOUNT_JSON:
 else:
     print("❌ ERROR: Service account credentials not found in environment variables.")
     credentials = None
+
 
 def get_oauth_token():
     """
