@@ -36,8 +36,9 @@ PROJECT_ID = "1741395134509"
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Decode Base64 before loading as JSON
+# ✅ Decode Base64 before loading as JSON
 SERVICE_ACCOUNT_JSON_BASE64 = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_BASE64")  # Updated ENV key
+credentials = None  # ✅ Define as a global variable
 
 if SERVICE_ACCOUNT_JSON_BASE64:
     try:
@@ -57,13 +58,15 @@ else:
     print("❌ ERROR: Service account credentials not found in environment variables.")
 
 def get_oauth_token():
+    global credentials  # ✅ Ensure we are using the global variable
+
     if credentials is None:
         logger.error("❌ ERROR: Credentials are not initialized.")
         return None
 
     try:
         auth_request = requests.Request()
-        credentials.refresh(auth_request)
+        credentials.refresh(auth_request)  # ✅ Refresh OAuth2 token
         return credentials.token
     except Exception as e:
         logger.error(f"❌ ERROR: Failed to get OAuth2 token: {e}")
