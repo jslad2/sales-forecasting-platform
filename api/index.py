@@ -42,7 +42,7 @@ for var in required_env_vars:
         logger.error(f"❌ ERROR: Missing required environment variable: {var}")
         raise ValueError(f"Missing required environment variable: {var}")
 
-# Load service account credentials
+# Load environment variable
 SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 
 if SERVICE_ACCOUNT_JSON:
