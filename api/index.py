@@ -34,7 +34,7 @@ PROJECT_ID = "1741395134509"
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Validate required environment variables
+# Validate required environment variable
 required_env_vars = ["SUPABASE_URL", "SUPABASE_KEY", "SENDGRID_API_KEY", "SENDGRID_SENDER", "RECAPTCHA_SITE_KEY", "RECAPTCHA_SECRET_KEY", "GOOGLE_APPLICATION_CREDENTIALS_JSON"]
 
 for var in required_env_vars:
