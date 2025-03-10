@@ -636,12 +636,13 @@ html {
 
 .contact-form input,
 .contact-form textarea {
-    width: 100%;
+    width: 100%; /* Ensure all inputs are same width */
     padding: 12px;
     font-size: 1rem;
     border: 1px solid #ccc;
     border-radius: 8px;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
+    box-sizing: border-box; /* Prevent width issues */
 }
 
 /* Fix Textarea Height */
