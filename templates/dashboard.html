@@ -4,14 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - SynovaAI</title>
-
-    <!-- Stylesheets -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
 </head>
 <body class="dashboard-page bg-light">
 
-    <!-- Header Navigation -->
+    <!-- Header -->
     <header class="bg-dark text-white p-3">
         <div class="container d-flex justify-content-between align-items-center">
             <div class="logo fw-bold fs-4">SYNOVAAI</div>
@@ -19,23 +17,57 @@
                 <a href="{{ url_for('home') }}" class="text-white me-3">Home</a>
                 <a href="{{ url_for('data_services') }}" class="text-white me-3">Data Services</a>
                 <a href="{{ url_for('pricing') }}" class="text-white me-3">Pricing</a>
-                <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm">Logout</a>
+                <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to logout?')">Logout</a>
             </nav>
         </div>
     </header>
 
     <!-- Dashboard Content -->
-    <section class="dashboard-container container d-flex flex-column align-items-center text-center mt-5">
-        <h2>Welcome, <span class="text-primary">{{ user_email }}</span>!</h2>
+    <section class="dashboard-container container mt-5">
+        <h2>Welcome back, <span class="text-primary">{{ user_name }}</span>!</h2>
         <p>Your Subscription: <strong>{{ user_plan.capitalize() }}</strong></p>
 
-        <!-- Dashboard Links -->
-        <div class="mt-4">
-            <a href="{{ url_for('forecasting_tool') }}" class="btn btn-primary btn-lg mb-3">📊 Access Forecasting Tool</a>
+        <!-- Quick Actions -->
+        <div class="quick-actions mt-4">
+            <h3>Quick Actions</h3>
+            <div class="d-flex gap-3 justify-content-center">
+                <a href="{{ url_for('forecasting_tool') }}" class="btn btn-primary btn-lg">📊 Access Forecasting Tool</a>
+                <a href="{{ url_for('new_forecast') }}" class="btn btn-outline-primary btn-lg">➕ New Forecast</a>
+            </div>
+        </div>
 
-            {% if user_plan == "free" %}
-                <a href="{{ url_for('pricing') }}" class="btn btn-warning btn-lg">🚀 Upgrade to Premium</a>
-            {% endif %}
+        <!-- Stats -->
+        <div class="user-stats row mt-5">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Forecasts Generated</h5>
+                        <p class="fs-2">{{ forecast_count }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Last Login</h5>
+                        <p class="fs-2">{{ last_login }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Subscription Status</h5>
+                        <p class="fs-2">{{ user_plan.capitalize() }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart -->
+        <div class="chart-container mt-5">
+            <h3>Forecast Performance</h3>
+            <canvas id="forecastChart" width="400" height="200"></canvas>
         </div>
     </section>
 
@@ -44,8 +76,31 @@
         <p>© 2025 SynovaAI. All rights reserved.</p>
     </footer>
 
-    <!-- Bootstrap Scripts -->
+    <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const ctx = document.getElementById('forecastChart').getContext('2d');
+        const forecastChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                datasets: [{
+                    label: 'Sales Forecast',
+                    data: [65, 59, 80, 81, 56, 55],
+                    fill: false,
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    </script>
 </body>
 </html>
