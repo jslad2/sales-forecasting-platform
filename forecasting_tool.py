@@ -686,7 +686,7 @@ def main():
                         automl_data["yoy_growth"] = 0
 
                     # ✅ Add momentum tracking
-                    automl_data["y_diff"] = automl_data["y"].diff().fillna(0)  # Capture momentum
+                    automl_data["y_diff"] = automl_data["y"].diff().fillna(0)
                     automl_data["rolling_mean_growth"] = automl_data["y"].rolling(window=3).mean().diff().fillna(0)
 
                     # ✅ Add seasonal features
@@ -703,7 +703,7 @@ def main():
                         automl_data["y_log"] = automl_data["y"]
                         apply_log = False
 
-                    automl_data.dropna(inplace=True)  # Drop NA values
+                    automl_data.dropna(inplace=True)
 
                     # ✅ Dynamically build feature list
                     feature_cols = [col for col in automl_data.columns if col not in ["y", "ds", "y_log"]]
@@ -719,25 +719,43 @@ def main():
                         X_train=x_train,
                         y_train=y_train,
                         task="regression",
-                        time_budget=60,
+                        time_budget=300,
                         eval_method="cv",
-                        estimator_list=["xgboost", "lgbm", "rf"],  # Ensure multiple models are tested
+                        cv=TimeSeriesSplit(n_splits=3),
+                        estimator_list=["xgboost", "lgbm", "rf", "catboost"],
                         metric="r2",
                     )
+
                     st.write(f"✅ AutoML Training Completed! Best Estimator: {automl_model.best_estimator}")
 
                     # ✅ Generate Future Data
                     future_features = []
+                    last_row = automl_data.iloc[-1].copy()
+
                     for i in range(forecast_period):
                         future_row = {}
 
-                        for col in feature_cols:
-                            if col in automl_data.columns:
-                                future_row[col] = automl_data[col].iloc[-1]
+                        # Update lags
+                        for lag in range(1, max_lag + 1):
+                            if lag == 1:
+                                future_row[f"lag_{lag}"] = last_row["y_log"]
                             else:
-                                future_row[col] = 0  # Fill missing columns with default values
+                                future_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
+
+                        # Update rolling statistics
+                        for window in [3, 6, 12]:
+                            future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y_log"] - last_row[f"lag_{window}"]) / window
+                            future_row[f"rolling_std_{window}"] = last_row[f"rolling_std_{window}"]
+
+                        # Update other features
+                        future_row["yoy_growth"] = last_row["yoy_growth"]
+                        future_row["y_diff"] = last_row["y_diff"]
+                        future_row["rolling_mean_growth"] = last_row["rolling_mean_growth"]
+                        future_row["sin_month"] = np.sin(2 * np.pi * (last_row["ds"].month + i) / 12)
+                        future_row["cos_month"] = np.cos(2 * np.pi * (last_row["ds"].month + i) / 12)
 
                         future_features.append(future_row)
+                        last_row = future_row.copy()
 
                     future_df = pd.DataFrame(future_features)
 
@@ -758,7 +776,9 @@ def main():
                     # ✅ Prepare Forecast DataFrame
                     forecast_df = pd.DataFrame({
                         "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
-                        "yhat": automl_forecast
+                        "yhat": automl_forecast,
+                        "yhat_lower": automl_forecast * 0.9,
+                        "yhat_upper": automl_forecast * 1.1
                     })
 
                     # ✅ Calculate RMSE and MAPE
