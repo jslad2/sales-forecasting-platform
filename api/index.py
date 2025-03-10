@@ -30,7 +30,7 @@ SENDGRID_SENDER = os.getenv("SENDGRID_SENDER")
 RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY")
 RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY")
 
-PROJECT_ID = "1741395134509"
+PROJECT_ID = "synovaai-1741395134509"
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
