@@ -5,26 +5,26 @@ from forecasting_tool import main  # Keep forecasting logic separate
 # ✅ Flask Backend Authentication API
 BACKEND_AUTH_URL = "https://synovaai.io/check-auth"  # Change this to your actual Flask API
 
-# ✅ Function to Check Authentication
-def check_auth():
-    session_id = st.query_params.get("session_id")  # Get session ID from URL
+# # ✅ Function to Check Authentication
+# def check_auth():
+#     session_id = st.query_params.get("session_id")  # Get session ID from URL
 
-    if not session_id:
-        st.error("❌ You must be logged in to access this tool.")
-        st.stop()
+#     if not session_id:
+#         st.error("❌ You must be logged in to access this tool.")
+#         st.stop()
 
-    # ✅ Send request to Flask API to validate session
-    response = requests.get(BACKEND_AUTH_URL, params={"session_id": session_id})
+#     # ✅ Send request to Flask API to validate session
+#     response = requests.get(BACKEND_AUTH_URL, params={"session_id": session_id})
 
-    if response.status_code != 200:
-        st.error("❌ Invalid session. Please log in again.")
-        st.stop()
+#     if response.status_code != 200:
+#         st.error("❌ Invalid session. Please log in again.")
+#         st.stop()
 
-    # ✅ Store authenticated user details
-    return response.json()
+#     # ✅ Store authenticated user details
+#     return response.json()
 
-# ✅ Authenticate the User Before Running the App
-user_data = check_auth()
+# # ✅ Authenticate the User Before Running the App
+# user_data = check_auth()
 
 # ✅ Apply custom SynovaAI styles
 def apply_styles():

@@ -228,6 +228,13 @@ def find_best_prophet_params(train):
     return best_params, best_rmse
 
 def main():
+    # Check user subscription level
+    user_id = "user123"  # Replace with actual user ID from session
+    subscription_level = get_user_subscription_level(user_id)
+
+    if subscription_level != "premium":
+        st.warning("🔒 Upgrade to Premium to unlock advanced features like AutoML, scenario planning, and more!")
+        st.stop()
 
     # File Upload
     uploaded_file = st.file_uploader("Upload your sales data file", type=["csv"])
@@ -399,7 +406,7 @@ def main():
                 except Exception as e:
                     st.warning(f"❌ Prophet Model failed: {e}")
 
-
+                # ARIMA Model
                 st.write("🔄 Training ARIMA Model...")
 
                 try:
@@ -504,7 +511,6 @@ def main():
 
                 except Exception as e:
                     st.warning(f"❌ ARIMA Model failed: {e}")
-
 
                 # XGBoost Model with Dynamic Adaptation
                 st.write("Training XGBoost Model...")
@@ -645,7 +651,7 @@ def main():
                 except Exception as e:
                     st.warning(f"XGBoost Model failed: {e}")
 
-                    
+                # AutoML Model
                 st.write("🚀 Training AutoML Model...")
 
                 try:
@@ -917,7 +923,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
