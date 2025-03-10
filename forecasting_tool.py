@@ -44,25 +44,25 @@ if theme == "Dark":
         unsafe_allow_html=True,
     )
 
-# ✅ Load environment variables from .env
-load_dotenv()
+# # ✅ Load environment variables from .env
+# load_dotenv()
 
-# ✅ Ensure environment variables exist
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+# # ✅ Ensure environment variables exist
+# SUPABASE_URL = os.getenv("SUPABASE_URL")
+# SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-if not SUPABASE_URL or not SUPABASE_KEY:
-    st.error("❌ Supabase credentials are missing. Please check your .env file.")
-    st.stop()
+# if not SUPABASE_URL or not SUPABASE_KEY:
+#     st.error("❌ Supabase credentials are missing. Please check your .env file.")
+#     st.stop()
 
-# ✅ Initialize Supabase Client
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# # ✅ Initialize Supabase Client
+# supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-def get_user_subscription_level(user_id):
-    response = supabase.table("users").select("subscription_level").eq("id", user_id).execute()
-    if response.data:
-        return response.data[0].get("subscription_level", "free").lower()  # Ensure lowercase for consistency
-    return "free"
+# def get_user_subscription_level(user_id):
+#     response = supabase.table("users").select("subscription_level").eq("id", user_id).execute()
+#     if response.data:
+#         return response.data[0].get("subscription_level", "free").lower()  # Ensure lowercase for consistency
+#     return "free"
 
 def is_feature_available(subscription_level, feature):
     subscription_levels = {
@@ -230,7 +230,7 @@ def find_best_prophet_params(train):
 def main():
     # Check user subscription level
     user_id = "user123"  # Replace with actual user ID from session
-    subscription_level = get_user_subscription_level(user_id)
+    subscription_level = "premium" # get_user_subscription_level(user_id)
 
     if subscription_level != "premium":
         st.warning("🔒 Upgrade to Premium to unlock advanced features like AutoML, scenario planning, and more!")
