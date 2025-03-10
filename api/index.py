@@ -13,6 +13,8 @@ from sendgrid.helpers.mail import Mail, Email, To, ReplyTo
 from google.oauth2 import service_account
 import json
 import base64
+from google.auth.transport.requests import Request
+
 
 
 # ✅ Load environment variables from .env
@@ -60,21 +62,21 @@ else:
     logger.error("❌ ERROR: Service account credentials not found in environment variables.")
 
 def get_oauth_token():
-    global credentials  # ✅ Ensure we are using the global variable
+    global credentials  
 
     if credentials is None:
         logger.error("❌ ERROR: Credentials are not initialized.")
         return None
 
     try:
-        auth_request = requests.Request()
-        credentials.refresh(auth_request)  # ✅ Refresh OAuth2 token
+        auth_request = Request()  # ✅ Correct usage
+        credentials.refresh(auth_request)  # ✅ Refresh the OAuth2 token
+        logger.info("✅ OAuth2 token successfully obtained.")
         return credentials.token
     except Exception as e:
         logger.error(f"❌ ERROR: Failed to get OAuth2 token: {e}")
         return None
-
-
+    
 # ✅ Initialize Flask App
 app = Flask(__name__, 
             template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")), 
