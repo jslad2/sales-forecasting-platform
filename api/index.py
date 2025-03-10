@@ -15,8 +15,6 @@ import json
 import base64
 from google.auth.transport.requests import Request
 
-
-
 # ✅ Load environment variables from .env
 load_dotenv()
 
@@ -64,14 +62,15 @@ else:
 def get_oauth_token():
     global credentials  
 
-    if credentials is None:
+    if not credentials:
         logger.error("❌ ERROR: Credentials are not initialized.")
         return None
 
     try:
-        auth_request = Request()  # ✅ Correct usage
-        credentials.refresh(auth_request)  # ✅ Refresh the OAuth2 token
-        logger.info("✅ OAuth2 token successfully obtained.")
+        if not credentials.valid or credentials.expired:
+            credentials.refresh(Request())  # ✅ Refresh the token
+            logger.info("✅ OAuth2 token refreshed successfully.")
+
         return credentials.token
     except Exception as e:
         logger.error(f"❌ ERROR: Failed to get OAuth2 token: {e}")
@@ -148,7 +147,7 @@ def contact():
         message_body = request.form.get("message", "").strip()
         recaptcha_response = request.form.get("g-recaptcha-response", "").strip()
 
-        print(f"🔍 DEBUG: Received reCAPTCHA Token: {recaptcha_response}")
+        logger.info(f"🔍 DEBUG: Received reCAPTCHA Token: {recaptcha_response}")
 
         # ✅ Validate Required Fields
         if not name or not email or not message_body:
@@ -156,8 +155,8 @@ def contact():
             return redirect(request.referrer or url_for("contact"))
 
         if not recaptcha_response:
-            print("❌ ERROR: Missing reCAPTCHA response from the form")
-            flash("⚠ reCAPTCHA not completed. Please verify you are not a robot.", "error")
+            logger.error("❌ ERROR: Missing reCAPTCHA response from the form")
+            flash("⚠ Please verify you are not a robot.", "error")
             return redirect(request.referrer or url_for("contact"))
 
         # ✅ Get OAuth2 Token
@@ -182,23 +181,23 @@ def contact():
 
         try:
             recaptcha_result = requests.post(recaptcha_url, json=recaptcha_payload, headers=recaptcha_headers, timeout=5).json()
-            print(f"🔍 DEBUG: reCAPTCHA API Response: {recaptcha_result}")
+            logger.info(f"🔍 DEBUG: Google reCAPTCHA API Response: {recaptcha_result}")
 
             # ✅ Check if reCAPTCHA validation was successful
             if not recaptcha_result.get("tokenProperties", {}).get("valid", False):
-                print("❌ ERROR: reCAPTCHA validation failed.")
+                logger.error("❌ ERROR: reCAPTCHA validation failed.")
                 flash("❌ reCAPTCHA verification failed. Please try again.", "error")
                 return redirect(request.referrer or url_for("contact"))
 
             # ✅ Check risk score (ensure it's above threshold, e.g., 0.5)
             risk_score = recaptcha_result.get("riskAnalysis", {}).get("score", 0)
             if risk_score < 0.5:
-                print(f"⚠ WARNING: reCAPTCHA returned low score: {risk_score}")
-                flash("⚠ reCAPTCHA flagged this as suspicious activity. Please try again.", "error")
+                logger.warning(f"⚠ WARNING: reCAPTCHA returned low score: {risk_score}")
+                flash("⚠ Suspicious activity detected. Please try again.", "error")
                 return redirect(request.referrer or url_for("contact"))
 
         except requests.exceptions.RequestException as e:
-            print(f"❌ ERROR: reCAPTCHA API Request Failed: {e}")
+            logger.error(f"❌ ERROR: reCAPTCHA API Request Failed: {e}")
             flash("❌ reCAPTCHA validation error. Please try again.", "error")
             return redirect(request.referrer or url_for("contact"))
 
@@ -219,9 +218,9 @@ def contact():
             sg = SendGridAPIClient(SENDGRID_API_KEY)
             response = sg.send(message)
 
-            print(f"📨 DEBUG: SendGrid Response Code: {response.status_code}")
+            logger.info(f"📨 DEBUG: SendGrid Response Code: {response.status_code}")
             response_body = response.body.decode('utf-8') if response.body else "No Content"
-            print(f"📨 DEBUG: SendGrid Response Body: {response_body}")
+            logger.info(f"📨 DEBUG: SendGrid Response Body: {response_body}")
 
             if response.status_code in [200, 202]:
                 flash("✅ Your message has been sent successfully!", "success")
@@ -229,7 +228,7 @@ def contact():
                 flash(f"❌ Failed to send message. Error {response.status_code}.", "error")
 
         except Exception as e:
-            print(f"❌ SendGrid Error: {e}")
+            logger.error(f"❌ SendGrid Error: {e}")
             flash("❌ Error sending email. Please try again later.", "error")
 
         return redirect(request.referrer or url_for("contact"))
