@@ -615,6 +615,9 @@ html {
     background: var(--white-color);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     border-radius: 12px;
+    display: flex;
+    flex-direction: column; /* Stack elements correctly */
+    gap: 15px; /* Ensure even spacing */
 }
 
 .contact-form h2 {
