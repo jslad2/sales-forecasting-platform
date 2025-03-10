@@ -62,19 +62,20 @@ else:
 def get_oauth_token():
     global credentials  
 
-    if not credentials:
+    if credentials is None:
         logger.error("❌ ERROR: Credentials are not initialized.")
         return None
 
     try:
-        if not credentials.valid or credentials.expired:
-            credentials.refresh(Request())  # ✅ Refresh the token
-            logger.info("✅ OAuth2 token refreshed successfully.")
-
-        return credentials.token
+        auth_request = Request()
+        credentials.refresh(auth_request)
+        access_token = credentials.token  # ✅ Fresh token
+        logger.info(f"✅ OAuth2 token refreshed: {access_token[:20]}...")  # Mask for security
+        return access_token
     except Exception as e:
         logger.error(f"❌ ERROR: Failed to get OAuth2 token: {e}")
         return None
+
     
 # ✅ Initialize Flask App
 app = Flask(__name__, 
@@ -159,9 +160,11 @@ def contact():
             flash("⚠ Please verify you are not a robot.", "error")
             return redirect(request.referrer or url_for("contact"))
 
-        # ✅ Get OAuth2 Token
+        # ✅ Refresh OAuth2 Token before using it
         OAUTH_ACCESS_TOKEN = get_oauth_token()
+
         if not OAUTH_ACCESS_TOKEN:
+            logger.error("❌ ERROR: Failed to obtain OAuth2 token.")
             flash("❌ Authentication error. Please try again later.", "error")
             return redirect(request.referrer or url_for("contact"))
 
@@ -179,9 +182,13 @@ def contact():
             "Content-Type": "application/json"
         }
 
+        # ✅ Debugging log
+        logger.info(f"🔍 DEBUG: Sending reCAPTCHA verification request to: {recaptcha_url}")
+        logger.info(f"🔍 DEBUG: Using OAuth2 Token (first 20 chars): {OAUTH_ACCESS_TOKEN[:20]}...")
+
         try:
             recaptcha_result = requests.post(recaptcha_url, json=recaptcha_payload, headers=recaptcha_headers, timeout=5).json()
-            logger.info(f"🔍 DEBUG: Google reCAPTCHA API Response: {recaptcha_result}")
+            logger.info(f"🔍 DEBUG: reCAPTCHA API Response: {recaptcha_result}")
 
             # ✅ Check if reCAPTCHA validation was successful
             if not recaptcha_result.get("tokenProperties", {}).get("valid", False):
@@ -193,7 +200,7 @@ def contact():
             risk_score = recaptcha_result.get("riskAnalysis", {}).get("score", 0)
             if risk_score < 0.5:
                 logger.warning(f"⚠ WARNING: reCAPTCHA returned low score: {risk_score}")
-                flash("⚠ Suspicious activity detected. Please try again.", "error")
+                flash("⚠ reCAPTCHA flagged this as suspicious activity. Please try again.", "error")
                 return redirect(request.referrer or url_for("contact"))
 
         except requests.exceptions.RequestException as e:
