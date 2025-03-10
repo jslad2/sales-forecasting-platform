@@ -36,7 +36,7 @@ PROJECT_ID = "1741395134509"
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# ✅ Define credentials as a global variable
+# ✅ Define credentials as a global variables
 credentials = None  
 
 # ✅ Decode and Load Service Account JSON
