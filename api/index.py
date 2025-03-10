@@ -36,9 +36,11 @@ PROJECT_ID = "1741395134509"
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# ✅ Decode Base64 before loading as JSON
-SERVICE_ACCOUNT_JSON_BASE64 = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_BASE64")  # Updated ENV key
-credentials = None  # ✅ Define as a global variable
+# ✅ Define credentials as a global variable
+credentials = None  
+
+# ✅ Decode and Load Service Account JSON
+SERVICE_ACCOUNT_JSON_BASE64 = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_BASE64")
 
 if SERVICE_ACCOUNT_JSON_BASE64:
     try:
@@ -49,13 +51,13 @@ if SERVICE_ACCOUNT_JSON_BASE64:
             SERVICE_ACCOUNT_JSON,
             scopes=["https://www.googleapis.com/auth/cloud-platform"]
         )
-        print("✅ Service account credentials loaded successfully!")
+        logger.info("✅ Service account credentials loaded successfully!")
     except json.JSONDecodeError as e:
-        print(f"❌ ERROR: JSON decoding failed: {e}")
+        logger.error(f"❌ ERROR: JSON decoding failed: {e}")
     except Exception as e:
-        print(f"❌ ERROR: Failed to load service account credentials: {e}")
+        logger.error(f"❌ ERROR: Failed to load service account credentials: {e}")
 else:
-    print("❌ ERROR: Service account credentials not found in environment variables.")
+    logger.error("❌ ERROR: Service account credentials not found in environment variables.")
 
 def get_oauth_token():
     global credentials  # ✅ Ensure we are using the global variable
@@ -71,6 +73,7 @@ def get_oauth_token():
     except Exception as e:
         logger.error(f"❌ ERROR: Failed to get OAuth2 token: {e}")
         return None
+
 
 # ✅ Initialize Flask App
 app = Flask(__name__, 
