@@ -293,7 +293,7 @@ def main():
                 start_forecast = st.button("⏳ Select Columns First", disabled=True, key="start_disabled")
 
             if start_forecast:
-                preprocessed_data, stationarity_result, original_data, original_data_monthly = preprocess_data(data, date_column, sales_column)
+                preprocessed_data, stationarity_result, original_data_monthly = preprocess_data(data, date_column, sales_column)
                 if preprocessed_data is None:
                     return
 
