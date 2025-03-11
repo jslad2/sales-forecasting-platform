@@ -15,9 +15,6 @@ from sklearn.model_selection import ParameterGrid
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.graphics.tsaplots import plot_acf
 import optuna
-from sklearn.model_selection import train_test_split
-from sklearn.feature_selection import RFE
-from xgboost import XGBRegressor
 from sklearn.model_selection import train_test_split, TimeSeriesSplit
 import plotly.graph_objects as go
 from statsmodels.tsa.stattools import acf
@@ -32,9 +29,13 @@ from tqdm import tqdm
 st.set_page_config(layout="wide")
 
 # Add dark mode toggle
-theme = st.radio("🌙 Theme Mode:", ["Light", "Dark"])
+if 'theme' not in st.session_state:
+    st.session_state.theme = "Light"
 
-if theme == "Dark":
+theme = st.radio("🌙 Theme Mode:", ["Light", "Dark"], index=0 if st.session_state.theme == "Light" else 1)
+st.session_state.theme = theme
+
+if st.session_state.theme == "Dark":
     st.markdown(
         """
         <style>
@@ -46,25 +47,11 @@ if theme == "Dark":
         unsafe_allow_html=True,
     )
 
-# # ✅ Load environment variables from .env
+# Load environment variables from .env
 # load_dotenv()
 
-# # ✅ Ensure environment variables exist
-# SUPABASE_URL = os.getenv("SUPABASE_URL")
-# SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
-# if not SUPABASE_URL or not SUPABASE_KEY:
-#     st.error("❌ Supabase credentials are missing. Please check your .env file.")
-#     st.stop()
-
-# # ✅ Initialize Supabase Client
-# supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-# def get_user_subscription_level(user_id):
-#     response = supabase.table("users").select("subscription_level").eq("id", user_id).execute()
-#     if response.data:
-#         return response.data[0].get("subscription_level", "free").lower()  # Ensure lowercase for consistency
-#     return "free"
+# Initialize Supabase Client
+# supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
 
 def is_feature_available(subscription_level, feature):
     subscription_levels = {
@@ -108,18 +95,12 @@ def is_feature_available(subscription_level, feature):
     return subscription_levels.get(subscription_level, {}).get(feature, False)
 
 def check_stationarity(series):
-    """
-    Perform the Augmented Dickey-Fuller (ADF) and KPSS tests to check stationarity.
-    """
-    # ADF Test
     adf_result = adfuller(series, autolag="AIC")
     adf_p_value = adf_result[1]
 
-    # KPSS Test
     kpss_result = kpss(series, regression="c", nlags="auto")
     kpss_p_value = kpss_result[1]
 
-    # Determine stationarity
     if adf_p_value < 0.05 and kpss_p_value > 0.05:
         return "Stationary"
     elif adf_p_value >= 0.05 and kpss_p_value <= 0.05:
@@ -128,32 +109,28 @@ def check_stationarity(series):
         return "Inconclusive"
 
 def preprocess_data(data, date_column, sales_column):
-    """
-    Preprocess the uploaded data, check stationarity, and apply transformations if needed.
-    """
     try:
-        # Convert date column to datetime
         data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
         data = data.dropna(subset=[date_column, sales_column])
 
-        # Aggregate to Monthly
-        data = data[[date_column, sales_column]].rename(columns={date_column: "ds", sales_column: "y"})
-        data["ds"] = pd.to_datetime(data["ds"], errors="coerce")
-        data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
-        data["ds"] = data["ds"].dt.to_timestamp()
+        # Save the original data before aggregation
+        original_data = data[[date_column, sales_column]].rename(columns={date_column: "ds", sales_column: "y"})
+        original_data["ds"] = pd.to_datetime(original_data["ds"], errors="coerce")
 
-        # Plot original series
+        # Aggregate to monthly data
+        preprocessed_data = original_data.groupby(original_data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
+        preprocessed_data["ds"] = preprocessed_data["ds"].dt.to_timestamp()
+
         st.markdown("### Original Series")
         plt.figure(figsize=(10, 6))
-        plt.plot(data["ds"], data["y"], label="Original Series")
+        plt.plot(preprocessed_data["ds"], preprocessed_data["y"], label="Original Series")
         plt.xlabel("Date")
         plt.ylabel("Sales")
         plt.title("Original Time Series")
         plt.legend()
         st.pyplot(plt)
 
-        # Check stationarity
-        stationarity_result = check_stationarity(data["y"])
+        stationarity_result = check_stationarity(preprocessed_data["y"])
         st.markdown(
             f"""
             <div style="text-align: center;">
@@ -164,23 +141,20 @@ def preprocess_data(data, date_column, sales_column):
             unsafe_allow_html=True,
         )
 
-        # Apply transformations if non-stationary
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
-            data["y"] = data["y"].diff().dropna()
+            preprocessed_data["y"] = preprocessed_data["y"].diff().dropna()
 
-            # Plot differenced series
             st.markdown("### Differenced Series")
             plt.figure(figsize=(10, 6))
-            plt.plot(data["ds"].iloc[1:], data["y"].iloc[1:], label="Differenced Series", color="orange")
+            plt.plot(preprocessed_data["ds"].iloc[1:], preprocessed_data["y"].iloc[1:], label="Differenced Series", color="orange")
             plt.xlabel("Date")
             plt.ylabel("Differenced Sales")
             plt.title("Differenced Time Series")
             plt.legend()
             st.pyplot(plt)
 
-            # Recheck stationarity after differencing
-            stationarity_result = check_stationarity(data["y"].dropna())
+            stationarity_result = check_stationarity(preprocessed_data["y"].dropna())
             st.markdown(
                 f"""
                 <div style="text-align: center;">
@@ -191,80 +165,74 @@ def preprocess_data(data, date_column, sales_column):
                 unsafe_allow_html=True,
             )
 
-        return data
+        return preprocessed_data, stationarity_result, original_data
 
     except Exception as e:
         st.error(f"Error during data preprocessing: {e}")
-        return None
+        return None, None, None
+
+    except Exception as e:
+        st.error(f"Error during data preprocessing: {e}")
+        return None, None
+
+def inverse_difference(original_data, forecast_data):
+    forecast_data["yhat"] = original_data["y"].iloc[-1] + forecast_data["yhat"].cumsum()
+    return forecast_data
 
 def detect_and_add_seasonalities(model, data):
-    """
-    Detect seasonalities dynamically and add them to the Prophet model.
-    """
     data_frequency = pd.infer_freq(data["ds"])
-    if data_frequency == "D":  # Daily data
+    if data_frequency == "D":
         model.add_seasonality(name="daily", period=1, fourier_order=3)
-    elif data_frequency == "W":  # Weekly data
+    elif data_frequency == "W":
         model.add_seasonality(name="weekly", period=7, fourier_order=3)
-    elif data_frequency == "M":  # Monthly data
+    elif data_frequency == "M":
         model.add_seasonality(name="monthly", period=30.5, fourier_order=5)
-    elif data_frequency == "Q":  # Quarterly data
+    elif data_frequency == "Q":
         model.add_seasonality(name="quarterly", period=91.25, fourier_order=5)
-    elif data_frequency == "Y":  # Yearly data
+    elif data_frequency == "Y":
         model.add_seasonality(name="yearly", period=365.25, fourier_order=10)
     return model
 
 def find_best_prophet_params(train):
-    """
-    Automates the selection of the best Prophet hyperparameters using cross-validation.
-    Dynamically adjusts horizon, initial, and parameter grid based on dataset size.
-    """
-    # Determine dataset size
     dataset_length = len(train)
 
-    # Dynamic parameter grid based on dataset size
-    if dataset_length < 100:  # Small dataset
+    if dataset_length < 100:
         param_grid = {
-            "changepoint_prior_scale": [0.01, 0.1],  # Fewer values
-            "seasonality_mode": ["additive"]  # Only additive seasonality
+            "changepoint_prior_scale": [0.01, 0.1],
+            "seasonality_mode": ["additive"]
         }
-    else:  # Large dataset
+    else:
         param_grid = {
-            "changepoint_prior_scale": [0.01, 0.05, 0.1, 0.2, 0.3],  # More values
-            "seasonality_mode": ["additive", "multiplicative"]  # Both modes
+            "changepoint_prior_scale": [0.01, 0.05, 0.1, 0.2, 0.3],
+            "seasonality_mode": ["additive", "multiplicative"]
         }
 
     best_params = None
     best_rmse = float("inf")
 
-    # Dynamic horizon and initial window
-    if dataset_length < 100:  # Small dataset
-        horizon_days = min(7, max(3, dataset_length // 5))  # Smaller horizon
-        initial_days = max(30, dataset_length // 2)  # Smaller initial window
-    else:  # Large dataset
-        horizon_days = min(30, max(7, dataset_length // 10))  # Larger horizon
-        initial_days = max(90, dataset_length // 3)  # Larger initial window
+    if dataset_length < 100:
+        horizon_days = min(7, max(3, dataset_length // 5))
+        initial_days = max(30, dataset_length // 2)
+    else:
+        horizon_days = min(30, max(7, dataset_length // 10))
+        initial_days = max(90, dataset_length // 3)
 
     horizon = f"{horizon_days} days"
     initial = f"{initial_days} days"
-    period = f"{horizon_days // 2} days"  # Dynamic period
+    period = f"{horizon_days // 2} days"
 
-    # Track progress with tqdm
     for params in tqdm(ParameterGrid(param_grid), desc="Hyperparameter Search"):
         try:
-            # Initialize Prophet model with current parameters
             prophet_model = Prophet(
                 seasonality_mode=params["seasonality_mode"],
                 changepoint_prior_scale=params["changepoint_prior_scale"],
-                yearly_seasonality=dataset_length >= 365,  # Enable yearly seasonality for large datasets
-                weekly_seasonality=dataset_length >= 30,   # Enable weekly seasonality for medium/large datasets
-                daily_seasonality=False  # Disable daily seasonality unless needed
+                yearly_seasonality=dataset_length >= 365,
+                weekly_seasonality=dataset_length >= 30,
+                daily_seasonality=False
             )
 
-            # Fit the model
             prophet_model.fit(train)
 
-            # Perform cross-validation
             cv_results = cross_validation(
                 prophet_model,
                 initial=initial,
@@ -273,31 +241,26 @@ def find_best_prophet_params(train):
             )
             metrics = performance_metrics(cv_results)
 
-            # Extract RMSE
             rmse = metrics["rmse"].mean()
 
-            # Update best parameters
             if rmse < best_rmse:
                 best_rmse = rmse
                 best_params = params
 
         except Exception as e:
-            # Log and skip invalid configurations
             st.write(f"Failed with params {params}: {e}")
             continue
 
     return best_params, best_rmse
 
 def main():
-    # Check user subscription level
-    user_id = "user123"  # Replace with actual user ID from session
-    subscription_level = "premium" # get_user_subscription_level(user_id)
+    user_id = "user123"
+    subscription_level = "premium"
 
     if subscription_level != "premium":
         st.warning("🔒 Upgrade to Premium to unlock advanced features like AutoML, scenario planning, and more!")
         st.stop()
 
-    # File Upload
     uploaded_file = st.file_uploader("Upload your sales data file", type=["csv"])
 
     if uploaded_file:
@@ -306,7 +269,6 @@ def main():
             st.write("Uploaded Data:")
             st.dataframe(data)
 
-            # 📌 Center "Map Your Columns" Section
             st.markdown(
                 """
                 <div style="text-align: center;">
@@ -316,28 +278,22 @@ def main():
                 unsafe_allow_html=True,
             )
 
-            # 🗂 Dropdowns for Column Selection (Centered)
             col1, col2 = st.columns([1, 1])
             with col1:
                 date_column = st.selectbox("📅 Select the Date Column:", ["-- Select Column --"] + list(data.columns), key="date_col")
             with col2:
                 sales_column = st.selectbox("💰 Select the Sales Column:", ["-- Select Column --"] + list(data.columns), key="sales_col")
 
-            # 🚀 Disable "Start Forecast" Button Until Valid Selections
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
                 start_forecast = st.button("✅ Start Forecast", key="start_btn", help="Click to generate your AI-powered forecast")
             else:
                 start_forecast = st.button("⏳ Select Columns First", disabled=True, key="start_disabled")
 
-            # 🏁 Run Forecast Only If Button is Clicked
             if start_forecast:
-                # Run forecast logic
-                # Preprocess Data
-                data = preprocess_data(data, date_column, sales_column)
-                if data is None:
+                preprocessed_data, stationarity_result = preprocess_data(data, date_column, sales_column)
+                if preprocessed_data is None:
                     return
 
-                # ✅ Centered Header with Icon
                 st.markdown(
                     """
                     <div style="text-align: center;">
@@ -349,9 +305,7 @@ def main():
                     unsafe_allow_html=True,
                 )
 
-                # ✅ Use Streamlit's Expander to Organize Data
                 with st.expander("📊 View Processed Data"):
-                    # ✅ Adjust Column Widths Dynamically
                     st.markdown(
                         """
                         <style>
@@ -362,26 +316,22 @@ def main():
                         unsafe_allow_html=True,
                     )
 
-                    # ✅ Display DataFrame with Improved Spacing
                     st.dataframe(
-                        data.style.set_properties(**{"text-align": "center"}),
-                        width=1400,  # Wider Table
-                        height=450   # Show More Rows
+                        preprocessed_data.style.set_properties(**{"text-align": "center"}),
+                        width=1400,
+                        height=450
                     )
 
-                # Determine Testing Period Dynamically
-                testing_period = int(len(data) * 0.2)
-                train = data.iloc[:-testing_period]
-                test = data.iloc[-testing_period:]
+                testing_period = int(len(preprocessed_data) * 0.2)
+                train = preprocessed_data.iloc[:-testing_period]
+                test = preprocessed_data.iloc[-testing_period:]
 
-                forecast_period = 12  # Fixed to 12 months forecast
+                forecast_period = 12
 
-                # Forecasting Models
                 results = {}
 
-                # Prophet Model
                 st.write("🚀 Finding the best Prophet hyperparameters...")
-                best_params, best_rmse = find_best_prophet_params(train)  # No need for 'test' parameter anymore
+                best_params, best_rmse = find_best_prophet_params(train)
 
                 if best_params is None:
                     st.error("❌ No valid Prophet parameters were found. Check your data preprocessing or parameter grid.")
@@ -896,10 +846,8 @@ def main():
                 # Create a DataFrame for model comparison
                 comparison_data = []
                 for model, result in results.items():
-                    # Ensure the result contains valid RMSE and MAPE values
                     if isinstance(result, dict) and "RMSE" in result and "MAPE" in result:
                         try:
-                            # Convert RMSE and MAPE to float (in case they are numpy.float64)
                             rmse = float(result["RMSE"])
                             mape = float(result["MAPE"])
                             comparison_data.append({
@@ -912,7 +860,6 @@ def main():
                     else:
                         st.warning(f"⚠️ Invalid result format for model {model}. Expected a dictionary with 'RMSE' and 'MAPE' keys.")
 
-                # Check if any valid models were added to the comparison
                 if comparison_data:
                     comparison = pd.DataFrame(comparison_data)
                     comparison = comparison.sort_values(by="RMSE")  # Sort models by accuracy (lower RMSE is better)
@@ -971,6 +918,11 @@ def main():
                     except Exception as e:
                         st.error(f"❌ Error analyzing forecast data: {e}")
 
+                # Preprocess the data and get original_data
+                preprocessed_data, stationarity_result, original_data = preprocess_data(data, date_column, sales_column)
+                if preprocessed_data is None:
+                    return
+
                 # 📊 Multi-Model Forecast Visualization
                 st.markdown("### 🔍 Forecast Comparison Across Models")
                 model_colors = {
@@ -980,18 +932,28 @@ def main():
                     "AutoML": "purple"
                 }
 
+                # Create the figure
                 fig = go.Figure()
+
+                # Add historical data
                 fig.add_trace(go.Scatter(
-                    x=train["ds"],
-                    y=train["y"],
+                    x=original_data["ds"],
+                    y=original_data["y"],
                     mode="lines",
                     name="Historical Data",
                     line=dict(color="black", width=2)
                 ))
 
+                # Add forecasts for each model
                 for model, result in results.items():
                     if "Forecast" in result and result["Forecast"] is not None and not result["Forecast"].empty:
-                        forecast_df = result["Forecast"]
+                        forecast_df = result["Forecast"].copy()  # Create a copy to avoid modifying the original
+
+                        # Apply inverse differencing if the series was differenced
+                        if stationarity_result == "Non-Stationary":
+                            forecast_df = inverse_difference(original_data, forecast_df)
+
+                        # Add the forecast to the plot
                         fig.add_trace(go.Scatter(
                             x=forecast_df["ds"],
                             y=forecast_df["yhat"],
@@ -1000,6 +962,7 @@ def main():
                             line=dict(width=2, color=model_colors.get(model, "gray"))
                         ))
 
+                # Update layout
                 fig.update_layout(
                     title="📊 Multi-Model Sales Forecast",
                     xaxis_title="Date",
@@ -1007,6 +970,8 @@ def main():
                     legend_title="Models",
                     template="plotly_white"
                 )
+
+                # Display the chart
                 st.plotly_chart(fig, use_container_width=True)
 
                 # 📥 Download Forecast Data
@@ -1024,9 +989,6 @@ def main():
                         st.error(f"❌ Error generating download file: {e}")
                 else:
                     st.warning("⚠️ No forecast data available for download.")
-
-        except Exception as e:
-            st.error(f"Error processing file: {e}")
 
 if __name__ == "__main__":
     main()
