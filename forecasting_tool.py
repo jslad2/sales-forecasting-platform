@@ -94,13 +94,25 @@ def is_feature_available(subscription_level, feature):
     }
     return subscription_levels.get(subscription_level, {}).get(feature, False)
 
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.stattools import adfuller, kpss
+import streamlit as st
+
 def check_stationarity(series):
+    """
+    Perform the Augmented Dickey-Fuller (ADF) and KPSS tests to check stationarity.
+    """
+    # ADF Test
     adf_result = adfuller(series, autolag="AIC")
     adf_p_value = adf_result[1]
 
+    # KPSS Test
     kpss_result = kpss(series, regression="c", nlags="auto")
     kpss_p_value = kpss_result[1]
 
+    # Determine stationarity
     if adf_p_value < 0.05 and kpss_p_value > 0.05:
         return "Stationary"
     elif adf_p_value >= 0.05 and kpss_p_value <= 0.05:
@@ -109,6 +121,76 @@ def check_stationarity(series):
         return "Inconclusive"
 
 def preprocess_data(data, date_column, sales_column):
+    """
+    Preprocess the uploaded data, check stationarity, and apply transformations if needed.
+    """
+    try:
+        # Convert date column to datetime
+        data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
+        data = data.dropna(subset=[date_column, sales_column])
+
+        # Aggregate to Monthly
+        data = data[[date_column, sales_column]].rename(columns={date_column: "ds", sales_column: "y"})
+        data["ds"] = pd.to_datetime(data["ds"], errors="coerce")
+        data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
+        data["ds"] = data["ds"].dt.to_timestamp()
+
+        # Plot original series
+        st.markdown("### Original Series")
+        plt.figure(figsize=(10, 6))
+        plt.plot(data["ds"], data["y"], label="Original Series")
+        plt.xlabel("Date")
+        plt.ylabel("Sales")
+        plt.title("Original Time Series")
+        plt.legend()
+        st.pyplot(plt)
+
+        # Check stationarity
+        stationarity_result = check_stationarity(data["y"])
+        st.markdown(
+            f"""
+            <div style="text-align: center;">
+                <h2 style="color: #2B3A42;">📊 Stationarity Test</h2>
+                <p style="font-size: 1.2rem;">Conclusion: The series is <strong>{stationarity_result}</strong>.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # Apply transformations if non-stationary
+        if stationarity_result == "Non-Stationary":
+            st.warning("Applying differencing to stabilize the series.")
+            data["y"] = data["y"].diff().dropna()
+
+            # Plot differenced series
+            st.markdown("### Differenced Series")
+            plt.figure(figsize=(10, 6))
+            plt.plot(data["ds"].iloc[1:], data["y"].iloc[1:], label="Differenced Series", color="orange")
+            plt.xlabel("Date")
+            plt.ylabel("Differenced Sales")
+            plt.title("Differenced Time Series")
+            plt.legend()
+            st.pyplot(plt)
+
+            # Recheck stationarity after differencing
+            stationarity_result = check_stationarity(data["y"].dropna())
+            st.markdown(
+                f"""
+                <div style="text-align: center;">
+                    <h2 style="color: #2B3A42;">📊 Stationarity Test (After Differencing)</h2>
+                    <p style="font-size: 1.2rem;">Conclusion: The series is <strong>{stationarity_result}</strong>.</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        return data
+
+    except Exception as e:
+        st.error(f"Error during data preprocessing: {e}")
+        return None
+
+# def preprocess_data(data, date_column, sales_column):
     try:
         data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
         data = data.dropna(subset=[date_column, sales_column])
@@ -117,19 +199,13 @@ def preprocess_data(data, date_column, sales_column):
         original_data = data[[date_column, sales_column]].rename(columns={date_column: "ds", sales_column: "y"})
         original_data["ds"] = pd.to_datetime(original_data["ds"], errors="coerce")
 
-        # Aggregate to monthly data
-        preprocessed_data = original_data.groupby(original_data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
-        preprocessed_data["ds"] = preprocessed_data["ds"].dt.to_timestamp()
+        # Aggregate daily data to monthly data
+        original_data_monthly = original_data.resample("M", on="ds").sum().reset_index()
 
-        st.markdown("### Original Series")
-        plt.figure(figsize=(10, 6))
-        plt.plot(preprocessed_data["ds"], preprocessed_data["y"], label="Original Series")
-        plt.xlabel("Date")
-        plt.ylabel("Sales")
-        plt.title("Original Time Series")
-        plt.legend()
-        st.pyplot(plt)
+        # Aggregate to monthly data for preprocessing
+        preprocessed_data = original_data_monthly.copy()
 
+        # Check stationarity
         stationarity_result = check_stationarity(preprocessed_data["y"])
         st.markdown(
             f"""
@@ -141,39 +217,88 @@ def preprocess_data(data, date_column, sales_column):
             unsafe_allow_html=True,
         )
 
+        # Apply differencing if the series is non-stationary
         if stationarity_result == "Non-Stationary":
-            st.warning("Applying differencing to stabilize the series.")
-            preprocessed_data["y"] = preprocessed_data["y"].diff().dropna()
+            preprocessed_data["y_diff"] = preprocessed_data["y"].diff().dropna()
+            differenced_data = preprocessed_data[["ds", "y_diff"]].dropna()
 
-            st.markdown("### Differenced Series")
-            plt.figure(figsize=(10, 6))
-            plt.plot(preprocessed_data["ds"].iloc[1:], preprocessed_data["y"].iloc[1:], label="Differenced Series", color="orange")
-            plt.xlabel("Date")
-            plt.ylabel("Differenced Sales")
-            plt.title("Differenced Time Series")
-            plt.legend()
-            st.pyplot(plt)
+            # Create a Plotly figure
+            fig = go.Figure()
 
-            stationarity_result = check_stationarity(preprocessed_data["y"].dropna())
-            st.markdown(
-                f"""
-                <div style="text-align: center;">
-                    <h2 style="color: #2B3A42;">📊 Stationarity Test (After Differencing)</h2>
-                    <p style="font-size: 1.2rem;">Conclusion: The series is <strong>{stationarity_result}</strong>.</p>
-                </div>
-                """,
-                unsafe_allow_html=True,
+            # Add the original series
+            fig.add_trace(go.Scatter(
+                x=preprocessed_data["ds"],
+                y=preprocessed_data["y"],
+                mode="lines",
+                name="Original Series",
+                line=dict(color="blue", width=2)
+            ))
+
+            # Add the differenced series
+            fig.add_trace(go.Scatter(
+                x=differenced_data["ds"],
+                y=differenced_data["y_diff"],
+                mode="lines",
+                name="Differenced Series",
+                line=dict(color="orange", width=2, dash="dot")
+            ))
+
+            # Update layout
+            fig.update_layout(
+                title="📊 Original vs Differenced Series",
+                xaxis_title="Date",
+                yaxis_title="Sales",
+                legend_title="Series",
+                template="plotly_white",
+                hovermode="x unified",
+                margin=dict(l=50, r=50, t=80, b=50),
+                showlegend=True
             )
 
-        return preprocessed_data, stationarity_result, original_data
+            # Add grid lines
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
+
+            # Display the chart
+            st.plotly_chart(fig, use_container_width=True)
+
+        else:
+            # If the series is stationary, plot only the original series
+            fig = go.Figure()
+
+            # Add the original series
+            fig.add_trace(go.Scatter(
+                x=preprocessed_data["ds"],
+                y=preprocessed_data["y"],
+                mode="lines",
+                name="Original Series",
+                line=dict(color="blue", width=2)
+            ))
+
+            # Update layout
+            fig.update_layout(
+                title="📊 Original Series",
+                xaxis_title="Date",
+                yaxis_title="Sales",
+                legend_title="Series",
+                template="plotly_white",
+                hovermode="x unified",
+                margin=dict(l=50, r=50, t=80, b=50),
+                showlegend=True
+            )
+
+            # Add grid lines
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
+
+            # Display the chart
+            st.plotly_chart(fig, use_container_width=True)
+
+        return preprocessed_data, stationarity_result, original_data_monthly
 
     except Exception as e:
         st.error(f"Error during data preprocessing: {e}")
         return None, None, None
-
-    except Exception as e:
-        st.error(f"Error during data preprocessing: {e}")
-        return None, None
 
 def inverse_difference(original_data, forecast_data):
     forecast_data["yhat"] = original_data["y"].iloc[-1] + forecast_data["yhat"].cumsum()
@@ -290,7 +415,7 @@ def main():
                 start_forecast = st.button("⏳ Select Columns First", disabled=True, key="start_disabled")
 
             if start_forecast:
-                preprocessed_data, stationarity_result, original_data = preprocess_data(data, date_column, sales_column)
+                preprocessed_data, stationarity_result, original_data_monthly = preprocess_data(data, date_column, sales_column)
                 if preprocessed_data is None:
                     return
 
@@ -662,6 +787,7 @@ def main():
                 # except Exception as e:
                 #     st.warning(f"XGBoost Model failed: {e}")
 
+                # AutoML Model
                 st.write("🚀 Training AutoML Model...")
 
                 try:
@@ -670,11 +796,11 @@ def main():
 
                     # ✅ Dynamically determine max_lag based on dataset size
                     if len(train) <= 6:
-                        max_lag = min(3, len(train) - 1)
+                        max_lag = min(3, len(train) - 1)  # Use smaller lags for small datasets
                     elif len(train) <= 12:
                         max_lag = min(6, len(train) - 1)
                     elif len(train) <= 24:
-                        max_lag = min(12, len(train) - 1)
+                        max_lag = min(6, len(train) - 1)  # Reduce max_lag for small datasets
                     else:
                         max_lag = min(24, len(train) - 1)
 
@@ -685,7 +811,7 @@ def main():
                         automl_data[f"lag_{lag}"] = automl_data["y"].shift(lag)
 
                     # ✅ Add rolling statistics
-                    for window in [3, 6, 12]:
+                    for window in [1, 2, 3]:  # Smaller windows to reduce missing values
                         automl_data[f"rolling_mean_{window}"] = automl_data["y"].rolling(window=window, min_periods=1).mean()
                         automl_data[f"rolling_std_{window}"] = automl_data["y"].rolling(window=window, min_periods=1).std()
 
@@ -702,34 +828,28 @@ def main():
                     # ✅ Add seasonal features
                     automl_data["sin_month"] = np.sin(2 * np.pi * automl_data["ds"].dt.month / 12)
                     automl_data["cos_month"] = np.cos(2 * np.pi * automl_data["ds"].dt.month / 12)
+                    automl_data["day_of_week"] = automl_data["ds"].dt.dayofweek  # Add day of week feature
 
-                    # ✅ Apply log transformation only when needed
-                    if automl_data["y"].max() / automl_data["y"].min() > 5:
-                        st.write("🔹 Applying log transformation for variance stabilization.")
-                        automl_data["y_log"] = np.log1p(automl_data["y"])
-                        apply_log = True
-                    else:
-                        st.write("🔹 Skipping log transformation.")
-                        apply_log = False
-
-                    # Use y instead of y_log if log transformation is skipped
-                    if not apply_log:
-                        automl_data["y_log"] = automl_data["y"]  # <-- Ensure y_log exists for consistency
+                    # ✅ Skip log transformation
+                    apply_log = False
+                    automl_data["y_log"] = automl_data["y"]  # Use y directly
 
                     # Debugging: Check columns
                     st.write(f"🔹 Log transformation applied: {apply_log}")
                     st.write(f"🔹 Columns in automl_data: {automl_data.columns}")
 
+                    # Debugging: Check rows before and after dropna
+                    st.write(f"🔹 Rows in automl_data before dropna: {len(automl_data)}")
                     automl_data.dropna(inplace=True)
+                    st.write(f"🔹 Rows in automl_data after dropna: {len(automl_data)}")
 
                     # ✅ Dynamically build feature list
                     feature_cols = [col for col in automl_data.columns if col not in ["y", "ds", "y_log"]]
+                    st.write(f"🔹 Feature columns: {feature_cols}")
 
                     # ✅ Prepare training data
-                    if apply_log:
-                        y_train = automl_data["y_log"]
-                    else:
-                        y_train = automl_data["y"]  # <-- Use y if log transformation is skipped
+                    y_train = automl_data["y"]  # Use y directly
+                    st.write(f"🔹 y_train: {y_train}")
 
                     x_train = automl_data[feature_cols]
 
@@ -740,9 +860,8 @@ def main():
                         X_train=x_train,
                         y_train=y_train,
                         task="regression",
-                        time_budget=300,
+                        time_budget=600,  # Increase time budget
                         eval_method="cv",
-                        #cv=TimeSeriesSplit(n_splits=3),
                         estimator_list=["xgboost", "lgbm", "rf", "catboost"],
                         metric="r2",
                     )
@@ -762,19 +881,13 @@ def main():
                         # Update lags
                         for lag in range(1, max_lag + 1):
                             if lag == 1:
-                                if apply_log:
-                                    future_row[f"lag_{lag}"] = last_row["y_log"]  # Use y_log if log transformation is applied
-                                else:
-                                    future_row[f"lag_{lag}"] = last_row["y"]  # Use y if log transformation is skipped
+                                future_row[f"lag_{lag}"] = last_row["y"]  # Use y directly
                             else:
                                 future_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
 
                         # Update rolling statistics
-                        for window in [3, 6, 12]:
-                            if apply_log:
-                                future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y_log"] - last_row[f"lag_{window}"]) / window
-                            else:
-                                future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y"] - last_row[f"lag_{window}"]) / window
+                        for window in [1, 2, 3]:  # Smaller windows to preserve peaks
+                            future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y"] - last_row[f"lag_{window}"]) / window
                             future_row[f"rolling_std_{window}"] = last_row[f"rolling_std_{window}"]
 
                         # Update other features
@@ -783,12 +896,12 @@ def main():
                         future_row["rolling_mean_growth"] = last_row["rolling_mean_growth"]
                         future_row["sin_month"] = np.sin(2 * np.pi * (last_row["ds"].month + i) / 12)
                         future_row["cos_month"] = np.cos(2 * np.pi * (last_row["ds"].month + i) / 12)
+                        future_row["day_of_week"] = (last_row["ds"].dayofweek + i) % 7  # Update day of week
 
-                    # Append the future_row to future_features
+                        # Append the future_row to future_features
                         future_features.append(future_row)
 
                         # Update last_row for the next iteration
-                        # Preserve all columns from last_row and update only the relevant ones
                         last_row = last_row.copy()  # Create a copy of last_row to avoid modifying the original
                         for key, value in future_row.items():
                             last_row[key] = value  # Update last_row with the new values
@@ -805,10 +918,6 @@ def main():
 
                     # ✅ Generate Forecast
                     automl_forecast = automl_model.predict(future_df)
-
-                    # ✅ Reverse log transformation if applied
-                    if apply_log:
-                        automl_forecast = np.expm1(automl_forecast)
 
                     # ✅ Prepare Forecast DataFrame
                     forecast_df = pd.DataFrame({
@@ -930,12 +1039,12 @@ def main():
                 # Create the figure
                 fig = go.Figure()
 
-                # Add historical data
+                # Add historical data (monthly aggregated)
                 fig.add_trace(go.Scatter(
-                    x=original_data["ds"],
-                    y=original_data["y"],
+                    x=original_data_monthly["ds"],
+                    y=original_data_monthly["y"],
                     mode="lines",
-                    name="Historical Data",
+                    name="Historical Data (Monthly)",
                     line=dict(color="black", width=2)
                 ))
 
@@ -944,9 +1053,17 @@ def main():
                     if "Forecast" in result and result["Forecast"] is not None and not result["Forecast"].empty:
                         forecast_df = result["Forecast"].copy()  # Create a copy to avoid modifying the original
 
+                        # Debugging: Check forecast data before inverse differencing
+                        st.write(f"Forecast Data (Before Inverse Differencing) for {model}:")
+                        st.write(forecast_df)
+
                         # Apply inverse differencing if the series was differenced
                         if stationarity_result == "Non-Stationary":
-                            forecast_df = inverse_difference(original_data, forecast_df)
+                            forecast_df = inverse_difference(original_data_monthly, forecast_df)
+
+                            # Debugging: Check forecast data after inverse differencing
+                            st.write(f"Forecast Data (After Inverse Differencing) for {model}:")
+                            st.write(forecast_df)
 
                         # Add the forecast to the plot
                         fig.add_trace(go.Scatter(
@@ -984,7 +1101,9 @@ def main():
                         st.error(f"❌ Error generating download file: {e}")
                 else:
                     st.warning("⚠️ No forecast data available for download.")
+
         except Exception as e:
             st.error(f"Error processing file: {e}")
+
 if __name__ == "__main__":
     main()
