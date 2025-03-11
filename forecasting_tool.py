@@ -25,6 +25,7 @@ import time
 import os
 from supabase import create_client, Client
 from dotenv import load_dotenv
+import catboost
 
 # Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
 st.set_page_config(layout="wide")
