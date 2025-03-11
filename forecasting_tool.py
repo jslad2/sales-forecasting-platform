@@ -7,7 +7,7 @@ from flaml import AutoML
 from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
 import numpy as np
 import plotly.express as px
-from statsmodels.tsa.stattools import adfuller
+from statsmodels.tsa.stattools import adfuller, kpss
 import matplotlib.pyplot as plt
 from prophet.plot import add_changepoints_to_plot
 from prophet.diagnostics import cross_validation, performance_metrics
@@ -26,6 +26,7 @@ import os
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import catboost
+from tqdm import tqdm
 
 # Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
 st.set_page_config(layout="wide")
@@ -108,17 +109,30 @@ def is_feature_available(subscription_level, feature):
 
 def check_stationarity(series):
     """
-    Perform the Augmented Dickey-Fuller test to check stationarity.
+    Perform the Augmented Dickey-Fuller (ADF) and KPSS tests to check stationarity.
     """
-    result = adfuller(series, autolag="AIC")
-    p_value = result[1]
-    return "Stationary" if p_value < 0.05 else "Non-Stationary"
+    # ADF Test
+    adf_result = adfuller(series, autolag="AIC")
+    adf_p_value = adf_result[1]
+
+    # KPSS Test
+    kpss_result = kpss(series, regression="c", nlags="auto")
+    kpss_p_value = kpss_result[1]
+
+    # Determine stationarity
+    if adf_p_value < 0.05 and kpss_p_value > 0.05:
+        return "Stationary"
+    elif adf_p_value >= 0.05 and kpss_p_value <= 0.05:
+        return "Non-Stationary"
+    else:
+        return "Inconclusive"
 
 def preprocess_data(data, date_column, sales_column):
     """
-    Preprocess the uploaded data and check stationarity.
+    Preprocess the uploaded data, check stationarity, and apply transformations if needed.
     """
     try:
+        # Convert date column to datetime
         data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
         data = data.dropna(subset=[date_column, sales_column])
 
@@ -128,23 +142,57 @@ def preprocess_data(data, date_column, sales_column):
         data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
         data["ds"] = data["ds"].dt.to_timestamp()
 
+        # Plot original series
+        st.markdown("### Original Series")
+        plt.figure(figsize=(10, 6))
+        plt.plot(data["ds"], data["y"], label="Original Series")
+        plt.xlabel("Date")
+        plt.ylabel("Sales")
+        plt.title("Original Time Series")
+        plt.legend()
+        st.pyplot(plt)
+
         # Check stationarity
         stationarity_result = check_stationarity(data["y"])
         st.markdown(
-                    """
-                    <div style="text-align: center;">
-                        <h2 style="color: #2B3A42;">📊 Stationarity Test</h2>
-                        <p style="font-size: 1.2rem;">Conclusion: The series is <strong>Stationary</strong>.</p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+            f"""
+            <div style="text-align: center;">
+                <h2 style="color: #2B3A42;">📊 Stationarity Test</h2>
+                <p style="font-size: 1.2rem;">Conclusion: The series is <strong>{stationarity_result}</strong>.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
+        # Apply transformations if non-stationary
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
             data["y"] = data["y"].diff().dropna()
 
+            # Plot differenced series
+            st.markdown("### Differenced Series")
+            plt.figure(figsize=(10, 6))
+            plt.plot(data["ds"].iloc[1:], data["y"].iloc[1:], label="Differenced Series", color="orange")
+            plt.xlabel("Date")
+            plt.ylabel("Differenced Sales")
+            plt.title("Differenced Time Series")
+            plt.legend()
+            st.pyplot(plt)
+
+            # Recheck stationarity after differencing
+            stationarity_result = check_stationarity(data["y"].dropna())
+            st.markdown(
+                f"""
+                <div style="text-align: center;">
+                    <h2 style="color: #2B3A42;">📊 Stationarity Test (After Differencing)</h2>
+                    <p style="font-size: 1.2rem;">Conclusion: The series is <strong>{stationarity_result}</strong>.</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
         return data
+
     except Exception as e:
         st.error(f"Error during data preprocessing: {e}")
         return None
@@ -169,37 +217,49 @@ def detect_and_add_seasonalities(model, data):
 def find_best_prophet_params(train):
     """
     Automates the selection of the best Prophet hyperparameters using cross-validation.
-    Dynamically adjusts horizon and initial based on the dataset size.
+    Dynamically adjusts horizon, initial, and parameter grid based on dataset size.
     """
-    from prophet.diagnostics import cross_validation, performance_metrics
-    from sklearn.model_selection import ParameterGrid
+    # Determine dataset size
+    dataset_length = len(train)
 
-    param_grid = {
-        "changepoint_prior_scale": [0.01, 0.05, 0.1, 0.2, 0.3],
-        "seasonality_mode": ["additive", "multiplicative"]
-    }
+    # Dynamic parameter grid based on dataset size
+    if dataset_length < 100:  # Small dataset
+        param_grid = {
+            "changepoint_prior_scale": [0.01, 0.1],  # Fewer values
+            "seasonality_mode": ["additive"]  # Only additive seasonality
+        }
+    else:  # Large dataset
+        param_grid = {
+            "changepoint_prior_scale": [0.01, 0.05, 0.1, 0.2, 0.3],  # More values
+            "seasonality_mode": ["additive", "multiplicative"]  # Both modes
+        }
 
     best_params = None
     best_rmse = float("inf")
 
-    # Determine dynamic horizon and initial window
-    dataset_length = len(train)
-    horizon_days = min(30, max(7, dataset_length // 5))  # Dynamic horizon: 20% of dataset length, capped at 30 days
-    initial_days = max(90, dataset_length // 2)  # Dynamic initial window: 50% of dataset length, min 90 days
+    # Dynamic horizon and initial window
+    if dataset_length < 100:  # Small dataset
+        horizon_days = min(7, max(3, dataset_length // 5))  # Smaller horizon
+        initial_days = max(30, dataset_length // 2)  # Smaller initial window
+    else:  # Large dataset
+        horizon_days = min(30, max(7, dataset_length // 10))  # Larger horizon
+        initial_days = max(90, dataset_length // 3)  # Larger initial window
 
     horizon = f"{horizon_days} days"
     initial = f"{initial_days} days"
+    period = f"{horizon_days // 2} days"  # Dynamic period
 
-    for params in ParameterGrid(param_grid):
+    # Track progress with tqdm
+    for params in tqdm(ParameterGrid(param_grid), desc="Hyperparameter Search"):
         try:
             # Initialize Prophet model with current parameters
             prophet_model = Prophet(
                 seasonality_mode=params["seasonality_mode"],
-                changepoint_prior_scale=params["changepoint_prior_scale"]
+                changepoint_prior_scale=params["changepoint_prior_scale"],
+                yearly_seasonality=dataset_length >= 365,  # Enable yearly seasonality for large datasets
+                weekly_seasonality=dataset_length >= 30,   # Enable weekly seasonality for medium/large datasets
+                daily_seasonality=False  # Disable daily seasonality unless needed
             )
-
-            # Dynamically detect and add seasonalities
-            prophet_model = detect_and_add_seasonalities(prophet_model, train)
 
             # Fit the model
             prophet_model.fit(train)
@@ -209,7 +269,7 @@ def find_best_prophet_params(train):
                 prophet_model,
                 initial=initial,
                 horizon=horizon,
-                period=f"{horizon_days // 2} days"  # Test every half-horizon period
+                period=period
             )
             metrics = performance_metrics(cv_results)
 
