@@ -676,7 +676,7 @@ def main():
                         automl_data[f"lag_{lag}"] = automl_data["y"].shift(lag)
 
                     # ✅ Add rolling statistics
-                    for window in [3, 6, 12]:
+                    for window in [1, 2, 3, 7]:  # Smaller windows to preserve peaks
                         automl_data[f"rolling_mean_{window}"] = automl_data["y"].rolling(window=window, min_periods=1).mean()
                         automl_data[f"rolling_std_{window}"] = automl_data["y"].rolling(window=window, min_periods=1).std()
 
@@ -693,19 +693,11 @@ def main():
                     # ✅ Add seasonal features
                     automl_data["sin_month"] = np.sin(2 * np.pi * automl_data["ds"].dt.month / 12)
                     automl_data["cos_month"] = np.cos(2 * np.pi * automl_data["ds"].dt.month / 12)
+                    automl_data["day_of_week"] = automl_data["ds"].dt.dayofweek  # Add day of week feature
 
-                    # ✅ Apply log transformation only when needed
-                    if automl_data["y"].max() / automl_data["y"].min() > 5:
-                        st.write("🔹 Applying log transformation for variance stabilization.")
-                        automl_data["y_log"] = np.log1p(automl_data["y"])
-                        apply_log = True
-                    else:
-                        st.write("🔹 Skipping log transformation.")
-                        apply_log = False
-
-                    # Use y instead of y_log if log transformation is skipped
-                    if not apply_log:
-                        automl_data["y_log"] = automl_data["y"]  # <-- Ensure y_log exists for consistency
+                    # ✅ Skip log transformation
+                    apply_log = False
+                    automl_data["y_log"] = automl_data["y"]  # Use y directly
 
                     # Debugging: Check columns
                     st.write(f"🔹 Log transformation applied: {apply_log}")
@@ -717,11 +709,7 @@ def main():
                     feature_cols = [col for col in automl_data.columns if col not in ["y", "ds", "y_log"]]
 
                     # ✅ Prepare training data
-                    if apply_log:
-                        y_train = automl_data["y_log"]
-                    else:
-                        y_train = automl_data["y"]  # <-- Use y if log transformation is skipped
-
+                    y_train = automl_data["y"]  # Use y directly
                     x_train = automl_data[feature_cols]
 
                     # ✅ Train AutoML with multiple models
@@ -731,9 +719,8 @@ def main():
                         X_train=x_train,
                         y_train=y_train,
                         task="regression",
-                        time_budget=300,
+                        time_budget=600,  # Increase time budget
                         eval_method="cv",
-                        #cv=TimeSeriesSplit(n_splits=3),
                         estimator_list=["xgboost", "lgbm", "rf", "catboost"],
                         metric="r2",
                     )
@@ -753,19 +740,13 @@ def main():
                         # Update lags
                         for lag in range(1, max_lag + 1):
                             if lag == 1:
-                                if apply_log:
-                                    future_row[f"lag_{lag}"] = last_row["y_log"]  # Use y_log if log transformation is applied
-                                else:
-                                    future_row[f"lag_{lag}"] = last_row["y"]  # Use y if log transformation is skipped
+                                future_row[f"lag_{lag}"] = last_row["y"]  # Use y directly
                             else:
                                 future_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
 
                         # Update rolling statistics
-                        for window in [3, 6, 12]:
-                            if apply_log:
-                                future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y_log"] - last_row[f"lag_{window}"]) / window
-                            else:
-                                future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y"] - last_row[f"lag_{window}"]) / window
+                        for window in [1, 2, 3, 7]:  # Smaller windows to preserve peaks
+                            future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y"] - last_row[f"lag_{window}"]) / window
                             future_row[f"rolling_std_{window}"] = last_row[f"rolling_std_{window}"]
 
                         # Update other features
@@ -774,12 +755,12 @@ def main():
                         future_row["rolling_mean_growth"] = last_row["rolling_mean_growth"]
                         future_row["sin_month"] = np.sin(2 * np.pi * (last_row["ds"].month + i) / 12)
                         future_row["cos_month"] = np.cos(2 * np.pi * (last_row["ds"].month + i) / 12)
+                        future_row["day_of_week"] = (last_row["ds"].dayofweek + i) % 7  # Update day of week
 
-                    # Append the future_row to future_features
+                        # Append the future_row to future_features
                         future_features.append(future_row)
 
                         # Update last_row for the next iteration
-                        # Preserve all columns from last_row and update only the relevant ones
                         last_row = last_row.copy()  # Create a copy of last_row to avoid modifying the original
                         for key, value in future_row.items():
                             last_row[key] = value  # Update last_row with the new values
@@ -796,10 +777,6 @@ def main():
 
                     # ✅ Generate Forecast
                     automl_forecast = automl_model.predict(future_df)
-
-                    # ✅ Reverse log transformation if applied
-                    if apply_log:
-                        automl_forecast = np.expm1(automl_forecast)
 
                     # ✅ Prepare Forecast DataFrame
                     forecast_df = pd.DataFrame({
@@ -822,9 +799,6 @@ def main():
                     }
 
                     st.success("✅ AutoML Forecast Generated Successfully!")
-
-                except Exception as e:
-                    st.error(f"❌ AutoML Model failed: {e}")
 
                 except Exception as e:
                     st.error(f"❌ AutoML Model failed: {e}")
