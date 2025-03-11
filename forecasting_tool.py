@@ -753,13 +753,19 @@ def main():
                         # Update lags
                         for lag in range(1, max_lag + 1):
                             if lag == 1:
-                                future_row[f"lag_{lag}"] = last_row["y"]  # <-- Use y instead of y_log
+                                if apply_log:
+                                    future_row[f"lag_{lag}"] = last_row["y_log"]  # Use y_log if log transformation is applied
+                                else:
+                                    future_row[f"lag_{lag}"] = last_row["y"]  # Use y if log transformation is skipped
                             else:
                                 future_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
 
                         # Update rolling statistics
                         for window in [3, 6, 12]:
-                            future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y"] - last_row[f"lag_{window}"]) / window
+                            if apply_log:
+                                future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y_log"] - last_row[f"lag_{window}"]) / window
+                            else:
+                                future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y"] - last_row[f"lag_{window}"]) / window
                             future_row[f"rolling_std_{window}"] = last_row[f"rolling_std_{window}"]
 
                         # Update other features
@@ -809,6 +815,9 @@ def main():
                     }
 
                     st.success("✅ AutoML Forecast Generated Successfully!")
+
+                except Exception as e:
+                    st.error(f"❌ AutoML Model failed: {e}")
 
                 except Exception as e:
                     st.error(f"❌ AutoML Model failed: {e}")
