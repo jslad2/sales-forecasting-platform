@@ -710,8 +710,12 @@ def main():
                     feature_cols = [col for col in automl_data.columns if col not in ["y", "ds", "y_log"]]
 
                     # ✅ Prepare training data
+                    if apply_log:
+                        y_train = automl_data["y_log"]
+                    else:
+                        y_train = automl_data["y"]
+
                     x_train = automl_data[feature_cols]
-                    y_train = automl_data["y_log"]
 
                     # ✅ Train AutoML with multiple models
                     automl_model = AutoML()
