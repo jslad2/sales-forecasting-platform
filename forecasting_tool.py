@@ -676,7 +676,7 @@ def main():
                         automl_data[f"lag_{lag}"] = automl_data["y"].shift(lag)
 
                     # ✅ Add rolling statistics
-                    for window in [1, 2, 3, 7]:  # Smaller windows to preserve peaks
+                    for window in [1, 2, 3]:  # Smaller windows to reduce missing values
                         automl_data[f"rolling_mean_{window}"] = automl_data["y"].rolling(window=window, min_periods=1).mean()
                         automl_data[f"rolling_std_{window}"] = automl_data["y"].rolling(window=window, min_periods=1).std()
 
@@ -703,13 +703,19 @@ def main():
                     st.write(f"🔹 Log transformation applied: {apply_log}")
                     st.write(f"🔹 Columns in automl_data: {automl_data.columns}")
 
+                    # Debugging: Check rows before and after dropna
+                    st.write(f"🔹 Rows in automl_data before dropna: {len(automl_data)}")
                     automl_data.dropna(inplace=True)
+                    st.write(f"🔹 Rows in automl_data after dropna: {len(automl_data)}")
 
                     # ✅ Dynamically build feature list
                     feature_cols = [col for col in automl_data.columns if col not in ["y", "ds", "y_log"]]
+                    st.write(f"🔹 Feature columns: {feature_cols}")
 
                     # ✅ Prepare training data
                     y_train = automl_data["y"]  # Use y directly
+                    st.write(f"🔹 y_train: {y_train}")
+
                     x_train = automl_data[feature_cols]
 
                     # ✅ Train AutoML with multiple models
@@ -745,7 +751,7 @@ def main():
                                 future_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
 
                         # Update rolling statistics
-                        for window in [1, 2, 3, 7]:  # Smaller windows to preserve peaks
+                        for window in [1, 2, 3]:  # Smaller windows to preserve peaks
                             future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y"] - last_row[f"lag_{window}"]) / window
                             future_row[f"rolling_std_{window}"] = last_row[f"rolling_std_{window}"]
 
