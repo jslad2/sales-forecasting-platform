@@ -945,8 +945,8 @@ def main():
                         forecast_df = result["Forecast"].copy()  # Create a copy to avoid modifying the original
 
                         # Apply inverse differencing if the series was differenced
-                        if stationarity_result == "Non-Stationary":
-                            forecast_df = inverse_difference(original_data, forecast_df)
+                        # if stationarity_result == "Non-Stationary":
+                        #     forecast_df = inverse_difference(original_data, forecast_df)
 
                         # Add the forecast to the plot
                         fig.add_trace(go.Scatter(
