@@ -117,13 +117,19 @@ def preprocess_data(data, date_column, sales_column):
         original_data = data[[date_column, sales_column]].rename(columns={date_column: "ds", sales_column: "y"})
         original_data["ds"] = pd.to_datetime(original_data["ds"], errors="coerce")
 
-        # Aggregate daily data to monthly data
-        original_data_monthly = original_data.resample("M", on="ds").sum().reset_index()
+        # Aggregate to monthly data
+        preprocessed_data = original_data.groupby(original_data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
+        preprocessed_data["ds"] = preprocessed_data["ds"].dt.to_timestamp()
 
-        # Aggregate to monthly data for preprocessing
-        preprocessed_data = original_data_monthly.copy()
+        st.markdown("### Original Series")
+        plt.figure(figsize=(10, 6))
+        plt.plot(preprocessed_data["ds"], preprocessed_data["y"], label="Original Series")
+        plt.xlabel("Date")
+        plt.ylabel("Sales")
+        plt.title("Original Time Series")
+        plt.legend()
+        st.pyplot(plt)
 
-        # Check stationarity
         stationarity_result = check_stationarity(preprocessed_data["y"])
         st.markdown(
             f"""
@@ -135,88 +141,39 @@ def preprocess_data(data, date_column, sales_column):
             unsafe_allow_html=True,
         )
 
-        # Apply differencing if the series is non-stationary
         if stationarity_result == "Non-Stationary":
-            preprocessed_data["y_diff"] = preprocessed_data["y"].diff().dropna()
-            differenced_data = preprocessed_data[["ds", "y_diff"]].dropna()
+            st.warning("Applying differencing to stabilize the series.")
+            preprocessed_data["y"] = preprocessed_data["y"].diff().dropna()
 
-            # Create a Plotly figure
-            fig = go.Figure()
+            st.markdown("### Differenced Series")
+            plt.figure(figsize=(10, 6))
+            plt.plot(preprocessed_data["ds"].iloc[1:], preprocessed_data["y"].iloc[1:], label="Differenced Series", color="orange")
+            plt.xlabel("Date")
+            plt.ylabel("Differenced Sales")
+            plt.title("Differenced Time Series")
+            plt.legend()
+            st.pyplot(plt)
 
-            # Add the original series
-            fig.add_trace(go.Scatter(
-                x=preprocessed_data["ds"],
-                y=preprocessed_data["y"],
-                mode="lines",
-                name="Original Series",
-                line=dict(color="blue", width=2)
-            ))
-
-            # Add the differenced series
-            fig.add_trace(go.Scatter(
-                x=differenced_data["ds"],
-                y=differenced_data["y_diff"],
-                mode="lines",
-                name="Differenced Series",
-                line=dict(color="orange", width=2, dash="dot")
-            ))
-
-            # Update layout
-            fig.update_layout(
-                title="📊 Original vs Differenced Series",
-                xaxis_title="Date",
-                yaxis_title="Sales",
-                legend_title="Series",
-                template="plotly_white",
-                hovermode="x unified",
-                margin=dict(l=50, r=50, t=80, b=50),
-                showlegend=True
+            stationarity_result = check_stationarity(preprocessed_data["y"].dropna())
+            st.markdown(
+                f"""
+                <div style="text-align: center;">
+                    <h2 style="color: #2B3A42;">📊 Stationarity Test (After Differencing)</h2>
+                    <p style="font-size: 1.2rem;">Conclusion: The series is <strong>{stationarity_result}</strong>.</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
 
-            # Add grid lines
-            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
-            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
-
-            # Display the chart
-            st.plotly_chart(fig, use_container_width=True)
-
-        else:
-            # If the series is stationary, plot only the original series
-            fig = go.Figure()
-
-            # Add the original series
-            fig.add_trace(go.Scatter(
-                x=preprocessed_data["ds"],
-                y=preprocessed_data["y"],
-                mode="lines",
-                name="Original Series",
-                line=dict(color="blue", width=2)
-            ))
-
-            # Update layout
-            fig.update_layout(
-                title="📊 Original Series",
-                xaxis_title="Date",
-                yaxis_title="Sales",
-                legend_title="Series",
-                template="plotly_white",
-                hovermode="x unified",
-                margin=dict(l=50, r=50, t=80, b=50),
-                showlegend=True
-            )
-
-            # Add grid lines
-            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
-            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
-
-            # Display the chart
-            st.plotly_chart(fig, use_container_width=True)
-
-        return preprocessed_data, stationarity_result, original_data_monthly
+        return preprocessed_data, stationarity_result, original_data
 
     except Exception as e:
         st.error(f"Error during data preprocessing: {e}")
         return None, None, None
+
+    except Exception as e:
+        st.error(f"Error during data preprocessing: {e}")
+        return None, None
 
 def inverse_difference(original_data, forecast_data):
     forecast_data["yhat"] = original_data["y"].iloc[-1] + forecast_data["yhat"].cumsum()
@@ -333,7 +290,7 @@ def main():
                 start_forecast = st.button("⏳ Select Columns First", disabled=True, key="start_disabled")
 
             if start_forecast:
-                preprocessed_data, stationarity_result, original_data_monthly = preprocess_data(data, date_column, sales_column)
+                preprocessed_data, stationarity_result, original_data = preprocess_data(data, date_column, sales_column)
                 if preprocessed_data is None:
                     return
 
@@ -776,13 +733,6 @@ def main():
 
                     x_train = automl_data[feature_cols]
 
-                    # Debugging: Check training data
-                    st.write("Training Data (x_train):")
-                    st.write(x_train)
-
-                    st.write("Training Data (y_train):")
-                    st.write(y_train)
-
                     # ✅ Train AutoML with multiple models
                     automl_model = AutoML()
                     st.write("🔄 **Training AutoML Model...**")
@@ -790,8 +740,9 @@ def main():
                         X_train=x_train,
                         y_train=y_train,
                         task="regression",
-                        time_budget=600,  # Increase time budget
+                        time_budget=300,
                         eval_method="cv",
+                        #cv=TimeSeriesSplit(n_splits=3),
                         estimator_list=["xgboost", "lgbm", "rf", "catboost"],
                         metric="r2",
                     )
@@ -833,10 +784,11 @@ def main():
                         future_row["sin_month"] = np.sin(2 * np.pi * (last_row["ds"].month + i) / 12)
                         future_row["cos_month"] = np.cos(2 * np.pi * (last_row["ds"].month + i) / 12)
 
-                        # Append the future_row to future_features
+                    # Append the future_row to future_features
                         future_features.append(future_row)
 
                         # Update last_row for the next iteration
+                        # Preserve all columns from last_row and update only the relevant ones
                         last_row = last_row.copy()  # Create a copy of last_row to avoid modifying the original
                         for key, value in future_row.items():
                             last_row[key] = value  # Update last_row with the new values
@@ -978,12 +930,12 @@ def main():
                 # Create the figure
                 fig = go.Figure()
 
-                # Add historical data (monthly aggregated)
+                # Add historical data
                 fig.add_trace(go.Scatter(
-                    x=original_data_monthly["ds"],
-                    y=original_data_monthly["y"],
+                    x=original_data["ds"],
+                    y=original_data["y"],
                     mode="lines",
-                    name="Historical Data (Monthly)",
+                    name="Historical Data",
                     line=dict(color="black", width=2)
                 ))
 
@@ -992,17 +944,9 @@ def main():
                     if "Forecast" in result and result["Forecast"] is not None and not result["Forecast"].empty:
                         forecast_df = result["Forecast"].copy()  # Create a copy to avoid modifying the original
 
-                        # Debugging: Check forecast data before inverse differencing
-                        st.write(f"Forecast Data (Before Inverse Differencing) for {model}:")
-                        st.write(forecast_df)
-
                         # Apply inverse differencing if the series was differenced
                         if stationarity_result == "Non-Stationary":
-                            forecast_df = inverse_difference(original_data_monthly, forecast_df)
-
-                            # Debugging: Check forecast data after inverse differencing
-                            st.write(f"Forecast Data (After Inverse Differencing) for {model}:")
-                            st.write(forecast_df)
+                            forecast_df = inverse_difference(original_data, forecast_df)
 
                         # Add the forecast to the plot
                         fig.add_trace(go.Scatter(
@@ -1040,9 +984,7 @@ def main():
                         st.error(f"❌ Error generating download file: {e}")
                 else:
                     st.warning("⚠️ No forecast data available for download.")
-
         except Exception as e:
             st.error(f"Error processing file: {e}")
-
 if __name__ == "__main__":
     main()
