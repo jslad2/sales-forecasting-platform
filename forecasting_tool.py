@@ -652,7 +652,6 @@ def main():
                 # except Exception as e:
                 #     st.warning(f"XGBoost Model failed: {e}")
 
-                # AutoML Model
                 st.write("🚀 Training AutoML Model...")
 
                 try:
@@ -775,9 +774,16 @@ def main():
                         future_row["sin_month"] = np.sin(2 * np.pi * (last_row["ds"].month + i) / 12)
                         future_row["cos_month"] = np.cos(2 * np.pi * (last_row["ds"].month + i) / 12)
 
+                    # Append the future_row to future_features
                         future_features.append(future_row)
-                        last_row = future_row.copy()
 
+                        # Update last_row for the next iteration
+                        # Preserve all columns from last_row and update only the relevant ones
+                        last_row = last_row.copy()  # Create a copy of last_row to avoid modifying the original
+                        for key, value in future_row.items():
+                            last_row[key] = value  # Update last_row with the new values
+
+                    # Convert future_features to a DataFrame
                     future_df = pd.DataFrame(future_features)
 
                     # ✅ Ensure future data matches training data
@@ -815,9 +821,6 @@ def main():
                     }
 
                     st.success("✅ AutoML Forecast Generated Successfully!")
-
-                except Exception as e:
-                    st.error(f"❌ AutoML Model failed: {e}")
 
                 except Exception as e:
                     st.error(f"❌ AutoML Model failed: {e}")
