@@ -790,9 +790,9 @@ def main():
                         X_train=x_train,
                         y_train=y_train,
                         task="regression",
-                        time_budget=1200,  # Increase time budget
+                        time_budget=600,  # Increase time budget
                         eval_method="cv",
-                        estimator_list=["xgboost", "lgbm", "rf", "catboost", "extra_tree", "kneighbor"],
+                        estimator_list=["xgboost", "lgbm", "rf", "catboost"],
                         metric="r2",
                     )
 
