@@ -123,20 +123,6 @@ def preprocess_data(data, date_column, sales_column):
         # Aggregate to monthly data for preprocessing
         preprocessed_data = original_data_monthly.copy()
 
-        # Create two columns for side-by-side charts
-        col1, col2 = st.columns(2)
-
-        # Plot the original series in the first column
-        with col1:
-            st.markdown("### Original Series (Monthly Aggregation)")
-            plt.figure(figsize=(10, 6))
-            plt.plot(preprocessed_data["ds"], preprocessed_data["y"], label="Original Series (Monthly)")
-            plt.xlabel("Date")
-            plt.ylabel("Sales")
-            plt.title("Original Time Series (Monthly Aggregation)")
-            plt.legend()
-            st.pyplot(plt)
-
         # Check stationarity
         stationarity_result = check_stationarity(preprocessed_data["y"])
         st.markdown(
@@ -149,38 +135,82 @@ def preprocess_data(data, date_column, sales_column):
             unsafe_allow_html=True,
         )
 
-        # Plot the differenced series in the second column
+        # Apply differencing if the series is non-stationary
         if stationarity_result == "Non-Stationary":
-            # Apply differencing
             preprocessed_data["y_diff"] = preprocessed_data["y"].diff().dropna()
-
-            # Create a DataFrame for the differenced data
             differenced_data = preprocessed_data[["ds", "y_diff"]].dropna()
 
-            # Debugging: Check differenced data
-            st.write("Differenced Data:")
-            st.write(differenced_data)
+            # Create a Plotly figure
+            fig = go.Figure()
 
-            with col2:
-                st.markdown("### Differenced Series")
-                plt.figure(figsize=(10, 6))
-                plt.plot(differenced_data["ds"], differenced_data["y_diff"], label="Differenced Series", color="orange")
-                plt.xlabel("Date")
-                plt.ylabel("Differenced Sales")
-                plt.title("Differenced Time Series")
-                plt.legend()
-                st.pyplot(plt)
+            # Add the original series
+            fig.add_trace(go.Scatter(
+                x=preprocessed_data["ds"],
+                y=preprocessed_data["y"],
+                mode="lines",
+                name="Original Series",
+                line=dict(color="blue", width=2)
+            ))
 
-            stationarity_result = check_stationarity(preprocessed_data["y_diff"].dropna())
-            st.markdown(
-                f"""
-                <div style="text-align: center;">
-                    <h2 style="color: #2B3A42;">📊 Stationarity Test (After Differencing)</h2>
-                    <p style="font-size: 1.2rem;">Conclusion: The series is <strong>{stationarity_result}</strong>.</p>
-                </div>
-                """,
-                unsafe_allow_html=True,
+            # Add the differenced series
+            fig.add_trace(go.Scatter(
+                x=differenced_data["ds"],
+                y=differenced_data["y_diff"],
+                mode="lines",
+                name="Differenced Series",
+                line=dict(color="orange", width=2, dash="dot")
+            ))
+
+            # Update layout
+            fig.update_layout(
+                title="📊 Original vs Differenced Series",
+                xaxis_title="Date",
+                yaxis_title="Sales",
+                legend_title="Series",
+                template="plotly_white",
+                hovermode="x unified",
+                margin=dict(l=50, r=50, t=80, b=50),
+                showlegend=True
             )
+
+            # Add grid lines
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
+
+            # Display the chart
+            st.plotly_chart(fig, use_container_width=True)
+
+        else:
+            # If the series is stationary, plot only the original series
+            fig = go.Figure()
+
+            # Add the original series
+            fig.add_trace(go.Scatter(
+                x=preprocessed_data["ds"],
+                y=preprocessed_data["y"],
+                mode="lines",
+                name="Original Series",
+                line=dict(color="blue", width=2)
+            ))
+
+            # Update layout
+            fig.update_layout(
+                title="📊 Original Series",
+                xaxis_title="Date",
+                yaxis_title="Sales",
+                legend_title="Series",
+                template="plotly_white",
+                hovermode="x unified",
+                margin=dict(l=50, r=50, t=80, b=50),
+                showlegend=True
+            )
+
+            # Add grid lines
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
+
+            # Display the chart
+            st.plotly_chart(fig, use_container_width=True)
 
         return preprocessed_data, stationarity_result, original_data_monthly
 
@@ -753,7 +783,7 @@ def main():
                         X_train=x_train,
                         y_train=y_train,
                         task="regression",
-                        time_budget=300,
+                        time_budget=600,
                         eval_method="cv",
                         #cv=TimeSeriesSplit(n_splits=3),
                         estimator_list=["xgboost", "lgbm", "rf", "catboost"],
