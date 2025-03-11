@@ -701,13 +701,16 @@ def main():
                         apply_log = True
                     else:
                         st.write("🔹 Skipping log transformation.")
-                        automl_data["y_log"] = automl_data["y"]
                         apply_log = False
+
+                    # Use y instead of y_log if log transformation is skipped
+                    if not apply_log:
+                        automl_data["y_log"] = automl_data["y"]  # <-- Ensure y_log exists for consistency
 
                     # Debugging: Check columns
                     st.write(f"🔹 Log transformation applied: {apply_log}")
                     st.write(f"🔹 Columns in automl_data: {automl_data.columns}")
-    
+
                     automl_data.dropna(inplace=True)
 
                     # ✅ Dynamically build feature list
@@ -717,7 +720,7 @@ def main():
                     if apply_log:
                         y_train = automl_data["y_log"]
                     else:
-                        y_train = automl_data["y"]
+                        y_train = automl_data["y"]  # <-- Use y if log transformation is skipped
 
                     x_train = automl_data[feature_cols]
 
@@ -750,13 +753,13 @@ def main():
                         # Update lags
                         for lag in range(1, max_lag + 1):
                             if lag == 1:
-                                future_row[f"lag_{lag}"] = last_row["y_log"]
+                                future_row[f"lag_{lag}"] = last_row["y"]  # <-- Use y instead of y_log
                             else:
                                 future_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
 
                         # Update rolling statistics
                         for window in [3, 6, 12]:
-                            future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y_log"] - last_row[f"lag_{window}"]) / window
+                            future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y"] - last_row[f"lag_{window}"]) / window
                             future_row[f"rolling_std_{window}"] = last_row[f"rolling_std_{window}"]
 
                         # Update other features
