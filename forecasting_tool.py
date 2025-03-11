@@ -704,6 +704,10 @@ def main():
                         automl_data["y_log"] = automl_data["y"]
                         apply_log = False
 
+                    # Debugging: Check columns
+                    st.write(f"🔹 Log transformation applied: {apply_log}")
+                    st.write(f"🔹 Columns in automl_data: {automl_data.columns}")
+
                     automl_data.dropna(inplace=True)
 
                     # ✅ Dynamically build feature list
