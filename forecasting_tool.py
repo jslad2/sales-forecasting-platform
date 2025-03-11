@@ -776,6 +776,13 @@ def main():
 
                     x_train = automl_data[feature_cols]
 
+                    # Debugging: Check training data
+                    st.write("Training Data (x_train):")
+                    st.write(x_train)
+
+                    st.write("Training Data (y_train):")
+                    st.write(y_train)
+
                     # ✅ Train AutoML with multiple models
                     automl_model = AutoML()
                     st.write("🔄 **Training AutoML Model...**")
@@ -783,10 +790,9 @@ def main():
                         X_train=x_train,
                         y_train=y_train,
                         task="regression",
-                        time_budget=600,
+                        time_budget=1200,  # Increase time budget
                         eval_method="cv",
-                        #cv=TimeSeriesSplit(n_splits=3),
-                        estimator_list=["xgboost", "lgbm", "rf", "catboost"],
+                        estimator_list=["xgboost", "lgbm", "rf", "catboost", "extra_tree", "kneighbor"],
                         metric="r2",
                     )
 
@@ -827,11 +833,10 @@ def main():
                         future_row["sin_month"] = np.sin(2 * np.pi * (last_row["ds"].month + i) / 12)
                         future_row["cos_month"] = np.cos(2 * np.pi * (last_row["ds"].month + i) / 12)
 
-                    # Append the future_row to future_features
+                        # Append the future_row to future_features
                         future_features.append(future_row)
 
                         # Update last_row for the next iteration
-                        # Preserve all columns from last_row and update only the relevant ones
                         last_row = last_row.copy()  # Create a copy of last_row to avoid modifying the original
                         for key, value in future_row.items():
                             last_row[key] = value  # Update last_row with the new values
