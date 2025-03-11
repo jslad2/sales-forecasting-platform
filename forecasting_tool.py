@@ -117,19 +117,27 @@ def preprocess_data(data, date_column, sales_column):
         original_data = data[[date_column, sales_column]].rename(columns={date_column: "ds", sales_column: "y"})
         original_data["ds"] = pd.to_datetime(original_data["ds"], errors="coerce")
 
-        # Aggregate to monthly data
-        preprocessed_data = original_data.groupby(original_data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
-        preprocessed_data["ds"] = preprocessed_data["ds"].dt.to_timestamp()
+        # Aggregate daily data to monthly data
+        original_data_monthly = original_data.resample("M", on="ds").sum().reset_index()
 
-        st.markdown("### Original Series")
-        plt.figure(figsize=(10, 6))
-        plt.plot(preprocessed_data["ds"], preprocessed_data["y"], label="Original Series")
-        plt.xlabel("Date")
-        plt.ylabel("Sales")
-        plt.title("Original Time Series")
-        plt.legend()
-        st.pyplot(plt)
+        # Aggregate to monthly data for preprocessing
+        preprocessed_data = original_data_monthly.copy()
 
+        # Create two columns for side-by-side charts
+        col1, col2 = st.columns(2)
+
+        # Plot the original series in the first column
+        with col1:
+            st.markdown("### Original Series (Monthly Aggregation)")
+            plt.figure(figsize=(10, 6))
+            plt.plot(preprocessed_data["ds"], preprocessed_data["y"], label="Original Series (Monthly)")
+            plt.xlabel("Date")
+            plt.ylabel("Sales")
+            plt.title("Original Time Series (Monthly Aggregation)")
+            plt.legend()
+            st.pyplot(plt)
+
+        # Check stationarity
         stationarity_result = check_stationarity(preprocessed_data["y"])
         st.markdown(
             f"""
@@ -141,18 +149,17 @@ def preprocess_data(data, date_column, sales_column):
             unsafe_allow_html=True,
         )
 
+        # Plot the differenced series in the second column
         if stationarity_result == "Non-Stationary":
-            st.warning("Applying differencing to stabilize the series.")
-            preprocessed_data["y"] = preprocessed_data["y"].diff().dropna()
-
-            st.markdown("### Differenced Series")
-            plt.figure(figsize=(10, 6))
-            plt.plot(preprocessed_data["ds"].iloc[1:], preprocessed_data["y"].iloc[1:], label="Differenced Series", color="orange")
-            plt.xlabel("Date")
-            plt.ylabel("Differenced Sales")
-            plt.title("Differenced Time Series")
-            plt.legend()
-            st.pyplot(plt)
+            with col2:
+                st.markdown("### Differenced Series")
+                plt.figure(figsize=(10, 6))
+                plt.plot(preprocessed_data["ds"].iloc[1:], preprocessed_data["y"].iloc[1:], label="Differenced Series", color="orange")
+                plt.xlabel("Date")
+                plt.ylabel("Differenced Sales")
+                plt.title("Differenced Time Series")
+                plt.legend()
+                st.pyplot(plt)
 
             stationarity_result = check_stationarity(preprocessed_data["y"].dropna())
             st.markdown(
@@ -165,15 +172,11 @@ def preprocess_data(data, date_column, sales_column):
                 unsafe_allow_html=True,
             )
 
-        return preprocessed_data, stationarity_result, original_data
+        return preprocessed_data, stationarity_result, original_data_monthly
 
     except Exception as e:
         st.error(f"Error during data preprocessing: {e}")
         return None, None, None
-
-    except Exception as e:
-        st.error(f"Error during data preprocessing: {e}")
-        return None, None
 
 def inverse_difference(original_data, forecast_data):
     forecast_data["yhat"] = original_data["y"].iloc[-1] + forecast_data["yhat"].cumsum()
@@ -290,7 +293,7 @@ def main():
                 start_forecast = st.button("⏳ Select Columns First", disabled=True, key="start_disabled")
 
             if start_forecast:
-                preprocessed_data, stationarity_result, original_data = preprocess_data(data, date_column, sales_column)
+                preprocessed_data, stationarity_result, original_data, original_data_monthly = preprocess_data(data, date_column, sales_column)
                 if preprocessed_data is None:
                     return
 
@@ -930,12 +933,12 @@ def main():
                 # Create the figure
                 fig = go.Figure()
 
-                # Add historical data
+                # Add historical data (monthly aggregated)
                 fig.add_trace(go.Scatter(
-                    x=original_data["ds"],
-                    y=original_data["y"],
+                    x=original_data_monthly["ds"],
+                    y=original_data_monthly["y"],
                     mode="lines",
-                    name="Historical Data",
+                    name="Historical Data (Monthly)",
                     line=dict(color="black", width=2)
                 ))
 
@@ -944,9 +947,17 @@ def main():
                     if "Forecast" in result and result["Forecast"] is not None and not result["Forecast"].empty:
                         forecast_df = result["Forecast"].copy()  # Create a copy to avoid modifying the original
 
+                        # Debugging: Check forecast data before inverse differencing
+                        st.write(f"Forecast Data (Before Inverse Differencing) for {model}:")
+                        st.write(forecast_df)
+
                         # Apply inverse differencing if the series was differenced
-                        # if stationarity_result == "Non-Stationary":
-                        #     forecast_df = inverse_difference(original_data, forecast_df)
+                        if stationarity_result == "Non-Stationary":
+                            forecast_df = inverse_difference(original_data_monthly, forecast_df)
+
+                            # Debugging: Check forecast data after inverse differencing
+                            st.write(f"Forecast Data (After Inverse Differencing) for {model}:")
+                            st.write(forecast_df)
 
                         # Add the forecast to the plot
                         fig.add_trace(go.Scatter(
