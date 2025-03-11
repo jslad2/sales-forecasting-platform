@@ -661,11 +661,11 @@ def main():
 
                     # ✅ Dynamically determine max_lag based on dataset size
                     if len(train) <= 6:
-                        max_lag = min(3, len(train) - 1)
+                        max_lag = min(3, len(train) - 1)  # Use smaller lags for small datasets
                     elif len(train) <= 12:
                         max_lag = min(6, len(train) - 1)
                     elif len(train) <= 24:
-                        max_lag = min(12, len(train) - 1)
+                        max_lag = min(6, len(train) - 1)  # Reduce max_lag for small datasets
                     else:
                         max_lag = min(24, len(train) - 1)
 
