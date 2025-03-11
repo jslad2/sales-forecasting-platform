@@ -151,17 +151,27 @@ def preprocess_data(data, date_column, sales_column):
 
         # Plot the differenced series in the second column
         if stationarity_result == "Non-Stationary":
+            # Apply differencing
+            preprocessed_data["y_diff"] = preprocessed_data["y"].diff().dropna()
+
+            # Create a DataFrame for the differenced data
+            differenced_data = preprocessed_data[["ds", "y_diff"]].dropna()
+
+            # Debugging: Check differenced data
+            st.write("Differenced Data:")
+            st.write(differenced_data)
+
             with col2:
                 st.markdown("### Differenced Series")
                 plt.figure(figsize=(10, 6))
-                plt.plot(preprocessed_data["ds"].iloc[1:], preprocessed_data["y"].iloc[1:], label="Differenced Series", color="orange")
+                plt.plot(differenced_data["ds"], differenced_data["y_diff"], label="Differenced Series", color="orange")
                 plt.xlabel("Date")
                 plt.ylabel("Differenced Sales")
                 plt.title("Differenced Time Series")
                 plt.legend()
                 st.pyplot(plt)
 
-            stationarity_result = check_stationarity(preprocessed_data["y"].dropna())
+            stationarity_result = check_stationarity(preprocessed_data["y_diff"].dropna())
             st.markdown(
                 f"""
                 <div style="text-align: center;">
