@@ -721,7 +721,7 @@ def main():
                         task="regression",
                         time_budget=300,
                         eval_method="cv",
-                        cv=TimeSeriesSplit(n_splits=3),
+                        #cv=TimeSeriesSplit(n_splits=3),
                         estimator_list=["xgboost", "lgbm", "rf", "catboost"],
                         metric="r2",
                     )
