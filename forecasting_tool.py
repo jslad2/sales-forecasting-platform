@@ -707,7 +707,7 @@ def main():
                     # Debugging: Check columns
                     st.write(f"🔹 Log transformation applied: {apply_log}")
                     st.write(f"🔹 Columns in automl_data: {automl_data.columns}")
-
+    
                     automl_data.dropna(inplace=True)
 
                     # ✅ Dynamically build feature list
@@ -740,6 +740,9 @@ def main():
                     # ✅ Generate Future Data
                     future_features = []
                     last_row = automl_data.iloc[-1].copy()
+
+                    # Debugging: Check columns in last_row
+                    st.write(f"🔹 Columns in last_row: {last_row.index.tolist()}")
 
                     for i in range(forecast_period):
                         future_row = {}
