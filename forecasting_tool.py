@@ -990,5 +990,8 @@ def main():
                 else:
                     st.warning("⚠️ No forecast data available for download.")
 
+        except Exception as e:
+            st.error(f"Error processing file: {e}")
+            
 if __name__ == "__main__":
     main()
