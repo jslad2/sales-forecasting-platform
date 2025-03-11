@@ -290,7 +290,7 @@ def main():
                 start_forecast = st.button("⏳ Select Columns First", disabled=True, key="start_disabled")
 
             if start_forecast:
-                preprocessed_data, stationarity_result = preprocess_data(data, date_column, sales_column)
+                preprocessed_data, stationarity_result, original_data = preprocess_data(data, date_column, sales_column)
                 if preprocessed_data is None:
                     return
 
@@ -918,11 +918,6 @@ def main():
                     except Exception as e:
                         st.error(f"❌ Error analyzing forecast data: {e}")
 
-                # Preprocess the data and get original_data
-                preprocessed_data, stationarity_result, original_data = preprocess_data(data, date_column, sales_column)
-                if preprocessed_data is None:
-                    return
-
                 # 📊 Multi-Model Forecast Visualization
                 st.markdown("### 🔍 Forecast Comparison Across Models")
                 model_colors = {
@@ -992,6 +987,6 @@ def main():
 
         except Exception as e:
             st.error(f"Error processing file: {e}")
-            
+
 if __name__ == "__main__":
     main()
