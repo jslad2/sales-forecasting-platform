@@ -114,9 +114,27 @@ def check_stationarity(series):
     else:
         return "Inconclusive"
 
+import pandas as pd
+import numpy as np
+import streamlit as st
+import plotly.graph_objects as go
+from statsmodels.tsa.stattools import adfuller
+
+def check_stationarity(series):
+    """
+    Check stationarity using the Augmented Dickey-Fuller test.
+    """
+    result = adfuller(series.dropna())
+    p_value = result[1]
+    if p_value <= 0.05:
+        return "Stationary"
+    else:
+        return "Non-Stationary"
+
 def preprocess_data(data, date_column, sales_column):
     """
     Preprocess the uploaded data, check stationarity, and apply transformations if needed.
+    Returns a dataframe with columns "ds" and "y" for Prophet compatibility.
     """
     try:
         # Convert date column to datetime
@@ -146,7 +164,7 @@ def preprocess_data(data, date_column, sales_column):
             st.warning("Applying differencing to stabilize the series.")
             data["y_diff"] = data["y"].diff().dropna()
 
-            # Create a Plotly figure
+            # Create a Plotly figure for visualization
             fig = go.Figure()
 
             # Original series
@@ -173,17 +191,57 @@ def preprocess_data(data, date_column, sales_column):
                 xaxis_title="Date",
                 yaxis_title="Sales",
                 legend_title="Series",
-                template="plotly_white"
+                template="plotly_white",
+                hovermode="x unified",
+                margin=dict(l=50, r=50, t=80, b=50),
+                showlegend=True
             )
+
+            # Add grid lines
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
 
             # Display the chart
             st.plotly_chart(fig, use_container_width=True)
 
-            # Return differenced data
-            return data[["ds", "y_diff"]].dropna()
+            # Return differenced data with "y" column
+            differenced_data = data[["ds", "y_diff"]].dropna()
+            differenced_data = differenced_data.rename(columns={"y_diff": "y"})  # Rename to "y"
+            return differenced_data
 
         else:
-            # If stationary, return original data
+            # If stationary, plot only the original series
+            fig = go.Figure()
+
+            # Add the original series
+            fig.add_trace(go.Scatter(
+                x=data["ds"],
+                y=data["y"],
+                mode="lines",
+                name="Original Series",
+                line=dict(color="blue", width=2)
+            ))
+
+            # Update layout
+            fig.update_layout(
+                title="📊 Original Series",
+                xaxis_title="Date",
+                yaxis_title="Sales",
+                legend_title="Series",
+                template="plotly_white",
+                hovermode="x unified",
+                margin=dict(l=50, r=50, t=80, b=50),
+                showlegend=True
+            )
+
+            # Add grid lines
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
+
+            # Display the chart
+            st.plotly_chart(fig, use_container_width=True)
+
+            # Return original data
             return data[["ds", "y"]]
 
     except Exception as e:
