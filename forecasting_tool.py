@@ -544,10 +544,6 @@ def main():
                 # Apply scenarios to training data
                 scenario_data = apply_scenarios(data.copy(), demand_shock, seasonality_adjustment, external_shock)
 
-                # Use scenario_data for training instead of the original data
-                train = scenario_data.iloc[:-testing_period]
-                test = scenario_data.iloc[-testing_period:]
-
                 # ✅ Centered Header with Icon
                 st.markdown(
                     """
