@@ -146,8 +146,10 @@ def preprocess_data(data, date_column, sales_column):
             """,
             unsafe_allow_html=True,
         )
-
-        differenced_data = data[["ds", "y_diff"]].dropna()
+        
+        preprocessed_data = data.copy()
+        preprocessed_data["y_diff"] = data["y"].diff().dropna()
+        differenced_data = preprocessed_data[["ds", "y_diff"]].dropna()
         # Apply transformations if non-stationary
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
