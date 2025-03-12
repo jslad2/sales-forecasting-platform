@@ -135,12 +135,6 @@ def check_stationarity(series):
     else:
         return "Inconclusive"
 
-import pandas as pd
-import numpy as np
-import streamlit as st
-import plotly.graph_objects as go
-from statsmodels.tsa.stattools import adfuller
-
 def check_stationarity(series):
     """
     Check stationarity using the Augmented Dickey-Fuller test.
@@ -457,6 +451,28 @@ def find_best_prophet_params(train):
 
     return best_params, best_rmse
 
+def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock):
+    """
+    Apply scenario adjustments to the training data.
+    """
+    # Apply demand shock
+    if demand_shock != 0:
+        data["y"] = data["y"] * (1 + demand_shock / 100)
+
+    # Apply seasonality adjustment
+    if seasonality_adjustment != 0:
+        # Example: Adjust monthly seasonality
+        data["month"] = data["ds"].dt.month
+        seasonality_multiplier = 1 + seasonality_adjustment / 100
+        data["y"] = data["y"] * (1 + (data["month"] - 1) * (seasonality_multiplier - 1) / 12)
+
+    # Apply external shock (e.g., economic downturn)
+    if external_shock:
+        data["y"] = data["y"] * 0.8  # Simulate a 20% reduction in sales
+
+    # Return the modified data
+    return data
+
 def main():
     user_id = "user123"
     subscription_level = "premium"
@@ -491,6 +507,26 @@ def main():
             with col2:
                 sales_column = st.selectbox("💰 Select the Sales Column:", ["-- Select Column --"] + list(data.columns), key="sales_col")
 
+            # Scenario Planning Section
+            st.sidebar.markdown("### 🎯 Scenario Planning")
+
+            # Demand Shock Scenario
+            demand_shock = st.sidebar.slider(
+                "Simulate Demand Shock (% Change in Sales):",
+                min_value=-50, max_value=50, value=0, step=5
+            )
+
+            # Seasonality Adjustment
+            seasonality_adjustment = st.sidebar.slider(
+                "Adjust Seasonality Strength (% Change):",
+                min_value=-50, max_value=50, value=0, step=5
+            )
+
+            # External Shock (e.g., Economic Downturn)
+            external_shock = st.sidebar.checkbox(
+                "Simulate External Shock (e.g., Economic Downturn)"
+            )
+
             # 🚀 Disable "Start Forecast" Button Until Valid Selections
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
                 start_forecast = st.button("✅ Start Forecast", key="start_btn", help="Click to generate your AI-powered forecast")
@@ -504,6 +540,13 @@ def main():
                 data = preprocess_data(data, date_column, sales_column)
                 if data is None:
                     return
+
+                # Apply scenarios to training data
+                scenario_data = apply_scenarios(data.copy(), demand_shock, seasonality_adjustment, external_shock)
+
+                # Use scenario_data for training instead of the original data
+                train = scenario_data.iloc[:-testing_period]
+                test = scenario_data.iloc[-testing_period:]
 
                 # ✅ Centered Header with Icon
                 st.markdown(
@@ -532,15 +575,15 @@ def main():
 
                     # ✅ Display DataFrame with Improved Spacing
                     st.dataframe(
-                        data.style.set_properties(**{"text-align": "center"}),
+                        scenario_data.style.set_properties(**{"text-align": "center"}),
                         width=1400,  # Wider Table
                         height=450   # Show More Rows
                     )
 
                 # Determine Testing Period Dynamically
-                testing_period = int(len(data) * 0.2)
-                train = data.iloc[:-testing_period]
-                test = data.iloc[-testing_period:]
+                testing_period = int(len(scenario_data) * 0.2)
+                train = scenario_data.iloc[:-testing_period]
+                test = scenario_data.iloc[-testing_period:]
 
                 forecast_period = 12  # Fixed to 12 months forecast
 
