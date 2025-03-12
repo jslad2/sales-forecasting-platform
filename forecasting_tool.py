@@ -960,8 +960,8 @@ def main():
                         task="regression",
                         time_budget=300,
                         eval_method="cv",
-                        estimator_list=["xgboost"],#, "lgbm", "rf", "catboost"],
-                        metric="r2",
+                        estimator_list=["xgboost"]#, "lgbm", "rf", "catboost"],
+                        #metric="r2",
                     )
 
                     st.write(f"✅ AutoML Training Completed! Best Estimator: {automl_model.best_estimator}")
