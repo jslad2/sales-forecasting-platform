@@ -135,16 +135,6 @@ def preprocess_data(data, date_column, sales_column):
         data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
         data["ds"] = data["ds"].dt.to_timestamp()
 
-        # Plot original series
-        st.markdown("### Original Series")
-        plt.figure(figsize=(10, 6))
-        plt.plot(data["ds"], data["y"], label="Original Series")
-        plt.xlabel("Date")
-        plt.ylabel("Sales")
-        plt.title("Original Time Series")
-        plt.legend()
-        st.pyplot(plt)
-
         # Check stationarity
         stationarity_result = check_stationarity(data["y"])
         st.markdown(
@@ -157,20 +147,83 @@ def preprocess_data(data, date_column, sales_column):
             unsafe_allow_html=True,
         )
 
+        differenced_data = data[["ds", "y_diff"]].dropna()
         # Apply transformations if non-stationary
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
             data["y"] = data["y"].diff().dropna()
 
-            # Plot differenced series
-            st.markdown("### Differenced Series")
-            plt.figure(figsize=(10, 6))
-            plt.plot(data["ds"].iloc[1:], data["y"].iloc[1:], label="Differenced Series", color="orange")
-            plt.xlabel("Date")
-            plt.ylabel("Differenced Sales")
-            plt.title("Differenced Time Series")
-            plt.legend()
-            st.pyplot(plt)
+            # Create a Plotly figure
+            fig = go.Figure()
+
+            # Add the original series
+            fig.add_trace(go.Scatter(
+                x=data["ds"],
+                y=data["y"],
+                mode="lines",
+                name="Original Series",
+                line=dict(color="blue", width=2)
+            ))
+
+            # Add the differenced series
+            fig.add_trace(go.Scatter(
+                x=differenced_data["ds"],
+                y=differenced_data["y_diff"],
+                mode="lines",
+                name="Differenced Series",
+                line=dict(color="orange", width=2, dash="dot")
+            ))
+
+            # Update layout
+            fig.update_layout(
+                title="📊 Original vs Differenced Series",
+                xaxis_title="Date",
+                yaxis_title="Sales",
+                legend_title="Series",
+                template="plotly_white",
+                hovermode="x unified",
+                margin=dict(l=50, r=50, t=80, b=50),
+                showlegend=True
+            )
+
+            # Add grid lines
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
+
+            # Display the chart
+            st.plotly_chart(fig, use_container_width=True)
+
+        else:
+            # If the series is stationary, plot only the original series
+            fig = go.Figure()
+
+            # Add the original series
+            fig.add_trace(go.Scatter(
+                x=data["ds"],
+                y=data["y"],
+                mode="lines",
+                name="Original Series",
+                line=dict(color="blue", width=2)
+            ))
+
+            # Update layout
+            fig.update_layout(
+                title="📊 Original Series",
+                xaxis_title="Date",
+                yaxis_title="Sales",
+                legend_title="Series",
+                template="plotly_white",
+                hovermode="x unified",
+                margin=dict(l=50, r=50, t=80, b=50),
+                showlegend=True
+            )
+
+            # Add grid lines
+            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
+            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
+
+            # Display the chart
+            st.plotly_chart(fig, use_container_width=True)
 
             # Recheck stationarity after differencing
             stationarity_result = check_stationarity(data["y"].dropna())
