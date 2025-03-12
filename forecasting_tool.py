@@ -146,7 +146,7 @@ def preprocess_data(data, date_column, sales_column):
             """,
             unsafe_allow_html=True,
         )
-        
+
         preprocessed_data = data.copy()
         preprocessed_data["y_diff"] = data["y"].diff().dropna()
         differenced_data = preprocessed_data[["ds", "y_diff"]].dropna()
@@ -226,18 +226,6 @@ def preprocess_data(data, date_column, sales_column):
 
             # Display the chart
             st.plotly_chart(fig, use_container_width=True)
-
-            # Recheck stationarity after differencing
-            stationarity_result = check_stationarity(data["y"].dropna())
-            st.markdown(
-                f"""
-                <div style="text-align: center;">
-                    <h2 style="color: #2B3A42;">📊 Stationarity Test (After Differencing)</h2>
-                    <p style="font-size: 1.2rem;">Conclusion: The series is <strong>{stationarity_result}</strong>.</p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
 
         return data
 
