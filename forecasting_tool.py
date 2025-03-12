@@ -913,13 +913,13 @@ def main():
                     else:
                         automl_data["yoy_growth"] = 0
 
-                    # # ✅ Add momentum tracking
-                    # automl_data["y_diff"] = automl_data["y"].diff().fillna(0)
-                    # automl_data["rolling_mean_growth"] = automl_data["y"].rolling(window=3).mean().diff().fillna(0)
+                    # ✅ Add momentum tracking
+                    automl_data["y_diff"] = automl_data["y"].diff().fillna(0)
+                    automl_data["rolling_mean_growth"] = automl_data["y"].rolling(window=3).mean().diff().fillna(0)
 
-                    # # ✅ Add seasonal features
-                    # automl_data["sin_month"] = np.sin(2 * np.pi * automl_data["ds"].dt.month / 12)
-                    # automl_data["cos_month"] = np.cos(2 * np.pi * automl_data["ds"].dt.month / 12)
+                    # ✅ Add seasonal features
+                    automl_data["sin_month"] = np.sin(2 * np.pi * automl_data["ds"].dt.month / 12)
+                    automl_data["cos_month"] = np.cos(2 * np.pi * automl_data["ds"].dt.month / 12)
 
                     # ✅ Apply log transformation only when needed
                     if automl_data["y"].max() / automl_data["y"].min() > 5:
@@ -995,11 +995,11 @@ def main():
                             future_row[f"rolling_std_{window}"] = last_row[f"rolling_std_{window}"]
 
                         # Update other features
-                        future_row["yoy_growth"] = last_row["yoy_growth"]
+                        # future_row["yoy_growth"] = last_row["yoy_growth"]
                         # future_row["y_diff"] = last_row["y_diff"]
                         # future_row["rolling_mean_growth"] = last_row["rolling_mean_growth"]
-                        future_row["sin_month"] = np.sin(2 * np.pi * (last_row["ds"].month + i) / 12)
-                        future_row["cos_month"] = np.cos(2 * np.pi * (last_row["ds"].month + i) / 12)
+                        # future_row["sin_month"] = np.sin(2 * np.pi * (last_row["ds"].month + i) / 12)
+                        # future_row["cos_month"] = np.cos(2 * np.pi * (last_row["ds"].month + i) / 12)
 
                         # Append the future_row to future_features
                         future_features.append(future_row)
