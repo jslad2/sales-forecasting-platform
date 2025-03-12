@@ -973,18 +973,18 @@ def main():
                     # Debugging: Check columns in last_row
                     st.write(f"🔹 Columns in last_row: {last_row.index.tolist()}")
 
-                    for i in range(forecast_period):
-                        future_row = {}
+                    # for i in range(forecast_period):
+                    #     future_row = {}
 
-                        # Update lags
-                        for lag in range(1, max_lag + 1):
-                            if lag == 1:
-                                if apply_log:
-                                    future_row[f"lag_{lag}"] = last_row["y_log"]  # Use y_log if log transformation is applied
-                                else:
-                                    future_row[f"lag_{lag}"] = last_row["y"]  # Use y if log transformation is skipped
-                            else:
-                                future_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
+                    #     # Update lags
+                    #     for lag in range(1, max_lag + 1):
+                    #         if lag == 1:
+                    #             if apply_log:
+                    #                 future_row[f"lag_{lag}"] = last_row["y_log"]  # Use y_log if log transformation is applied
+                    #             else:
+                    #                 future_row[f"lag_{lag}"] = last_row["y"]  # Use y if log transformation is skipped
+                    #         else:
+                    #             future_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
 
                         # # Update rolling statistics
                         # for window in [3, 6, 12]:
@@ -1001,13 +1001,13 @@ def main():
                         # future_row["sin_month"] = np.sin(2 * np.pi * (last_row["ds"].month + i) / 12)
                         # future_row["cos_month"] = np.cos(2 * np.pi * (last_row["ds"].month + i) / 12)
 
-                        # Append the future_row to future_features
-                        future_features.append(future_row)
+                        # # Append the future_row to future_features
+                        # future_features.append(future_row)
 
-                        # Update last_row for the next iteration
-                        last_row = last_row.copy()  # Create a copy of last_row to avoid modifying the original
-                        for key, value in future_row.items():
-                            last_row[key] = value  # Update last_row with the new values
+                        # # Update last_row for the next iteration
+                        # last_row = last_row.copy()  # Create a copy of last_row to avoid modifying the original
+                        # for key, value in future_row.items():
+                        #     last_row[key] = value  # Update last_row with the new values
 
                     # Convert future_features to a DataFrame
                     future_df = pd.DataFrame(future_features)
