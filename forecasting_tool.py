@@ -957,11 +957,11 @@ def main():
                     automl_model.fit(
                         X_train=x_train,
                         y_train=y_train,
-                        #task="regression",
+                        task="regression",
                         time_budget=300,
                         eval_method="cv",
                         estimator_list=["xgboost", "lgbm", "rf", "catboost"],
-                        metric="r2"
+                        metric="r2",
                     )
 
                     st.write(f"✅ AutoML Training Completed! Best Estimator: {automl_model.best_estimator}")
