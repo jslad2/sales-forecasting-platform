@@ -996,8 +996,8 @@ def main():
 
                         # Update other features
                         future_row["yoy_growth"] = last_row["yoy_growth"]
-                        future_row["y_diff"] = last_row["y_diff"]
-                        future_row["rolling_mean_growth"] = last_row["rolling_mean_growth"]
+                        # future_row["y_diff"] = last_row["y_diff"]
+                        # future_row["rolling_mean_growth"] = last_row["rolling_mean_growth"]
                         future_row["sin_month"] = np.sin(2 * np.pi * (last_row["ds"].month + i) / 12)
                         future_row["cos_month"] = np.cos(2 * np.pi * (last_row["ds"].month + i) / 12)
 
