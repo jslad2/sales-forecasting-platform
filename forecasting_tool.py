@@ -986,15 +986,15 @@ def main():
                             else:
                                 future_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
 
-                        # Update rolling statistics
-                        for window in [3, 6, 12]:
-                            if apply_log:
-                                future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y_log"] - last_row[f"lag_{window}"]) / window
-                            else:
-                                future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y"] - last_row[f"lag_{window}"]) / window
-                            future_row[f"rolling_std_{window}"] = last_row[f"rolling_std_{window}"]
+                        # # Update rolling statistics
+                        # for window in [3, 6, 12]:
+                        #     if apply_log:
+                        #         future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y_log"] - last_row[f"lag_{window}"]) / window
+                        #     else:
+                        #         future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y"] - last_row[f"lag_{window}"]) / window
+                        #     future_row[f"rolling_std_{window}"] = last_row[f"rolling_std_{window}"]
 
-                        # Update other features
+                        # # Update other features
                         # future_row["yoy_growth"] = last_row["yoy_growth"]
                         # future_row["y_diff"] = last_row["y_diff"]
                         # future_row["rolling_mean_growth"] = last_row["rolling_mean_growth"]
