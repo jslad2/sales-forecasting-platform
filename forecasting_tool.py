@@ -913,24 +913,22 @@ def main():
                     else:
                         automl_data["yoy_growth"] = 0
 
-                    # ✅ Add momentum tracking
-                    automl_data["y_diff"] = automl_data["y"].diff().fillna(0)
-                    automl_data["rolling_mean_growth"] = automl_data["y"].rolling(window=3).mean().diff().fillna(0)
+                    # # ✅ Add momentum tracking
+                    # automl_data["y_diff"] = automl_data["y"].diff().fillna(0)
+                    # automl_data["rolling_mean_growth"] = automl_data["y"].rolling(window=3).mean().diff().fillna(0)
 
-                    # ✅ Add seasonal features
-                    automl_data["sin_month"] = np.sin(2 * np.pi * automl_data["ds"].dt.month / 12)
-                    automl_data["cos_month"] = np.cos(2 * np.pi * automl_data["ds"].dt.month / 12)
+                    # # ✅ Add seasonal features
+                    # automl_data["sin_month"] = np.sin(2 * np.pi * automl_data["ds"].dt.month / 12)
+                    # automl_data["cos_month"] = np.cos(2 * np.pi * automl_data["ds"].dt.month / 12)
 
-                    # # ✅ Apply log transformation only when needed
-                    # if automl_data["y"].max() / automl_data["y"].min() > 5:
-                    #     st.write("🔹 Applying log transformation for variance stabilization.")
-                    #     automl_data["y_log"] = np.log1p(automl_data["y"])
-                    #     apply_log = True
-                    # else:
-                    #     st.write("🔹 Skipping log transformation.")
-                    #     apply_log = False
-                    
-                    apply_log = False
+                    # ✅ Apply log transformation only when needed
+                    if automl_data["y"].max() / automl_data["y"].min() > 5:
+                        st.write("🔹 Applying log transformation for variance stabilization.")
+                        automl_data["y_log"] = np.log1p(automl_data["y"])
+                        apply_log = True
+                    else:
+                        st.write("🔹 Skipping log transformation.")
+                        apply_log = False
 
                     # Use y instead of y_log if log transformation is skipped
                     if not apply_log:
