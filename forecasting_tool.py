@@ -386,6 +386,7 @@ def main():
         st.warning("🔒 Upgrade to Premium to unlock advanced features like AutoML, scenario planning, and more!")
         st.stop()
 
+    # File Upload
     uploaded_file = st.file_uploader("Upload your sales data file", type=["csv"])
 
     if uploaded_file:
@@ -394,6 +395,7 @@ def main():
             st.write("Uploaded Data:")
             st.dataframe(data)
 
+            # 📌 Center "Map Your Columns" Section
             st.markdown(
                 """
                 <div style="text-align: center;">
@@ -403,22 +405,28 @@ def main():
                 unsafe_allow_html=True,
             )
 
+            # 🗂 Dropdowns for Column Selection (Centered)
             col1, col2 = st.columns([1, 1])
             with col1:
                 date_column = st.selectbox("📅 Select the Date Column:", ["-- Select Column --"] + list(data.columns), key="date_col")
             with col2:
                 sales_column = st.selectbox("💰 Select the Sales Column:", ["-- Select Column --"] + list(data.columns), key="sales_col")
 
+            # 🚀 Disable "Start Forecast" Button Until Valid Selections
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
                 start_forecast = st.button("✅ Start Forecast", key="start_btn", help="Click to generate your AI-powered forecast")
             else:
                 start_forecast = st.button("⏳ Select Columns First", disabled=True, key="start_disabled")
 
+            # 🏁 Run Forecast Only If Button is Clicked
             if start_forecast:
-                preprocessed_data, stationarity_result, original_data_monthly = preprocess_data(data, date_column, sales_column)
-                if preprocessed_data is None:
+                # Run forecast logic
+                # Preprocess Data
+                data = preprocess_data(data, date_column, sales_column)
+                if data is None:
                     return
 
+                # ✅ Centered Header with Icon
                 st.markdown(
                     """
                     <div style="text-align: center;">
@@ -430,7 +438,9 @@ def main():
                     unsafe_allow_html=True,
                 )
 
+                # ✅ Use Streamlit's Expander to Organize Data
                 with st.expander("📊 View Processed Data"):
+                    # ✅ Adjust Column Widths Dynamically
                     st.markdown(
                         """
                         <style>
@@ -441,18 +451,21 @@ def main():
                         unsafe_allow_html=True,
                     )
 
+                    # ✅ Display DataFrame with Improved Spacing
                     st.dataframe(
-                        preprocessed_data.style.set_properties(**{"text-align": "center"}),
-                        width=1400,
-                        height=450
+                        data.style.set_properties(**{"text-align": "center"}),
+                        width=1400,  # Wider Table
+                        height=450   # Show More Rows
                     )
 
-                testing_period = int(len(preprocessed_data) * 0.2)
-                train = preprocessed_data.iloc[:-testing_period]
-                test = preprocessed_data.iloc[-testing_period:]
+                # Determine Testing Period Dynamically
+                testing_period = int(len(data) * 0.2)
+                train = data.iloc[:-testing_period]
+                test = data.iloc[-testing_period:]
 
-                forecast_period = 12
+                forecast_period = 12  # Fixed to 12 months forecast
 
+                # Forecasting Models
                 results = {}
 
                 st.write("🚀 Finding the best Prophet hyperparameters...")
@@ -1036,36 +1049,18 @@ def main():
                     "AutoML": "purple"
                 }
 
-                # Create the figure
                 fig = go.Figure()
-
-                # Add historical data (monthly aggregated)
                 fig.add_trace(go.Scatter(
-                    x=original_data_monthly["ds"],
-                    y=original_data_monthly["y"],
+                    x=train["ds"],
+                    y=train["y"],
                     mode="lines",
-                    name="Historical Data (Monthly)",
+                    name="Historical Data",
                     line=dict(color="black", width=2)
                 ))
 
-                # Add forecasts for each model
                 for model, result in results.items():
                     if "Forecast" in result and result["Forecast"] is not None and not result["Forecast"].empty:
-                        forecast_df = result["Forecast"].copy()  # Create a copy to avoid modifying the original
-
-                        # Debugging: Check forecast data before inverse differencing
-                        st.write(f"Forecast Data (Before Inverse Differencing) for {model}:")
-                        st.write(forecast_df)
-
-                        # Apply inverse differencing if the series was differenced
-                        if stationarity_result == "Non-Stationary":
-                            forecast_df = inverse_difference(original_data_monthly, forecast_df)
-
-                            # Debugging: Check forecast data after inverse differencing
-                            st.write(f"Forecast Data (After Inverse Differencing) for {model}:")
-                            st.write(forecast_df)
-
-                        # Add the forecast to the plot
+                        forecast_df = result["Forecast"]
                         fig.add_trace(go.Scatter(
                             x=forecast_df["ds"],
                             y=forecast_df["yhat"],
@@ -1074,7 +1069,6 @@ def main():
                             line=dict(width=2, color=model_colors.get(model, "gray"))
                         ))
 
-                # Update layout
                 fig.update_layout(
                     title="📊 Multi-Model Sales Forecast",
                     xaxis_title="Date",
@@ -1082,8 +1076,6 @@ def main():
                     legend_title="Models",
                     template="plotly_white"
                 )
-
-                # Display the chart
                 st.plotly_chart(fig, use_container_width=True)
 
                 # 📥 Download Forecast Data
