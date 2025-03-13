@@ -621,8 +621,16 @@ def main():
                     # Train the model
                     prophet_model.fit(train)
 
+                    # Detect data frequency (Daily or Monthly)
+                    data_freq = pd.infer_freq(train["ds"])
+                    st.write(f"🔍 Detected Data Frequency: {data_freq}")
+
                     # Generate future dates & predict
-                    future = prophet_model.make_future_dataframe(periods=forecast_period, freq="M", include_history=False)
+                    future = prophet_model.make_future_dataframe(
+                        periods=forecast_period, 
+                        freq="M" if data_freq == "M" else "D", 
+                        include_history=False
+                    )
                     prophet_forecast = prophet_model.predict(future)
 
                     # Ensure only future forecasts are used
@@ -633,35 +641,26 @@ def main():
                     prophet_rmse = mean_squared_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]) ** 0.5
                     prophet_mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length])
 
-                    # # Debugging: Check the first few rows before inverse differencing
-                    # st.write("First few rows of forecast before inverse differencing:", prophet_forecast.head())
-
-
-                    # Get the last known historical value (should match first_value)
+                    # Get the last known historical value before forecasting
                     last_historical_value = train["y"].iloc[-1]
-
-                    st.write("Last historical value before forecasting:", last_historical_value)
+                    st.write("✅ Last Historical Value (Original Scale):", last_historical_value)
 
                     # Apply inverse differencing if needed
                     if first_value is not None:
-                        # Get the last known historical value (should match first_value)
-                        last_historical_value = train["y"].iloc[-1]
-
                         # Reverse differencing by adding the last historical value to cumulative sum
                         prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum()
                         prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum()
-                        prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum()                      
+                        prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum()
 
                         # Reverse differencing for the historical data (train["y"])
                         train["y"] = y_original.iloc[:len(train)]  # Use the original data for historical values
 
-                    # # Debugging: Check after applying inverse differencing
-                    # st.write("First few rows of forecast after inverse differencing:", prophet_forecast.head())
+                    # Debugging: Check the first few rows after inverse differencing
+                    st.write("🔍 First Few Rows After Inverse Differencing:")
+                    st.dataframe(prophet_forecast.head())
 
-
-                    # Debugging: Check the contents of the train DataFrame
-                    st.write("Historical Data (train):")
-                    st.write(train)
+                    # Debugging: Ensure first forecasted value aligns with last historical value
+                    st.write("✅ First Forecasted Value After Inverse Differencing:", prophet_forecast["yhat"].iloc[0])
 
                     # Identify highest & lowest forecasted sales
                     highest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmax()]
@@ -741,6 +740,7 @@ def main():
 
                 except Exception as e:
                     st.warning(f"❌ Prophet Model failed: {e}")
+
 
                 # ARIMA Model
                 st.write("🔄 Training ARIMA Model...")
