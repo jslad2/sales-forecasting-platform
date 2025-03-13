@@ -164,6 +164,9 @@ def preprocess_data(data, date_column, sales_column):
             unsafe_allow_html=True,
         )
 
+        # Store the original values in a new column
+        data["y_original"] = data["y"]
+
         # Apply differencing if non-stationary
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
@@ -250,7 +253,7 @@ def preprocess_data(data, date_column, sales_column):
             st.plotly_chart(fig, use_container_width=True)
 
             # Return original data and None for first_value (no differencing applied)
-            return data[["ds", "y"]], None, None
+            return data[["ds", "y"]], None, data["y_original"]
 
     except Exception as e:
         st.error(f"An error occurred during preprocessing: {e}")
@@ -537,7 +540,7 @@ def main():
             if start_forecast:
                 # Run forecast logic
                 # Preprocess Data
-                data, first_value, _ = preprocess_data(data, date_column, sales_column)  # Capture first_value
+                data, first_value, data["y_original"] = preprocess_data(data, date_column, sales_column)  # Capture first_value
                 if data is None:  # Check if preprocessing failed
                                     st.error("❌ Preprocessing failed. Please check your data and try again.")
                                     return
@@ -634,7 +637,7 @@ def main():
                         prophet_forecast = inverse_difference(data, prophet_forecast, first_value)
 
                         # Reverse differencing for the historical data (train["y"])
-                        data["y"] = data["y"].iloc[:len(train)]  # Use the original data for historical values
+                        train["y"] = data["y_original"].iloc[:len(train)]  # Use the original data for historical values
 
                     # Identify highest & lowest forecasted sales
                     highest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmax()]
