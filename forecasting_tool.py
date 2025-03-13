@@ -139,6 +139,7 @@ def preprocess_data(data, date_column, sales_column):
     """
     Preprocess the uploaded data, check stationarity, and apply transformations if needed.
     Returns a dataframe with columns "ds" and "y" for Prophet compatibility.
+    Also returns the first value of the original series if differencing is applied.
     """
     try:
         # Convert date column to datetime
@@ -211,10 +212,10 @@ def preprocess_data(data, date_column, sales_column):
             # Display the chart
             st.plotly_chart(fig, use_container_width=True)
 
-            # Return differenced data with "y" column
+            # Return differenced data with "y" column and the first value
             differenced_data = data[["ds", "y_diff"]].dropna()
             differenced_data = differenced_data.rename(columns={"y_diff": "y"})  # Rename to "y"
-            return differenced_data
+            return differenced_data, first_value, None
 
         else:
             # If stationary, plot only the original series
@@ -248,12 +249,12 @@ def preprocess_data(data, date_column, sales_column):
             # Display the chart
             st.plotly_chart(fig, use_container_width=True)
 
-            # Return original data
-            return data[["ds", "y"]], None
+            # Return original data and None for first_value (no differencing applied)
+            return data[["ds", "y"]], None, None
 
     except Exception as e:
-        st.error(f"An error occurred: {e}")
-        return None
+        st.error(f"An error occurred during preprocessing: {e}")
+        return None, None, None  # Return None in case of an error
 
 # def preprocess_data(data, date_column, sales_column):
     try:
