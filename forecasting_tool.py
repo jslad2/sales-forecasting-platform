@@ -636,6 +636,12 @@ def main():
                     # # Debugging: Check the first few rows before inverse differencing
                     # st.write("First few rows of forecast before inverse differencing:", prophet_forecast.head())
 
+
+                    # Get the last known historical value (should match first_value)
+                    last_historical_value = train["y"].iloc[-1]
+
+                    st.write("Last historical value before forecasting:", last_historical_value)
+
                     # Apply inverse differencing if needed
                     if first_value is not None:
                         # Get the last known historical value (should match first_value)
