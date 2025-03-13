@@ -433,7 +433,6 @@ def main():
                 st.write(f"✅ Best Parameters: {best_params}")
                 st.write(f"📉 Best RMSE from cross-validation: {best_rmse}")
 
-                # Prophet Model
                 try:
                     st.write("📊 Training Prophet Model with Best Parameters...")
 
@@ -459,7 +458,7 @@ def main():
                     # Generate future dates & predict
                     future = prophet_model.make_future_dataframe(
                         periods=forecast_period, 
-                        freq="M" if data_freq == "M" else "D", 
+                        freq="M" if data_freq == "MS" else "D", 
                         include_history=False
                     )
                     prophet_forecast = prophet_model.predict(future)
@@ -477,16 +476,12 @@ def main():
 
                     # Apply inverse differencing if needed
                     if last_historical_value is not None:
-                        # Reverse differencing by adding the last historical value to cumulative sum
-                        # Ensure first forecasted value starts from last_historical_value
-                        prophet_forecast["yhat"] = prophet_forecast["yhat"]
+                        prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum() - prophet_forecast["yhat"].iloc[0]
+                        prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum() - prophet_forecast["yhat_upper"].iloc[0]
+                        prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum() - prophet_forecast["yhat_lower"].iloc[0]
 
-                        # Apply the same correction for confidence intervals
-                        prophet_forecast["yhat_upper"] = prophet_forecast["yhat_upper"]
-                        prophet_forecast["yhat_lower"] = prophet_forecast["yhat_lower"]
-
-                    # Reverse differencing for the historical data (Ensure proper alignment)
-                    train["y"] = y_original.iloc[:len(train)]  # Use the original data for historical values
+                    # Restore historical data
+                    train["y"] = y_original.iloc[:len(train)]
 
                     # Debugging: Check the first few rows after inverse differencing
                     st.write("🔍 First Few Rows After Inverse Differencing:")
@@ -517,63 +512,22 @@ def main():
 
                     # Create the chart
                     fig = go.Figure()
-
-                    # Add historical data (reverse-differenced if necessary)
-                    fig.add_trace(go.Scatter(
-                        x=train["ds"],
-                        y=train["y"],
-                        mode="lines",
-                        name="Historical",
-                        line=dict(color="black", width=2)
-                    ))
-
-                    # Add forecasted data
-                    fig.add_trace(go.Scatter(
-                        x=prophet_forecast["ds"],
-                        y=prophet_forecast["yhat"],
-                        mode="lines",
-                        name="Forecast",
-                        line=dict(color="blue", width=2)
-                    ))
-
-                    # Add confidence intervals
-                    fig.add_trace(go.Scatter(
-                        x=prophet_forecast["ds"],
-                        y=prophet_forecast["yhat_upper"],
-                        mode="lines",
-                        name="Upper Confidence",
-                        line=dict(color="lightblue", dash="dot")
-                    ))
-                    fig.add_trace(go.Scatter(
-                        x=prophet_forecast["ds"],
-                        y=prophet_forecast["yhat_lower"],
-                        mode="lines",
-                        name="Lower Confidence",
-                        line=dict(color="lightblue", dash="dot")
-                    ))
+                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
+                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat"], mode="lines", name="Forecast", line=dict(color="blue", width=2)))
+                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_upper"], mode="lines", name="Upper Confidence", line=dict(color="lightblue", dash="dot")))
+                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_lower"], mode="lines", name="Lower Confidence", line=dict(color="lightblue", dash="dot")))
 
                     # Update layout
-                    fig.update_layout(
-                        title="Prophet Forecast with Confidence Intervals",
-                        xaxis_title="Date",
-                        yaxis_title="Sales",
-                        legend_title="Legend",
-                        template="plotly_white"
-                    )
+                    fig.update_layout(title="Prophet Forecast with Confidence Intervals", xaxis_title="Date", yaxis_title="Sales", legend_title="Legend", template="plotly_white")
 
                     # Display the chart
                     st.plotly_chart(fig, use_container_width=True)
 
                     # Save results
-                    results["Prophet"] = {
-                        "RMSE": float(prophet_rmse),
-                        "MAPE": float(prophet_mape),
-                        "Forecast": prophet_forecast
-                    }
+                    results["Prophet"] = {"RMSE": float(prophet_rmse), "MAPE": float(prophet_mape), "Forecast": prophet_forecast}
 
                 except Exception as e:
                     st.warning(f"❌ Prophet Model failed: {e}")
-
 
                 # ARIMA Model
                 st.write("🔄 Training ARIMA Model...")
