@@ -152,6 +152,9 @@ def preprocess_data(data, date_column, sales_column):
         data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
         data["ds"] = data["ds"].dt.to_timestamp()
 
+        # Store the original values in a new column
+        data["y_original"] = data["y"]
+
         # Check stationarity
         stationarity_result = check_stationarity(data["y"])
         st.markdown(
@@ -163,9 +166,6 @@ def preprocess_data(data, date_column, sales_column):
             """,
             unsafe_allow_html=True,
         )
-
-        # Store the original values in a new column
-        data["y_original"] = data["y"]
 
         # Apply differencing if non-stationary
         if stationarity_result == "Non-Stationary":
@@ -218,7 +218,7 @@ def preprocess_data(data, date_column, sales_column):
             # Return differenced data with "y" column and the first value
             differenced_data = data[["ds", "y_diff"]].dropna()
             differenced_data = differenced_data.rename(columns={"y_diff": "y"})  # Rename to "y"
-            return differenced_data, first_value, None
+            return differenced_data, first_value, data["y_original"]
 
         else:
             # If stationary, plot only the original series
@@ -540,13 +540,13 @@ def main():
             if start_forecast:
                 # Run forecast logic
                 # Preprocess Data
-                data, first_value, data["y_original"] = preprocess_data(data, date_column, sales_column)  # Capture first_value
-                if data is None:  # Check if preprocessing failed
-                                    st.error("❌ Preprocessing failed. Please check your data and try again.")
-                                    return
+                processed_data, first_value, y_original = preprocess_data(data, date_column, sales_column)  # Unpack three values
+                if processed_data is None:  # Check if preprocessing failed
+                    st.error("❌ Preprocessing failed. Please check your data and try again.")
+                    return
 
                 # Apply scenarios to training data
-                scenario_data = apply_scenarios(data.copy(), demand_shock, seasonality_adjustment, external_shock)
+                scenario_data = apply_scenarios(processed_data.copy(), demand_shock, seasonality_adjustment, external_shock)
 
                 # ✅ Centered Header with Icon
                 st.markdown(
@@ -637,9 +637,9 @@ def main():
                         prophet_forecast = inverse_difference(data, prophet_forecast, first_value)
 
                         # Reverse differencing for the historical data (train["y"])
-                        train["y"] = data["y_original"].iloc[:len(train)]  # Use the original data for historical values
+                        train["y"] = y_original.iloc[:len(train)]  # Use the original data for historical values
 
-                            # Debugging: Check the contents of the train DataFrame
+                    # Debugging: Check the contents of the train DataFrame
                     st.write("Historical Data (train):")
                     st.write(train)
 
