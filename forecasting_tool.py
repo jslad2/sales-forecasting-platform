@@ -249,7 +249,7 @@ def preprocess_data(data, date_column, sales_column):
             st.plotly_chart(fig, use_container_width=True)
 
             # Return original data
-            return data[["ds", "y"]], first_value, None
+            return data[["ds", "y"]], None
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
