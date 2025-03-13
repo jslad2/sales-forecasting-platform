@@ -135,10 +135,6 @@ def check_stationarity(series):
     else:
         return "Inconclusive"
 
-import pandas as pd
-import streamlit as st
-import plotly.graph_objects as go
-
 def preprocess_data(data, date_column, sales_column):
     """
     Preprocess the uploaded data, check stationarity, and apply transformations if needed.
@@ -178,6 +174,7 @@ def preprocess_data(data, date_column, sales_column):
 
             # Store the last value before differencing (for inverse differencing)
             last_historical_value = data["y"].iloc[-1]
+            st.write(f"✅ Last Historical Value Before Differencing: {last_historical_value}")
 
             # Create a Plotly figure for visualization
             fig = go.Figure()
@@ -215,7 +212,6 @@ def inverse_difference(original_data, forecast_data, first_value):
         forecast_data["yhat_lower"] = first_value + forecast_data["yhat_lower"].cumsum().shift(fill_value=first_value)
     
     return forecast_data
-
 
 def detect_and_add_seasonalities(model, data):
     data_frequency = pd.infer_freq(data["ds"])
@@ -477,7 +473,6 @@ def main():
                     prophet_mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length])
 
                     # Get the last known historical value before forecasting
-                    last_historical_value = train["y"].iloc[-1]
                     st.write("✅ Last Historical Value (Original Scale):", last_historical_value)
 
                     # Apply inverse differencing if needed
