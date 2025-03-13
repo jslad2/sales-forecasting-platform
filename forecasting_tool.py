@@ -179,6 +179,9 @@ def preprocess_data(data, date_column, sales_column):
             st.warning("Applying differencing to stabilize the series.")
             data["y_diff"] = data["y"].diff().dropna()
 
+            # Store the first value of the original series
+            first_value = data["y"].iloc[0]
+
             # Create a Plotly figure for visualization
             fig = go.Figure()
 
@@ -257,7 +260,7 @@ def preprocess_data(data, date_column, sales_column):
             st.plotly_chart(fig, use_container_width=True)
 
             # Return original data
-            return data[["ds", "y"]]
+            return data[["ds", "y"]], first_value
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
@@ -373,9 +376,13 @@ def preprocess_data(data, date_column, sales_column):
         st.error(f"Error during data preprocessing: {e}")
         return None, None, None
 
-def inverse_difference(original_data, forecast_data):
-    forecast_data["yhat"] = original_data["y"].iloc[-1] + forecast_data["yhat"].cumsum()
-    return forecast_data
+def inverse_difference(original_data, forecast_data, first_value):
+    """
+    Reverse the differencing to bring the forecast back to the original scale.
+    """
+    if first_value is not None:
+        forecast_data["yhat"] = first_value + forecast_data["yhat"].cumsum()
+    return forecast_data    
 
 def detect_and_add_seasonalities(model, data):
     data_frequency = pd.infer_freq(data["ds"])
@@ -537,7 +544,7 @@ def main():
             if start_forecast:
                 # Run forecast logic
                 # Preprocess Data
-                data = preprocess_data(data, date_column, sales_column)
+                data, first_value = preprocess_data(data, date_column, sales_column)  # Capture first_value
                 if data is None:
                     return
 
@@ -596,7 +603,7 @@ def main():
                 st.write(f"✅ Best Parameters: {best_params}")
                 st.write(f"📉 Best RMSE from cross-validation: {best_rmse}")
 
-                # Step 2: Train Final Model
+                # Prophet Model
                 try:
                     st.write("📊 Training Prophet Model with Best Parameters...")
 
@@ -626,6 +633,10 @@ def main():
                     matching_length = min(len(test["y"]), len(prophet_forecast))
                     prophet_rmse = mean_squared_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]) ** 0.5
                     prophet_mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length])
+
+                    # After forecasting, reverse the differencing if it was applied
+                    if first_value is not None:
+                        prophet_forecast = inverse_difference(data, prophet_forecast, first_value)
 
                     # Identify highest & lowest forecasted sales
                     highest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmax()]
