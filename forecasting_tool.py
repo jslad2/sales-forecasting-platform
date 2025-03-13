@@ -629,10 +629,9 @@ def main():
                     if first_value is not None:
                         # Reverse differencing for the forecasted data
                         prophet_forecast = inverse_difference(data, prophet_forecast, first_value)
-                    
-                    if first_value is not None:
-                        # Reverse differencing for the forecasted data
-                        train["y"] = inverse_difference(data, prophet_forecast, first_value)
+
+                        # Reverse differencing for the historical data (train["y"])
+                        train["y"] = data["y"].iloc[:len(train)]  # Use the original data for historical values
 
                     # Identify highest & lowest forecasted sales
                     highest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmax()]
