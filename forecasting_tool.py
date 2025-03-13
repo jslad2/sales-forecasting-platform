@@ -169,7 +169,7 @@ def preprocess_data(data, date_column, sales_column):
             data["y_diff"] = data["y"].diff().dropna()
 
             # Store the first value of the original series
-            first_value = data["y"]
+            first_value = data["y"].iloc[0]
 
             # Create a Plotly figure for visualization
             fig = go.Figure()
@@ -249,7 +249,7 @@ def preprocess_data(data, date_column, sales_column):
             st.plotly_chart(fig, use_container_width=True)
 
             # Return original data
-            return data[["ds", "y"]], first_value
+            return data[["ds", "y"]], first_value, None
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
