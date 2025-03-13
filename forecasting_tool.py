@@ -135,17 +135,6 @@ def check_stationarity(series):
     else:
         return "Inconclusive"
 
-def check_stationarity(series):
-    """
-    Check stationarity using the Augmented Dickey-Fuller test.
-    """
-    result = adfuller(series.dropna())
-    p_value = result[1]
-    if p_value <= 0.05:
-        return "Stationary"
-    else:
-        return "Non-Stationary"
-
 def preprocess_data(data, date_column, sales_column):
     """
     Preprocess the uploaded data, check stationarity, and apply transformations if needed.
@@ -180,7 +169,7 @@ def preprocess_data(data, date_column, sales_column):
             data["y_diff"] = data["y"].diff().dropna()
 
             # Store the first value of the original series
-            first_value = data["y"].iloc[0]
+            first_value = data["y"]
 
             # Create a Plotly figure for visualization
             fig = go.Figure()
