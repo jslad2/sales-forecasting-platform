@@ -374,11 +374,13 @@ def inverse_difference(original_data, forecast_data, first_value):
     Reverse the differencing to bring the forecast back to the original scale.
     """
     if first_value is not None:
-        # Reverse differencing for the forecasted data
-        forecast_data["yhat"] = first_value + forecast_data["yhat"].cumsum()
-        forecast_data["yhat_upper"] = first_value + forecast_data["yhat_upper"].cumsum()
-        forecast_data["yhat_lower"] = first_value + forecast_data["yhat_lower"].cumsum()
-    return forecast_data 
+        # Ensure first value aligns with the restored series
+        forecast_data["yhat"] = first_value + forecast_data["yhat"].cumsum().shift(fill_value=first_value)
+        forecast_data["yhat_upper"] = first_value + forecast_data["yhat_upper"].cumsum().shift(fill_value=first_value)
+        forecast_data["yhat_lower"] = first_value + forecast_data["yhat_lower"].cumsum().shift(fill_value=first_value)
+    
+    return forecast_data
+
 
 def detect_and_add_seasonalities(model, data):
     data_frequency = pd.infer_freq(data["ds"])
@@ -620,37 +622,37 @@ def main():
                     prophet_model.fit(train)
 
                     # Generate future dates & predict
-                    future = prophet_model.make_future_dataframe(periods=forecast_period, freq="M", include_history=False)
+                    future = prophet_model.make_future_dataframe(periods=forecast_period, freq="M")
                     prophet_forecast = prophet_model.predict(future)
 
                     # Ensure only future forecasts are used
-                    prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
+                    prophet_forecast = prophet_forecast.iloc[-forecast_period:]
 
                     # Ensure test set matches forecast length for metric calculation
-                    matching_length = min(len(test["y"]), len(prophet_forecast))
+                    matching_length = min(len(test), len(prophet_forecast))
                     prophet_rmse = mean_squared_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]) ** 0.5
                     prophet_mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length])
 
                     # Debugging: Check the first few rows before inverse differencing
-                    st.write("First few rows of forecast before inverse differencing:", prophet_forecast.head())
+                    st.write("✅ Checking Prophet Forecast Before Inverse Differencing:")
+                    st.dataframe(prophet_forecast.head())
 
                     # Apply inverse differencing if needed
                     if first_value is not None:
-                        prophet_forecast["yhat"] = first_value + prophet_forecast["yhat"].cumsum()
-                        prophet_forecast["yhat_upper"] = first_value + prophet_forecast["yhat_upper"].cumsum()
-                        prophet_forecast["yhat_lower"] = first_value + prophet_forecast["yhat_lower"].cumsum()
-                        
+                        prophet_forecast["yhat"] = first_value + prophet_forecast["yhat"].cumsum().shift(fill_value=first_value)
+                        prophet_forecast["yhat_upper"] = first_value + prophet_forecast["yhat_upper"].cumsum().shift(fill_value=first_value)
+                        prophet_forecast["yhat_lower"] = first_value + prophet_forecast["yhat_lower"].cumsum().shift(fill_value=first_value)
 
                         # Reverse differencing for the historical data (train["y"])
                         train["y"] = y_original.iloc[:len(train)]  # Use the original data for historical values
 
                     # Debugging: Check after applying inverse differencing
-                    st.write("First few rows of forecast after inverse differencing:", prophet_forecast.head())
-
+                    st.write("✅ Checking Prophet Forecast After Inverse Differencing:")
+                    st.dataframe(prophet_forecast.head())
 
                     # Debugging: Check the contents of the train DataFrame
-                    st.write("Historical Data (train):")
-                    st.write(train)
+                    st.write("✅ Checking Train Data Before Forecasting:")
+                    st.dataframe(train.head())
 
                     # Identify highest & lowest forecasted sales
                     highest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmax()]
@@ -730,6 +732,7 @@ def main():
 
                 except Exception as e:
                     st.warning(f"❌ Prophet Model failed: {e}")
+
 
                 # ARIMA Model
                 st.write("🔄 Training ARIMA Model...")
