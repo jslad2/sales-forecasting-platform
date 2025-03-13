@@ -135,11 +135,15 @@ def check_stationarity(series):
     else:
         return "Inconclusive"
 
+import pandas as pd
+import streamlit as st
+import plotly.graph_objects as go
+
 def preprocess_data(data, date_column, sales_column):
     """
     Preprocess the uploaded data, check stationarity, and apply transformations if needed.
     Returns a dataframe with columns "ds" and "y" for Prophet compatibility.
-    Also returns the first value of the original series if differencing is applied.
+    Also returns the last historical value before forecasting if differencing is applied.
     """
     try:
         # Convert date column to datetime
@@ -172,87 +176,28 @@ def preprocess_data(data, date_column, sales_column):
             st.warning("Applying differencing to stabilize the series.")
             data["y_diff"] = data["y"].diff().dropna()
 
-            # Store the first value of the original series
-            first_value = data["y"].iloc[0]
+            # Store the last value before differencing (for inverse differencing)
+            last_historical_value = data["y"].iloc[-1]
 
             # Create a Plotly figure for visualization
             fig = go.Figure()
-
-            # Original series
-            fig.add_trace(go.Scatter(
-                x=data["ds"],
-                y=data["y"],
-                mode="lines",
-                name="Original Series",
-                line=dict(color="blue", width=2)
-            ))
-
-            # Differenced series
-            fig.add_trace(go.Scatter(
-                x=data["ds"].iloc[1:],  # Skip the first row (NaN after differencing)
-                y=data["y_diff"],
-                mode="lines",
-                name="Differenced Series",
-                line=dict(color="orange", width=2, dash="dot")
-            ))
-
-            # Update layout
-            fig.update_layout(
-                title="Original vs Differenced Series",
-                xaxis_title="Date",
-                yaxis_title="Sales",
-                legend_title="Series",
-                template="plotly_white",
-                hovermode="x unified",
-                margin=dict(l=50, r=50, t=80, b=50),
-                showlegend=True
-            )
-
-            # Add grid lines
-            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
-            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
-
-            # Display the chart
+            fig.add_trace(go.Scatter(x=data["ds"], y=data["y"], mode="lines", name="Original Series", line=dict(color="blue", width=2)))
+            fig.add_trace(go.Scatter(x=data["ds"].iloc[1:], y=data["y_diff"], mode="lines", name="Differenced Series", line=dict(color="orange", width=2, dash="dot")))
+            fig.update_layout(title="Original vs Differenced Series", xaxis_title="Date", yaxis_title="Sales", template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
 
-            # Return differenced data with "y" column and the first value
-            differenced_data = data[["ds", "y_diff"]].dropna()
-            differenced_data = differenced_data.rename(columns={"y_diff": "y"})  # Rename to "y"
-            return differenced_data, first_value, data["y_original"]
+            # Return differenced data with "y" column and the last historical value
+            differenced_data = data[["ds", "y_diff"]].dropna().rename(columns={"y_diff": "y"})
+            return differenced_data, last_historical_value, data["y_original"]
 
         else:
             # If stationary, plot only the original series
             fig = go.Figure()
-
-            # Add the original series
-            fig.add_trace(go.Scatter(
-                x=data["ds"],
-                y=data["y"],
-                mode="lines",
-                name="Original Series",
-                line=dict(color="blue", width=2)
-            ))
-
-            # Update layout
-            fig.update_layout(
-                title="📊 Original Series",
-                xaxis_title="Date",
-                yaxis_title="Sales",
-                legend_title="Series",
-                template="plotly_white",
-                hovermode="x unified",
-                margin=dict(l=50, r=50, t=80, b=50),
-                showlegend=True
-            )
-
-            # Add grid lines
-            fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
-            fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="lightgray")
-
-            # Display the chart
+            fig.add_trace(go.Scatter(x=data["ds"], y=data["y"], mode="lines", name="Original Series", line=dict(color="blue", width=2)))
+            fig.update_layout(title="📊 Original Series", xaxis_title="Date", yaxis_title="Sales", template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
 
-            # Return original data and None for first_value (no differencing applied)
+            # Return original data and None for last_historical_value (no differencing applied)
             return data[["ds", "y"]], None, data["y_original"]
 
     except Exception as e:
@@ -542,7 +487,7 @@ def main():
             if start_forecast:
                 # Run forecast logic
                 # Preprocess Data
-                processed_data, first_value, y_original = preprocess_data(data, date_column, sales_column)  # Unpack three values
+                processed_data, last_historical_value, y_original = preprocess_data(data, date_column, sales_column)
                 if processed_data is None:  # Check if preprocessing failed
                     st.error("❌ Preprocessing failed. Please check your data and try again.")
                     return
@@ -646,17 +591,17 @@ def main():
                     st.write("✅ Last Historical Value (Original Scale):", last_historical_value)
 
                     # Apply inverse differencing if needed
-                    if first_value is not None:
+                    if last_historical_value is not None:
                         # Reverse differencing by adding the last historical value to cumulative sum
                         # Ensure first forecasted value starts from last_historical_value
-                        prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum() - prophet_forecast["yhat"].iloc[0]
+                        prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum()
 
                         # Apply the same correction for confidence intervals
-                        prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum() - prophet_forecast["yhat_upper"].iloc[0]
-                        prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum() - prophet_forecast["yhat_lower"].iloc[0]
+                        prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum()
+                        prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum()
 
-                            # Reverse differencing for the historical data (train["y"])
-                        train["y"] = y_original.iloc[:len(train)]  # Use the original data for historical values
+                    # Reverse differencing for the historical data (Ensure proper alignment)
+                    train["y"] = y_original.iloc[:len(train)]  # Use the original data for historical values
 
                     # Debugging: Check the first few rows after inverse differencing
                     st.write("🔍 First Few Rows After Inverse Differencing:")
