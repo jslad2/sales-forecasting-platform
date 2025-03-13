@@ -639,6 +639,10 @@ def main():
                         # Reverse differencing for the historical data (train["y"])
                         train["y"] = data["y_original"].iloc[:len(train)]  # Use the original data for historical values
 
+                            # Debugging: Check the contents of the train DataFrame
+                    st.write("Historical Data (train):")
+                    st.write(train)
+
                     # Identify highest & lowest forecasted sales
                     highest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmax()]
                     lowest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmin()]
