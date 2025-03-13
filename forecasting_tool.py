@@ -627,7 +627,11 @@ def main():
 
                     # After forecasting, reverse the differencing if it was applied
                     if first_value is not None:
+                        # Reverse differencing for the forecasted data
                         prophet_forecast = inverse_difference(data, prophet_forecast, first_value)
+
+                        # Reverse differencing for the historical data (train["y"])
+                        train["y"] = data["y"].iloc[:len(train)]  # Use the original data for historical values
 
                     # Identify highest & lowest forecasted sales
                     highest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmax()]
@@ -649,12 +653,44 @@ def main():
                     with st.expander("📊 Prophet Model Summary"):
                         st.markdown(summary_text)
 
+                    # Create the chart
                     fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat"], mode="lines", name="Forecast", line=dict(color="blue", width=2)))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_upper"], mode="lines", name="Upper Confidence", line=dict(color="lightblue", dash="dot")))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_lower"], mode="lines", name="Lower Confidence", line=dict(color="lightblue", dash="dot")))
 
+                    # Add historical data (reverse-differenced if necessary)
+                    fig.add_trace(go.Scatter(
+                        x=train["ds"],
+                        y=train["y"],
+                        mode="lines",
+                        name="Historical",
+                        line=dict(color="black", width=2)
+                    ))
+
+                    # Add forecasted data
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"],
+                        y=prophet_forecast["yhat"],
+                        mode="lines",
+                        name="Forecast",
+                        line=dict(color="blue", width=2)
+                    ))
+
+                    # Add confidence intervals
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"],
+                        y=prophet_forecast["yhat_upper"],
+                        mode="lines",
+                        name="Upper Confidence",
+                        line=dict(color="lightblue", dash="dot")
+                    ))
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"],
+                        y=prophet_forecast["yhat_lower"],
+                        mode="lines",
+                        name="Lower Confidence",
+                        line=dict(color="lightblue", dash="dot")
+                    ))
+
+                    # Update layout
                     fig.update_layout(
                         title="Prophet Forecast with Confidence Intervals",
                         xaxis_title="Date",
@@ -663,6 +699,7 @@ def main():
                         template="plotly_white"
                     )
 
+                    # Display the chart
                     st.plotly_chart(fig, use_container_width=True)
 
                     # Save results
