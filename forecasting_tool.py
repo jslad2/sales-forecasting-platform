@@ -636,15 +636,15 @@ def main():
                     # # Debugging: Check the first few rows before inverse differencing
                     # st.write("First few rows of forecast before inverse differencing:", prophet_forecast.head())
 
-                    # # Apply inverse differencing if needed
-                    # if first_value is not None:
-                    #     prophet_forecast["yhat"] = first_value + prophet_forecast["yhat"].cumsum()
-                    #     prophet_forecast["yhat_upper"] = first_value + prophet_forecast["yhat_upper"].cumsum()
-                    #     prophet_forecast["yhat_lower"] = first_value + prophet_forecast["yhat_lower"].cumsum()
+                    # Apply inverse differencing if needed
+                    if first_value is not None:
+                        prophet_forecast["yhat"] = first_value + prophet_forecast["yhat"].cumsum().shift(-1, fill_value=first_value)
+                        prophet_forecast["yhat_upper"] = first_value + prophet_forecast["yhat_upper"].cumsum()
+                        prophet_forecast["yhat_lower"] = first_value + prophet_forecast["yhat_lower"].cumsum()
                         
 
-                    #     # Reverse differencing for the historical data (train["y"])
-                    #     train["y"] = y_original.iloc[:len(train)]  # Use the original data for historical values
+                        # Reverse differencing for the historical data (train["y"])
+                        train["y"] = y_original.iloc[:len(train)]  # Use the original data for historical values
 
                     # # Debugging: Check after applying inverse differencing
                     # st.write("First few rows of forecast after inverse differencing:", prophet_forecast.head())
