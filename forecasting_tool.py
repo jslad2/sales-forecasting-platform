@@ -371,8 +371,11 @@ def inverse_difference(original_data, forecast_data, first_value):
     Reverse the differencing to bring the forecast back to the original scale.
     """
     if first_value is not None:
+        # Reverse differencing for the forecasted data
         forecast_data["yhat"] = first_value + forecast_data["yhat"].cumsum()
-    return forecast_data    
+        forecast_data["yhat_upper"] = first_value + forecast_data["yhat_upper"].cumsum()
+        forecast_data["yhat_lower"] = first_value + forecast_data["yhat_lower"].cumsum()
+    return forecast_data 
 
 def detect_and_add_seasonalities(model, data):
     data_frequency = pd.infer_freq(data["ds"])
@@ -627,12 +630,8 @@ def main():
 
                     # After forecasting, reverse the differencing if it was applied
                     if first_value is not None:
-                        # Reverse differencing for the forecasted data
-                        prophet_forecast["yhat"] = inverse_difference(data, prophet_forecast[["ds", "yhat"]], first_value)["yhat"]
-
-                        # Reverse differencing for the confidence intervals
-                        prophet_forecast["yhat_upper"] = inverse_difference(data, prophet_forecast[["ds", "yhat_upper"]], first_value)["yhat_upper"]
-                        prophet_forecast["yhat_lower"] = inverse_difference(data, prophet_forecast[["ds", "yhat_lower"]], first_value)["yhat_lower"]
+                        # Reverse differencing for the forecasted data and confidence intervals
+                        prophet_forecast = inverse_difference(data, prophet_forecast, first_value)
 
                         # Reverse differencing for the historical data (train["y"])
                         train["y"] = data["y"].iloc[:len(train)]  # Use the original data for historical values
