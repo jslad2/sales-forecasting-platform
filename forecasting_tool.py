@@ -648,11 +648,14 @@ def main():
                     # Apply inverse differencing if needed
                     if first_value is not None:
                         # Reverse differencing by adding the last historical value to cumulative sum
-                        prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum()
-                        prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum()
-                        prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum()
+                        # Ensure first forecasted value starts from last_historical_value
+                        prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum() - prophet_forecast["yhat"].iloc[0]
 
-                        # Reverse differencing for the historical data (train["y"])
+                        # Apply the same correction for confidence intervals
+                        prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum() - prophet_forecast["yhat_upper"].iloc[0]
+                        prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum() - prophet_forecast["yhat_lower"].iloc[0]
+
+                            # Reverse differencing for the historical data (train["y"])
                         train["y"] = y_original.iloc[:len(train)]  # Use the original data for historical values
 
                     # Debugging: Check the first few rows after inverse differencing
