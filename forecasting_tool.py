@@ -534,9 +534,10 @@ def main():
             if start_forecast:
                 # Run forecast logic
                 # Preprocess Data
-                data, first_value = preprocess_data(data, date_column, sales_column)  # Capture first_value
-                if data is None:
-                    return
+                data, first_value, _ = preprocess_data(data, date_column, sales_column)  # Capture first_value
+                if data is None:  # Check if preprocessing failed
+                                    st.error("❌ Preprocessing failed. Please check your data and try again.")
+                                    return
 
                 # Apply scenarios to training data
                 scenario_data = apply_scenarios(data.copy(), demand_shock, seasonality_adjustment, external_shock)
