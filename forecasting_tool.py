@@ -483,7 +483,7 @@ def main():
                         prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum() - prophet_forecast["yhat_lower"].iloc[0]
 
                     # Restore historical data
-                    train["y"] = y_original.values[:len(train)]  # Ensures correct positional mapping
+                    train["y"] = y_original  # Ensures correct positional mapping
                     st.write(f"✅ Original data:", y_original)
                     st.write(f"✅ train:", train)
                     # Debugging: Check if historical values match expected scale
