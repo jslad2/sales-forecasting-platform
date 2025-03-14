@@ -484,8 +484,8 @@ def main():
 
                     # Restore historical data
                     train["y"] = y_original.values[:len(train)]  # Ensures correct positional mapping
-                    st.write(f"✅ Original data after:", data["y_original"])
-                    st.write(f"✅ Original data train:", train["y"])
+                    st.write(f"✅ Original data after:", data)
+                    st.write(f"✅ train:", train)
                     # Debugging: Check if historical values match expected scale
                     st.write("✅ Last 5 Historical Values Before Plotting:", train.tail())
 
