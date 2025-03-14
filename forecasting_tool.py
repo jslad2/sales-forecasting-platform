@@ -152,12 +152,8 @@ def preprocess_data(data, date_column, sales_column):
         data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
         data["ds"] = data["ds"].dt.to_timestamp()
 
-        # Store the original values as a separate DataFrame
-        y_original = data[["ds", "y"]].rename(columns={"y": "y_original"})
-
-        # Debug: Check data after aggregation
-        st.write("🔍 Data after aggregation and datetime conversion:")
-        st.write(data.head())
+        # Store the original values in a new column
+        data["y_original"] = data["y"]
 
         # Check stationarity
         stationarity_result = check_stationarity(data["y"])
@@ -174,8 +170,7 @@ def preprocess_data(data, date_column, sales_column):
         # Apply differencing if non-stationary
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
-            data["y_diff"] = data["y"].diff()
-            data = data.dropna(subset=["y_diff"])  # Drop rows with NaN in y_diff
+            data["y_diff"] = data["y"].diff().dropna()
 
             # Store the last value before differencing (for inverse differencing)
             last_historical_value = data["y"].iloc[-1]
@@ -188,9 +183,11 @@ def preprocess_data(data, date_column, sales_column):
             fig.update_layout(title="Original vs Differenced Series", xaxis_title="Date", yaxis_title="Sales", template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
 
+            st.write(f"✅ Original data:", data["y_original"])
+
             # Return differenced data with "y" column and the last historical value
-            differenced_data = data[["ds", "y_diff"]].rename(columns={"y_diff": "y"})
-            return differenced_data, last_historical_value, y_original
+            differenced_data = data[["ds", "y_diff"]].dropna().rename(columns={"y_diff": "y"})
+            return differenced_data, last_historical_value, data["y_original"]
 
         else:
             # If stationary, plot only the original series
@@ -200,12 +197,12 @@ def preprocess_data(data, date_column, sales_column):
             st.plotly_chart(fig, use_container_width=True)
 
             # Return original data and None for last_historical_value (no differencing applied)
-            return data[["ds", "y"]], None, y_original
+            return data[["ds", "y"]], None, data["y_original"]
 
     except Exception as e:
         st.error(f"An error occurred during preprocessing: {e}")
         return None, None, None  # Return None in case of an error
-    
+
 def inverse_difference(original_data, forecast_data, first_value):
     """
     Reverse the differencing to bring the forecast back to the original scale.
@@ -453,12 +450,6 @@ def main():
                     except Exception as e:
                         st.warning(f"⚠️ Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
 
-                    # Debug: Check training data
-                    st.write("🔍 Training Data Head:")
-                    st.write(train.head())
-                    st.write("🔍 Training Data Types:")
-                    st.write(train.dtypes)
-
                     # Train the model
                     prophet_model.fit(train)
 
@@ -469,25 +460,13 @@ def main():
                     # Generate future dates & predict
                     future = prophet_model.make_future_dataframe(
                         periods=forecast_period, 
-                        freq="MS" if data_freq == "MS" else "D",  # Use "MS" for monthly, "D" for daily
+                        freq="M" if data_freq == "MS" else "D", 
                         include_history=False
                     )
                     prophet_forecast = prophet_model.predict(future)
 
-                    # Debug: Check forecast data
-                    st.write("🔍 Forecast Data Head:")
-                    st.write(prophet_forecast.head())
-
                     # Ensure only future forecasts are used
-                    condition = prophet_forecast["ds"] > train["ds"].max()
-                    st.write("🔍 Filtering Condition:")
-                    st.write(condition)
-
-                    prophet_forecast = prophet_forecast[condition]
-
-                    # Debug: Check filtered forecast data
-                    st.write("🔍 Filtered Forecast Data Head:")
-                    st.write(prophet_forecast.head())
+                    prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
 
                     # Ensure test set matches forecast length for metric calculation
                     matching_length = min(len(test["y"]), len(prophet_forecast))
@@ -503,11 +482,18 @@ def main():
                         prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum() - prophet_forecast["yhat_upper"].iloc[0]
                         prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum() - prophet_forecast["yhat_lower"].iloc[0]
 
-                    # Debug: Check the first few rows after inverse differencing
+                    # Restore historical data
+                    train["y"] = y_original  # Ensures correct positional mapping
+                    st.write(f"✅ Original data:", y_original)
+                    st.write(f"✅ train:", train)
+                    # Debugging: Check if historical values match expected scale
+                    st.write("✅ Last 5 Historical Values Before Plotting:", train.tail())
+
+                    # Debugging: Check the first few rows after inverse differencing
                     st.write("🔍 First Few Rows After Inverse Differencing:")
                     st.dataframe(prophet_forecast.head())
 
-                    # Debug: Ensure first forecasted value aligns with last historical value
+                    # Debugging: Ensure first forecasted value aligns with last historical value
                     st.write("✅ First Forecasted Value After Inverse Differencing:", prophet_forecast["yhat"].iloc[0])
 
                     # Identify highest & lowest forecasted sales
@@ -547,8 +533,8 @@ def main():
                     results["Prophet"] = {"RMSE": float(prophet_rmse), "MAPE": float(prophet_mape), "Forecast": prophet_forecast}
 
                 except Exception as e:
-                    st.error(f"❌ Prophet Model failed: {e}")
-    
+                    st.warning(f"❌ Prophet Model failed: {e}")
+
                 # ARIMA Model
                 st.write("🔄 Training ARIMA Model...")
 
