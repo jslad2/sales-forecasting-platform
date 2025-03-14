@@ -462,6 +462,11 @@ def main():
                         include_history=False
                     )
                     prophet_forecast = prophet_model.predict(future)
+                    
+                    st.write(f"📏 Prophet Forecast Length: {len(prophet_forecast)}")
+                    st.write(f"📏 yhat Length: {len(prophet_forecast['yhat'])}")
+                    st.write(f"📏 yhat_upper Length: {len(prophet_forecast['yhat_upper'])}")
+                    st.write(f"📏 yhat_lower Length: {len(prophet_forecast['yhat_lower'])}")
 
                     # Ensure only future forecasts are used
                     prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
@@ -476,9 +481,10 @@ def main():
 
                     # Apply inverse differencing if needed
                     if last_historical_value is not None:
-                        prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum() - prophet_forecast["yhat"].iloc[0]
-                        prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum() - prophet_forecast["yhat_upper"].iloc[0]
-                        prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum() - prophet_forecast["yhat_lower"].iloc[0]
+                        # Instead of subtracting the first forecasted value, just add the last known value to the entire forecast
+                        prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum()
+                        prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum()
+                        prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum()
 
                     # Restore historical data
                     train["y"] = y_original  # Ensures correct positional mapping
