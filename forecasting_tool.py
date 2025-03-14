@@ -379,7 +379,7 @@ def main():
                 if processed_data is None:  # Check if preprocessing failed
                     st.error("❌ Preprocessing failed. Please check your data and try again.")
                     return
-
+                st.write(f"✅ yoriginal:", y_original)
                 # Apply scenarios to training data
                 scenario_data = apply_scenarios(processed_data.copy(), demand_shock, seasonality_adjustment, external_shock)
 
