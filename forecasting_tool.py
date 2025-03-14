@@ -155,6 +155,10 @@ def preprocess_data(data, date_column, sales_column):
         # Store the original values as a separate DataFrame
         y_original = data[["ds", "y"]].rename(columns={"y": "y_original"})
 
+        # Debug: Check data after aggregation
+        st.write("🔍 Data after aggregation and datetime conversion:")
+        st.write(data.head())
+
         # Check stationarity
         stationarity_result = check_stationarity(data["y"])
         st.markdown(
@@ -170,7 +174,8 @@ def preprocess_data(data, date_column, sales_column):
         # Apply differencing if non-stationary
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
-            data["y_diff"] = data["y"].diff().dropna()
+            data["y_diff"] = data["y"].diff()
+            data = data.dropna(subset=["y_diff"])  # Drop rows with NaN in y_diff
 
             # Store the last value before differencing (for inverse differencing)
             last_historical_value = data["y"].iloc[-1]
@@ -184,7 +189,7 @@ def preprocess_data(data, date_column, sales_column):
             st.plotly_chart(fig, use_container_width=True)
 
             # Return differenced data with "y" column and the last historical value
-            differenced_data = data[["ds", "y_diff"]].dropna().rename(columns={"y_diff": "y"})
+            differenced_data = data[["ds", "y_diff"]].rename(columns={"y_diff": "y"})
             return differenced_data, last_historical_value, y_original
 
         else:
@@ -200,7 +205,7 @@ def preprocess_data(data, date_column, sales_column):
     except Exception as e:
         st.error(f"An error occurred during preprocessing: {e}")
         return None, None, None  # Return None in case of an error
-
+    
 def inverse_difference(original_data, forecast_data, first_value):
     """
     Reverse the differencing to bring the forecast back to the original scale.
