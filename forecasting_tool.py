@@ -474,6 +474,8 @@ def main():
                     # Get the last known historical value before forecasting
                     st.write("✅ Last Historical Value (Original Scale):", last_historical_value)
 
+                    st.write("✅ Last Historical Value (Original Scale):", prophet_forecast["yhat"])
+
                     # Apply inverse differencing if needed
                     if last_historical_value is not None:
                         prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum() - prophet_forecast["yhat"].iloc[0]
