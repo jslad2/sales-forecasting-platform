@@ -453,6 +453,12 @@ def main():
                     except Exception as e:
                         st.warning(f"⚠️ Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
 
+                    # Debug: Check training data
+                    st.write("🔍 Training Data Head:")
+                    st.write(train.head())
+                    st.write("🔍 Training Data Types:")
+                    st.write(train.dtypes)
+
                     # Train the model
                     prophet_model.fit(train)
 
@@ -463,13 +469,25 @@ def main():
                     # Generate future dates & predict
                     future = prophet_model.make_future_dataframe(
                         periods=forecast_period, 
-                        freq="M" if data_freq == "MS" else "D", 
+                        freq="MS" if data_freq == "MS" else "D",  # Use "MS" for monthly, "D" for daily
                         include_history=False
                     )
                     prophet_forecast = prophet_model.predict(future)
 
+                    # Debug: Check forecast data
+                    st.write("🔍 Forecast Data Head:")
+                    st.write(prophet_forecast.head())
+
                     # Ensure only future forecasts are used
-                    prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
+                    condition = prophet_forecast["ds"] > train["ds"].max()
+                    st.write("🔍 Filtering Condition:")
+                    st.write(condition)
+
+                    prophet_forecast = prophet_forecast[condition]
+
+                    # Debug: Check filtered forecast data
+                    st.write("🔍 Filtered Forecast Data Head:")
+                    st.write(prophet_forecast.head())
 
                     # Ensure test set matches forecast length for metric calculation
                     matching_length = min(len(test["y"]), len(prophet_forecast))
@@ -479,26 +497,17 @@ def main():
                     # Get the last known historical value before forecasting
                     st.write("✅ Last Historical Value (Original Scale):", last_historical_value)
 
-                    st.write("✅ Last Historical Value (Original Scale):", prophet_forecast["yhat"])
-
                     # Apply inverse differencing if needed
                     if last_historical_value is not None:
                         prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum() - prophet_forecast["yhat"].iloc[0]
                         prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum() - prophet_forecast["yhat_upper"].iloc[0]
                         prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum() - prophet_forecast["yhat_lower"].iloc[0]
 
-                    # Restore historical data
-                    train["y"] = y_original[y_original]  # Ensures correct positional mapping
-                    st.write(f"✅ Original data:", y_original)
-                    st.write(f"✅ train:", train)
-                    # Debugging: Check if historical values match expected scale
-                    st.write("✅ Last 5 Historical Values Before Plotting:", train.tail())
-
-                    # Debugging: Check the first few rows after inverse differencing
+                    # Debug: Check the first few rows after inverse differencing
                     st.write("🔍 First Few Rows After Inverse Differencing:")
                     st.dataframe(prophet_forecast.head())
 
-                    # Debugging: Ensure first forecasted value aligns with last historical value
+                    # Debug: Ensure first forecasted value aligns with last historical value
                     st.write("✅ First Forecasted Value After Inverse Differencing:", prophet_forecast["yhat"].iloc[0])
 
                     # Identify highest & lowest forecasted sales
@@ -538,8 +547,8 @@ def main():
                     results["Prophet"] = {"RMSE": float(prophet_rmse), "MAPE": float(prophet_mape), "Forecast": prophet_forecast}
 
                 except Exception as e:
-                    st.warning(f"❌ Prophet Model failed: {e}")
-
+                    st.error(f"❌ Prophet Model failed: {e}")
+    
                 # ARIMA Model
                 st.write("🔄 Training ARIMA Model...")
 
