@@ -469,11 +469,12 @@ def main():
                         test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]
                     )
 
-                    # Apply inverse differencing if needed
                     if last_historical_value is not None:
-                        prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum()
-                        prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum()
-                        prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum()
+                        if len(prophet_forecast) > 0:  # Ensure it's not empty
+                            prophet_forecast = prophet_forecast.copy()  # Prevent modifying original dataframe reference
+                            prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum()
+                            prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum()
+                            prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum()
 
                     # Restore historical data
                     train["y"] = y_original
