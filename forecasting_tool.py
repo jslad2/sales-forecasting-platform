@@ -379,7 +379,7 @@ def main():
                 if processed_data is None:  # Check if preprocessing failed
                     st.error("❌ Preprocessing failed. Please check your data and try again.")
                     return
-                st.write(f"✅ Original data after:", y_original)
+                st.write(f"✅ yoriginal:", y_original)
                 # Apply scenarios to training data
                 scenario_data = apply_scenarios(processed_data.copy(), demand_shock, seasonality_adjustment, external_shock)
 
@@ -483,8 +483,8 @@ def main():
                         prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum() - prophet_forecast["yhat_lower"].iloc[0]
 
                     # Restore historical data
-                    train["y"] = y_original.values[:len(train)]  # Ensures correct positional mapping
-                    st.write(f"✅ Original data after:", data)
+                    train["y"] = y_original  # Ensures correct positional mapping
+                    st.write(f"✅ Original data:", y_original)
                     st.write(f"✅ train:", train)
                     # Debugging: Check if historical values match expected scale
                     st.write("✅ Last 5 Historical Values Before Plotting:", train.tail())
