@@ -183,6 +183,8 @@ def preprocess_data(data, date_column, sales_column):
             fig.update_layout(title="Original vs Differenced Series", xaxis_title="Date", yaxis_title="Sales", template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
 
+            st.write(f"✅ Original data:", data["y_original"])
+
             # Return differenced data with "y" column and the last historical value
             differenced_data = data[["ds", "y_diff"]].dropna().rename(columns={"y_diff": "y"})
             return differenced_data, last_historical_value, data["y_original"]
