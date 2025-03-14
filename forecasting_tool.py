@@ -434,7 +434,9 @@ def main():
                 st.write(f"📉 Best RMSE from cross-validation: {best_rmse}")
 
                 try:
-                    # Train Prophet Model
+                    st.write("📊 Training Prophet Model with Best Parameters...")
+
+                    # Define Prophet model
                     prophet_model = Prophet(
                         seasonality_mode=best_params["seasonality_mode"],
                         changepoint_prior_scale=best_params["changepoint_prior_scale"]
@@ -443,13 +445,15 @@ def main():
                     # Detect & dynamically add seasonalities
                     try:
                         prophet_model = detect_and_add_seasonalities(prophet_model, train)
-                    except Exception:
-                        pass  # Proceed without additional seasonalities if detection fails
+                    except Exception as e:
+                        st.warning(f"⚠️ Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
 
+                    # Train the model
                     prophet_model.fit(train)
 
-                    # Detect data frequency
+                    # Detect data frequency (Daily or Monthly)
                     data_freq = pd.infer_freq(train["ds"])
+                    st.write(f"🔍 Detected Data Frequency: {data_freq}")
 
                     # Generate future dates & predict
                     future = prophet_model.make_future_dataframe(
@@ -458,32 +462,44 @@ def main():
                         include_history=False
                     )
                     prophet_forecast = prophet_model.predict(future)
+
+                    # Ensure only future forecasts are used
                     prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
 
-                    # Calculate performance metrics
+                    # Ensure test set matches forecast length for metric calculation
                     matching_length = min(len(test["y"]), len(prophet_forecast))
-                    prophet_rmse = mean_squared_error(
-                        test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]
-                    ) ** 0.5
-                    prophet_mape = mean_absolute_percentage_error(
-                        test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]
-                    )
+                    prophet_rmse = mean_squared_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]) ** 0.5
+                    prophet_mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length])
 
+                    # Get the last known historical value before forecasting
+                    st.write("✅ Last Historical Value (Original Scale):", last_historical_value)
+
+                    # Apply inverse differencing if needed
                     if last_historical_value is not None:
-                        if len(prophet_forecast) > 0:  # Ensure it's not empty
-                            prophet_forecast = prophet_forecast.copy()  # Prevent modifying original dataframe reference
-                            prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum()
-                            prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum()
-                            prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum()
+                        # Instead of subtracting the first forecasted value, just add the last known value to the entire forecast
+                        prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum()
+                        prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum()
+                        prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum()
 
                     # Restore historical data
-                    train["y"] = y_original
+                    train["y"] = y_original  # Ensures correct positional mapping
+                    st.write(f"✅ Original data:", y_original)
+                    st.write(f"✅ train:", train)
+                    # Debugging: Check if historical values match expected scale
+                    st.write("✅ Last 5 Historical Values Before Plotting:", train.tail())
 
-                    # Identify key forecast points
+                    # Debugging: Check the first few rows after inverse differencing
+                    st.write("🔍 First Few Rows After Inverse Differencing:")
+                    st.dataframe(prophet_forecast.head())
+
+                    # Debugging: Ensure first forecasted value aligns with last historical value
+                    st.write("✅ First Forecasted Value After Inverse Differencing:", prophet_forecast["yhat"].iloc[0])
+
+                    # Identify highest & lowest forecasted sales
                     highest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmax()]
                     lowest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmin()]
 
-                    # Summary insights
+                    # Display key insights
                     summary_text = (
                         f"### 📊 Key Insights\n"
                         f"- **Projected Growth:** Sales are expected to {'increase' if prophet_forecast['yhat'].iloc[-1] > test['y'].iloc[-1] else 'decrease'} "
@@ -499,14 +515,17 @@ def main():
                     with st.expander("📊 Prophet Model Summary"):
                         st.markdown(summary_text)
 
-                    # Create and display the chart
+                    # Create the chart
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
                     fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat"], mode="lines", name="Forecast", line=dict(color="blue", width=2)))
                     fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_upper"], mode="lines", name="Upper Confidence", line=dict(color="lightblue", dash="dot")))
                     fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_lower"], mode="lines", name="Lower Confidence", line=dict(color="lightblue", dash="dot")))
 
+                    # Update layout
                     fig.update_layout(title="Prophet Forecast with Confidence Intervals", xaxis_title="Date", yaxis_title="Sales", legend_title="Legend", template="plotly_white")
+
+                    # Display the chart
                     st.plotly_chart(fig, use_container_width=True)
 
                     # Save results
