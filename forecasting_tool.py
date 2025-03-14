@@ -152,8 +152,8 @@ def preprocess_data(data, date_column, sales_column):
         data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
         data["ds"] = data["ds"].dt.to_timestamp()
 
-        # Store the original values in a new column
-        data["y_original"] = data["y"]
+        # Store the original values as a separate DataFrame
+        y_original = data[["ds", "y"]].rename(columns={"y": "y_original"})
 
         # Check stationarity
         stationarity_result = check_stationarity(data["y"])
@@ -183,11 +183,9 @@ def preprocess_data(data, date_column, sales_column):
             fig.update_layout(title="Original vs Differenced Series", xaxis_title="Date", yaxis_title="Sales", template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
 
-            st.write(f"✅ Original data:", data["y_original"])
-
             # Return differenced data with "y" column and the last historical value
             differenced_data = data[["ds", "y_diff"]].dropna().rename(columns={"y_diff": "y"})
-            return differenced_data, last_historical_value, data["y_original"]
+            return differenced_data, last_historical_value, y_original
 
         else:
             # If stationary, plot only the original series
@@ -197,7 +195,7 @@ def preprocess_data(data, date_column, sales_column):
             st.plotly_chart(fig, use_container_width=True)
 
             # Return original data and None for last_historical_value (no differencing applied)
-            return data[["ds", "y"]], None, data["y_original"]
+            return data[["ds", "y"]], None, y_original
 
     except Exception as e:
         st.error(f"An error occurred during preprocessing: {e}")
