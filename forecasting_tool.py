@@ -152,8 +152,8 @@ def preprocess_data(data, date_column, sales_column):
         data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
         data["ds"] = data["ds"].dt.to_timestamp()
 
-        # Store the original values as a copy (ensuring correct alignment)
-        y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
+        # Store the original values in a new column
+        data["y_original"] = data["y"]
 
         # Check stationarity
         stationarity_result = check_stationarity(data["y"])
@@ -170,7 +170,7 @@ def preprocess_data(data, date_column, sales_column):
         # Apply differencing if non-stationary
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
-            data["y_diff"] = data["y"].diff()
+            data["y_diff"] = data["y"].diff().dropna()
 
             # Store the last value before differencing (for inverse differencing)
             last_historical_value = data["y"].iloc[-1]
@@ -179,13 +179,15 @@ def preprocess_data(data, date_column, sales_column):
             # Create a Plotly figure for visualization
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=data["ds"], y=data["y"], mode="lines", name="Original Series", line=dict(color="blue", width=2)))
-            fig.add_trace(go.Scatter(x=data["ds"].iloc[1:], y=data["y_diff"].dropna(), mode="lines", name="Differenced Series", line=dict(color="orange", width=2, dash="dot")))
+            fig.add_trace(go.Scatter(x=data["ds"].iloc[1:], y=data["y_diff"], mode="lines", name="Differenced Series", line=dict(color="orange", width=2, dash="dot")))
             fig.update_layout(title="Original vs Differenced Series", xaxis_title="Date", yaxis_title="Sales", template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
 
+            st.write(f"✅ Original data:", data["y_original"])
+
             # Return differenced data with "y" column and the last historical value
             differenced_data = data[["ds", "y_diff"]].dropna().rename(columns={"y_diff": "y"})
-            return differenced_data, last_historical_value, y_original
+            return differenced_data, last_historical_value, data["y_original"]
 
         else:
             # If stationary, plot only the original series
@@ -195,7 +197,7 @@ def preprocess_data(data, date_column, sales_column):
             st.plotly_chart(fig, use_container_width=True)
 
             # Return original data and None for last_historical_value (no differencing applied)
-            return data[["ds", "y"]], None, y_original
+            return data[["ds", "y"]], None, data["y_original"]
 
     except Exception as e:
         st.error(f"An error occurred during preprocessing: {e}")
