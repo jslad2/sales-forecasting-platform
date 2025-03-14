@@ -152,8 +152,8 @@ def preprocess_data(data, date_column, sales_column):
         data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
         data["ds"] = data["ds"].dt.to_timestamp()
 
-        # Store the original values as a separate DataFrame
-        y_original = data[["ds", "y"]].rename(columns={"y": "y_original"})
+        # Store the original values as a copy (ensuring correct alignment)
+        y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
 
         # Check stationarity
         stationarity_result = check_stationarity(data["y"])
@@ -170,7 +170,7 @@ def preprocess_data(data, date_column, sales_column):
         # Apply differencing if non-stationary
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
-            data["y_diff"] = data["y"].diff().dropna()
+            data["y_diff"] = data["y"].diff()
 
             # Store the last value before differencing (for inverse differencing)
             last_historical_value = data["y"].iloc[-1]
@@ -179,7 +179,7 @@ def preprocess_data(data, date_column, sales_column):
             # Create a Plotly figure for visualization
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=data["ds"], y=data["y"], mode="lines", name="Original Series", line=dict(color="blue", width=2)))
-            fig.add_trace(go.Scatter(x=data["ds"].iloc[1:], y=data["y_diff"], mode="lines", name="Differenced Series", line=dict(color="orange", width=2, dash="dot")))
+            fig.add_trace(go.Scatter(x=data["ds"].iloc[1:], y=data["y_diff"].dropna(), mode="lines", name="Differenced Series", line=dict(color="orange", width=2, dash="dot")))
             fig.update_layout(title="Original vs Differenced Series", xaxis_title="Date", yaxis_title="Sales", template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
 
