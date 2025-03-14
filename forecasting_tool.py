@@ -374,7 +374,7 @@ def main():
             if start_forecast:
                 # Run forecast logic
                 # Preprocess Data
-                processed_data, last_historical_value, y_original,data["y_original"]  = preprocess_data(data, date_column, sales_column)
+                processed_data, last_historical_value, None,y_original,data["y_original"]  = preprocess_data(data, date_column, sales_column)
                 if processed_data is None:  # Check if preprocessing failed
                     st.error("❌ Preprocessing failed. Please check your data and try again.")
                     return
