@@ -433,52 +433,85 @@ def main():
                 st.write(f"✅ Best Parameters: {best_params}")
                 st.write(f"📉 Best RMSE from cross-validation: {best_rmse}")
 
+                st.write("🚀 Finding the best Prophet hyperparameters...")
+                best_params, best_rmse = find_best_prophet_params(train)
+
+                if best_params is None:
+                    st.error("❌ No valid Prophet parameters were found. Check your data preprocessing or parameter grid.")
+                    return
+
+                st.write(f"✅ Best Parameters: {best_params}")
+                st.write(f"📉 Best RMSE from cross-validation: {best_rmse}")
+
                 try:
-                    # Train Prophet Model
                     st.write("📊 Training Prophet Model with Best Parameters...")
 
-                    # Define and configure Prophet model
+                    # Define Prophet model
                     prophet_model = Prophet(
                         seasonality_mode=best_params["seasonality_mode"],
                         changepoint_prior_scale=best_params["changepoint_prior_scale"]
                     )
 
-                    # Add detected seasonalities
+                    # Detect & dynamically add seasonalities
                     try:
                         prophet_model = detect_and_add_seasonalities(prophet_model, train)
                     except Exception as e:
                         st.warning(f"⚠️ Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
 
-                    # Fit the model
+                    # Train the model
                     prophet_model.fit(train)
 
-                    # Detect data frequency
+                    # Detect data frequency (Daily or Monthly)
                     data_freq = pd.infer_freq(train["ds"])
                     st.write(f"🔍 Detected Data Frequency: {data_freq}")
 
-                    # Generate future dates and make predictions
-                    future = prophet_model.make_future_dataframe(periods=forecast_period, freq="M", include_history=True)
+                    # Dynamically determine the last historical date
+                    last_historical_date = train["ds"].max()
+                    st.write(f"🔍 Last Historical Date: {last_historical_date}")
+
+                    # Calculate the forecast start date (next period after the last historical date)
+                    forecast_start_date = last_historical_date + pd.DateOffset(months=1)  # Adjust for monthly data
+                    st.write(f"🔍 Forecast Start Date: {forecast_start_date}")
+
+                    # Generate future dates & predict
+                    future = prophet_model.make_future_dataframe(
+                        periods=forecast_period, 
+                        freq="M" if data_freq == "MS" else "D", 
+                        include_history=True  # Include historical data for full visualization
+                    )
                     prophet_forecast = prophet_model.predict(future)
 
                     # Ensure only future forecasts are used for metric calculation
-                    future_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
+                    future_forecast = prophet_forecast[prophet_forecast["ds"] >= forecast_start_date]
 
-                    # Compute RMSE and MAPE
+                    # Ensure test set matches forecast length for metric calculation
                     matching_length = min(len(test["y"]), len(future_forecast))
                     prophet_rmse = mean_squared_error(test["y"].iloc[:matching_length], future_forecast["yhat"].iloc[:matching_length]) ** 0.5
                     prophet_mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], future_forecast["yhat"].iloc[:matching_length])
 
+                    # Get the last known historical value before forecasting
+                    st.write("✅ Last Historical Value (Original Scale):", last_historical_value)
+
                     # Apply inverse differencing if needed
                     if last_historical_value is not None:
-                        prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum()
-                        prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum()
-                        prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum()
+                        prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum() - prophet_forecast["yhat"].iloc[0]
+                        prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum() - prophet_forecast["yhat_upper"].iloc[0]
+                        prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum() - prophet_forecast["yhat_lower"].iloc[0]
 
-                    # Use full `y_original` for historical reference instead of `train`
-                    full_historical_data = y_original.copy()
+                    # Restore historical data to original scale
+                    train["y"] = y_original  # Ensures correct positional mapping
+                    st.write(f"✅ Original data:", y_original)
+                    st.write(f"✅ train:", train)
 
-                    # Merge historical data with predictions
-                    historical_and_forecast = pd.concat([full_historical_data.rename(columns={"y_original": "yhat"}), prophet_forecast], ignore_index=True)
+                    # Debugging: Check if historical values match expected scale
+                    st.write("✅ Last 5 Historical Values Before Plotting:", train.tail())
+
+                    # Debugging: Check the first few rows after inverse differencing
+                    st.write("🔍 First Few Rows After Inverse Differencing:")
+                    st.dataframe(prophet_forecast.head())
+
+                    # Debugging: Ensure first forecasted value aligns with last historical value
+                    st.write("✅ First Forecasted Value After Inverse Differencing:", prophet_forecast["yhat"].iloc[0])
 
                     # Identify highest & lowest forecasted sales
                     highest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmax()]
@@ -500,13 +533,13 @@ def main():
                     with st.expander("📊 Prophet Model Summary"):
                         st.markdown(summary_text)
 
-                    # Create and display the forecast chart
+                    # Create the chart
                     fig = go.Figure()
 
-                    # Add full historical data instead of just `train`
+                    # Add historical data
                     fig.add_trace(go.Scatter(
-                        x=full_historical_data["ds"], 
-                        y=full_historical_data["y_original"], 
+                        x=train["ds"], 
+                        y=train["y"], 
                         mode="lines", 
                         name="Historical", 
                         line=dict(color="black", width=2)
@@ -536,6 +569,15 @@ def main():
                         name="Lower Confidence", 
                         line=dict(color="lightblue", dash="dot")
                     ))
+
+                    # Add a vertical line to indicate the start of the forecast
+                    fig.add_vline(
+                        x=forecast_start_date, 
+                        line_dash="dash", 
+                        line_color="red", 
+                        annotation_text="Forecast Start", 
+                        annotation_position="top left"
+                    )
 
                     # Update layout
                     fig.update_layout(
