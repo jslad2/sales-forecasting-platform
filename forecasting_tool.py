@@ -459,6 +459,9 @@ def main():
                     forecast_start_date = last_historical_date + pd.DateOffset(months=1)
                     st.write(f"🔍 Forecast Start Date: {forecast_start_date}")
 
+                    st.write("🔍 Train DataFrame Sample:")
+                    st.dataframe(train.head())
+
                     # Train the Prophet model
                     prophet_model.fit(train)
 
