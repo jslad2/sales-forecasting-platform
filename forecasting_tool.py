@@ -423,7 +423,7 @@ def main():
 
                 st.write(f"🔍 Train DataFrame: {train}")
 
-                forecast_period = 12  # Fixed to 12 months forecast
+                forecast_period = 24  # Fixed to 12 months forecast
 
                 # Forecasting Models
                 results = {}
@@ -477,7 +477,7 @@ def main():
                         periods=forecast_period, 
                         freq="M",  # Monthly frequency
                         include_history=True  # Include historical data for full visualization
-                    )  
+                    )   
                     st.write("Future", future)         
                     st.write("Future", forecast_start_date)
                     # Filter future DataFrame to start from the forecast start date
