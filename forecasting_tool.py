@@ -482,10 +482,14 @@ def main():
 
                     # Filter future DataFrame to start from the forecast start date
                     future = future[future["ds"] >= forecast_start_date]
+                    st.write("Future", future)
                     prophet_forecast = prophet_model.predict(future)
+                    st.write("Future", prophet_forecast)
 
                     # Ensure only future forecasts are used for metric calculation
                     future_forecast = prophet_forecast[prophet_forecast["ds"] >= forecast_start_date]
+
+                    st.write("Future forecast", future_forecast)
 
                     # Ensure test set matches forecast length for metric calculation
                     matching_length = min(len(test["y"]), len(future_forecast))
