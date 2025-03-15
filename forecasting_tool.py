@@ -451,12 +451,13 @@ def main():
                     except Exception as e:
                         st.warning(f"⚠️ Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
 
+                    # Calculate the last historical date from the full dataset
+                    last_historical_date = y_original["ds"].max()  # or scenario_data["ds"].max()
+                    st.write(f"🔍 Last Historical Date: {last_historical_date}")
+
                     # Calculate the forecast start date (next period after the last historical date)
                     forecast_start_date = last_historical_date + pd.DateOffset(months=1)
                     st.write(f"🔍 Forecast Start Date: {forecast_start_date}")
-
-                    # Train the Prophet model using the `train` dataset
-                    prophet_model.fit(train)
 
                     # Generate future dates & predict
                     future = prophet_model.make_future_dataframe(
@@ -583,7 +584,7 @@ def main():
 
                 except Exception as e:
                     st.warning(f"❌ Prophet Model failed: {e}")
-
+                    
                 # ARIMA Model
                 st.write("🔄 Training ARIMA Model...")
 
