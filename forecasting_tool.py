@@ -479,10 +479,10 @@ def main():
                         include_history=True  # Include historical data for full visualization
                     )  
                     st.write("Future", future)         
-
+                    st.write("Future", forecast_start_date)
                     # Filter future DataFrame to start from the forecast start date
-                    future = future[future["ds"] >= forecast_start_date]
-                    st.write("Future", future)
+                    # future = future[future["ds"] >= forecast_start_date]
+                    # st.write("Future", future)
                     prophet_forecast = prophet_model.predict(future)
                     st.write("Future", prophet_forecast)
 
