@@ -435,6 +435,21 @@ def main():
                 st.write(f"✅ Best Parameters: {best_params}")
                 st.write(f"📉 Best RMSE from cross-validation: {best_rmse}")
 
+                # Preprocess data
+                preprocessed_data, last_historical_value, original_values = preprocess_data(data, "date", "sales")
+
+                if preprocessed_data is not None:
+                    # Print monthly aggregated historical data
+                    st.write("📅 Monthly Aggregated Historical Data:")
+                    st.dataframe(preprocessed_data)
+
+                    # Debugging information
+                    st.write("🔍 Debugging: Monthly Aggregated Historical Data")
+                    st.write("Number of rows:", len(preprocessed_data))
+                    st.write("Date range:", preprocessed_data["ds"].min(), "to", preprocessed_data["ds"].max())
+                    st.write("Sample data:")
+                    st.dataframe(preprocessed_data.head())
+
                 try:
                     st.write("📊 Training Prophet Model with Best Parameters...")
 
@@ -461,17 +476,17 @@ def main():
                     future = prophet_model.make_future_dataframe(
                         periods=forecast_period, 
                         freq="M" if data_freq == "MS" else "D", 
-                        include_history=False
+                        include_history=True  # Include historical data for full visualization
                     )
                     prophet_forecast = prophet_model.predict(future)
 
-                    # Ensure only future forecasts are used
-                    prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
+                    # Ensure only future forecasts are used for metric calculation
+                    future_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
 
                     # Ensure test set matches forecast length for metric calculation
-                    matching_length = min(len(test["y"]), len(prophet_forecast))
-                    prophet_rmse = mean_squared_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]) ** 0.5
-                    prophet_mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length])
+                    matching_length = min(len(test["y"]), len(future_forecast))
+                    prophet_rmse = mean_squared_error(test["y"].iloc[:matching_length], future_forecast["yhat"].iloc[:matching_length]) ** 0.5
+                    prophet_mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], future_forecast["yhat"].iloc[:matching_length])
 
                     # Get the last known historical value before forecasting
                     st.write("✅ Last Historical Value (Original Scale):", last_historical_value)
@@ -482,10 +497,11 @@ def main():
                         prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum() - prophet_forecast["yhat_upper"].iloc[0]
                         prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum() - prophet_forecast["yhat_lower"].iloc[0]
 
-                    # Restore historical data
+                    # Restore historical data to original scale
                     train["y"] = y_original  # Ensures correct positional mapping
                     st.write(f"✅ Original data:", y_original)
                     st.write(f"✅ train:", train)
+
                     # Debugging: Check if historical values match expected scale
                     st.write("✅ Last 5 Historical Values Before Plotting:", train.tail())
 
@@ -518,19 +534,59 @@ def main():
 
                     # Create the chart
                     fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat"], mode="lines", name="Forecast", line=dict(color="blue", width=2)))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_upper"], mode="lines", name="Upper Confidence", line=dict(color="lightblue", dash="dot")))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_lower"], mode="lines", name="Lower Confidence", line=dict(color="lightblue", dash="dot")))
+
+                    # Add historical data
+                    fig.add_trace(go.Scatter(
+                        x=train["ds"], 
+                        y=train["y"], 
+                        mode="lines", 
+                        name="Historical", 
+                        line=dict(color="black", width=2)
+                    ))
+
+                    # Add forecasted data
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"], 
+                        y=prophet_forecast["yhat"], 
+                        mode="lines", 
+                        name="Forecast", 
+                        line=dict(color="blue", width=2)
+                    ))
+
+                    # Add confidence intervals
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"], 
+                        y=prophet_forecast["yhat_upper"], 
+                        mode="lines", 
+                        name="Upper Confidence", 
+                        line=dict(color="lightblue", dash="dot")
+                    ))
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"], 
+                        y=prophet_forecast["yhat_lower"], 
+                        mode="lines", 
+                        name="Lower Confidence", 
+                        line=dict(color="lightblue", dash="dot")
+                    ))
 
                     # Update layout
-                    fig.update_layout(title="Prophet Forecast with Confidence Intervals", xaxis_title="Date", yaxis_title="Sales", legend_title="Legend", template="plotly_white")
+                    fig.update_layout(
+                        title="Prophet Forecast with Confidence Intervals", 
+                        xaxis_title="Date", 
+                        yaxis_title="Sales", 
+                        legend_title="Legend", 
+                        template="plotly_white"
+                    )
 
                     # Display the chart
                     st.plotly_chart(fig, use_container_width=True)
 
                     # Save results
-                    results["Prophet"] = {"RMSE": float(prophet_rmse), "MAPE": float(prophet_mape), "Forecast": prophet_forecast}
+                    results["Prophet"] = {
+                        "RMSE": float(prophet_rmse), 
+                        "MAPE": float(prophet_mape), 
+                        "Forecast": prophet_forecast
+                    }
 
                 except Exception as e:
                     st.warning(f"❌ Prophet Model failed: {e}")
