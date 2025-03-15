@@ -466,6 +466,9 @@ def main():
 
                     st.write(f"🔍 Train DataFrame Shape: {train.shape}")
 
+                    st.write("🧐 Min Date in Train:", train["ds"].min())
+                    st.write("🧐 Max Date in Train:", train["ds"].max())
+
                     # Train the Prophet model
                     prophet_model.fit(train)
 
@@ -474,7 +477,8 @@ def main():
                         periods=forecast_period, 
                         freq="M",  # Monthly frequency
                         include_history=True  # Include historical data for full visualization
-                    )
+                    )  
+                    st.write("Future", future)         
 
                     # Filter future DataFrame to start from the forecast start date
                     future = future[future["ds"] >= forecast_start_date]
