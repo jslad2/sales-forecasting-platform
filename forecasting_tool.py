@@ -372,17 +372,16 @@ def main():
 
             # 🏁 Run Forecast Only If Button is Clicked
             if start_forecast:
-                # Define historical_data as the full dataset
-                historical_data = data.copy()  # Use the full dataset for visualization
-                st.write("✅ Full Historical Data:")
-                st.dataframe(historical_data)
-
                 # Preprocess Data
                 processed_data, last_historical_value, y_original = preprocess_data(data, date_column, sales_column)
                 if processed_data is None:  # Check if preprocessing failed
                     st.error("❌ Preprocessing failed. Please check your data and try again.")
                     return
                 st.write(f"✅ yoriginal:", y_original)
+
+                # Dynamically determine the last historical date from y_original
+                last_historical_date = y_original["ds"].max()
+                st.write(f"🔍 Last Historical Date: {last_historical_date}")
 
                 # Apply scenarios to training data
                 scenario_data = apply_scenarios(processed_data.copy(), demand_shock, seasonality_adjustment, external_shock)
@@ -454,12 +453,8 @@ def main():
                     except Exception as e:
                         st.warning(f"⚠️ Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
 
-                    # Dynamically determine the last historical date
-                    last_historical_date = historical_data["ds"].max()
-                    st.write(f"🔍 Last Historical Date: {last_historical_date}")
-
                     # Calculate the forecast start date (next period after the last historical date)
-                    forecast_start_date = last_historical_date + pd.DateOffset(months=1)  # Adjust for monthly data
+                    forecast_start_date = last_historical_date + pd.DateOffset(months=1)
                     st.write(f"🔍 Forecast Start Date: {forecast_start_date}")
 
                     # Train the Prophet model using the `train` dataset
@@ -493,13 +488,8 @@ def main():
                         prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum() - prophet_forecast["yhat_upper"].iloc[0]
                         prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum() - prophet_forecast["yhat_lower"].iloc[0]
 
-                    # Restore historical data to original scale
-                    historical_data["y"] = y_original  # Ensures correct positional mapping
-                    st.write(f"✅ Original data:", y_original)
-                    st.write(f"✅ Historical data:", historical_data)
-
                     # Debugging: Check if historical values match expected scale
-                    st.write("✅ Last 5 Historical Values Before Plotting:", historical_data.tail())
+                    st.write("✅ Last 5 Historical Values Before Plotting:", y_original.tail())
 
                     # Debugging: Check the first few rows after inverse differencing
                     st.write("🔍 First Few Rows After Inverse Differencing:")
@@ -531,10 +521,10 @@ def main():
                     # Create the chart
                     fig = go.Figure()
 
-                    # Add historical data
+                    # Add historical data from y_original
                     fig.add_trace(go.Scatter(
-                        x=historical_data["ds"], 
-                        y=historical_data["y"], 
+                        x=y_original["ds"], 
+                        y=y_original["y"], 
                         mode="lines", 
                         name="Historical", 
                         line=dict(color="black", width=2)
