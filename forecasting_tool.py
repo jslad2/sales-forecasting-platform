@@ -174,7 +174,6 @@ def preprocess_data(data, date_column, sales_column):
 
             # Store the last value before differencing (for inverse differencing)
             last_historical_value = data["y"].iloc[-1]
-            st.write(f"✅ Last Historical Value Before Differencing: {last_historical_value}")
 
             # Create a Plotly figure for visualization
             fig = go.Figure()
@@ -377,7 +376,6 @@ def main():
                 if processed_data is None:  # Check if preprocessing failed
                     st.error("❌ Preprocessing failed. Please check your data and try again.")
                     return
-                st.write(f"✅ yoriginal:", y_original)
 
                 # Dynamically determine the last historical date from y_original
                 last_historical_date = y_original["ds"].max()
