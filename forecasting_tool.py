@@ -152,8 +152,8 @@ def preprocess_data(data, date_column, sales_column):
         data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
         data["ds"] = data["ds"].dt.to_timestamp()
 
-        # Store the original values in a new column
-        data["y_original"] = data["y"]
+        # Store the original values as a copy (ensuring correct alignment)
+        y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
 
         # Check stationarity
         stationarity_result = check_stationarity(data["y"])
@@ -170,7 +170,7 @@ def preprocess_data(data, date_column, sales_column):
         # Apply differencing if non-stationary
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
-            data["y_diff"] = data["y"].diff().dropna()
+            data["y_diff"] = data["y"].diff()
 
             # Store the last value before differencing (for inverse differencing)
             last_historical_value = data["y"].iloc[-1]
@@ -179,15 +179,13 @@ def preprocess_data(data, date_column, sales_column):
             # Create a Plotly figure for visualization
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=data["ds"], y=data["y"], mode="lines", name="Original Series", line=dict(color="blue", width=2)))
-            fig.add_trace(go.Scatter(x=data["ds"].iloc[1:], y=data["y_diff"], mode="lines", name="Differenced Series", line=dict(color="orange", width=2, dash="dot")))
+            fig.add_trace(go.Scatter(x=data["ds"].iloc[1:], y=data["y_diff"].dropna(), mode="lines", name="Differenced Series", line=dict(color="orange", width=2, dash="dot")))
             fig.update_layout(title="Original vs Differenced Series", xaxis_title="Date", yaxis_title="Sales", template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
 
-            st.write(f"✅ Original data:", data["y_original"])
-
             # Return differenced data with "y" column and the last historical value
             differenced_data = data[["ds", "y_diff"]].dropna().rename(columns={"y_diff": "y"})
-            return differenced_data, last_historical_value, data["y_original"]
+            return differenced_data, last_historical_value, y_original
 
         else:
             # If stationary, plot only the original series
@@ -197,7 +195,7 @@ def preprocess_data(data, date_column, sales_column):
             st.plotly_chart(fig, use_container_width=True)
 
             # Return original data and None for last_historical_value (no differencing applied)
-            return data[["ds", "y"]], None, data["y_original"]
+            return data[["ds", "y"]], None, y_original
 
     except Exception as e:
         st.error(f"An error occurred during preprocessing: {e}")
@@ -435,82 +433,52 @@ def main():
                 st.write(f"✅ Best Parameters: {best_params}")
                 st.write(f"📉 Best RMSE from cross-validation: {best_rmse}")
 
-                # Preprocess data
-                preprocessed_data, last_historical_value, original_values = preprocess_data(data, "date", "sales")
-
-                if preprocessed_data is not None:
-                    # Print monthly aggregated historical data
-                    st.write("📅 Monthly Aggregated Historical Data:")
-                    st.dataframe(preprocessed_data)
-
-                    # Debugging information
-                    st.write("🔍 Debugging: Monthly Aggregated Historical Data")
-                    st.write("Number of rows:", len(preprocessed_data))
-                    st.write("Date range:", preprocessed_data["ds"].min(), "to", preprocessed_data["ds"].max())
-                    st.write("Sample data:")
-                    st.dataframe(preprocessed_data.head())
-
                 try:
+                    # Train Prophet Model
                     st.write("📊 Training Prophet Model with Best Parameters...")
 
-                    # Define Prophet model
+                    # Define and configure Prophet model
                     prophet_model = Prophet(
                         seasonality_mode=best_params["seasonality_mode"],
                         changepoint_prior_scale=best_params["changepoint_prior_scale"]
                     )
 
-                    # Detect & dynamically add seasonalities
+                    # Add detected seasonalities
                     try:
                         prophet_model = detect_and_add_seasonalities(prophet_model, train)
                     except Exception as e:
                         st.warning(f"⚠️ Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
 
-                    # Train the model
+                    # Fit the model
                     prophet_model.fit(train)
 
-                    # Detect data frequency (Daily or Monthly)
+                    # Detect data frequency
                     data_freq = pd.infer_freq(train["ds"])
                     st.write(f"🔍 Detected Data Frequency: {data_freq}")
 
-                    # Generate future dates & predict
-                    future = prophet_model.make_future_dataframe(
-                        periods=forecast_period, 
-                        freq="M" if data_freq == "MS" else "D", 
-                        include_history=True  # Include historical data for full visualization
-                    )
+                    # Generate future dates and make predictions
+                    future = prophet_model.make_future_dataframe(periods=forecast_period, freq="M", include_history=True)
                     prophet_forecast = prophet_model.predict(future)
 
                     # Ensure only future forecasts are used for metric calculation
                     future_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
 
-                    # Ensure test set matches forecast length for metric calculation
+                    # Compute RMSE and MAPE
                     matching_length = min(len(test["y"]), len(future_forecast))
                     prophet_rmse = mean_squared_error(test["y"].iloc[:matching_length], future_forecast["yhat"].iloc[:matching_length]) ** 0.5
                     prophet_mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], future_forecast["yhat"].iloc[:matching_length])
 
-                    # Get the last known historical value before forecasting
-                    st.write("✅ Last Historical Value (Original Scale):", last_historical_value)
-
                     # Apply inverse differencing if needed
                     if last_historical_value is not None:
-                        prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum() - prophet_forecast["yhat"].iloc[0]
-                        prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum() - prophet_forecast["yhat_upper"].iloc[0]
-                        prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum() - prophet_forecast["yhat_lower"].iloc[0]
+                        prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum()
+                        prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum()
+                        prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum()
 
-                    # Restore historical data to original scale
-                    train["y"] = y_original  # Ensures correct positional mapping
-                    st.write(f"✅ Original data:", y_original)
-                    st.write(f"✅ train:", train)
+                    # Use full `y_original` for historical reference instead of `train`
+                    full_historical_data = y_original.copy()
 
-                    # Debugging: Check if historical values match expected scale
-                    st.write("✅ Last 5 Historical Values Before Plotting:", train.tail())
-
-                    # Debugging: Check the first few rows after inverse differencing
-                    st.write("🔍 First Few Rows After Inverse Differencing:")
-                    st.dataframe(prophet_forecast.head())
-
-                    # Debugging: Ensure first forecasted value aligns with last historical value
-                    st.write("✅ First Forecasted Value After Inverse Differencing:", prophet_forecast["yhat"].iloc[0])
+                    # Merge historical data with predictions
+                    historical_and_forecast = pd.concat([full_historical_data.rename(columns={"y_original": "yhat"}), prophet_forecast], ignore_index=True)
 
                     # Identify highest & lowest forecasted sales
                     highest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmax()]
@@ -532,13 +500,13 @@ def main():
                     with st.expander("📊 Prophet Model Summary"):
                         st.markdown(summary_text)
 
-                    # Create the chart
+                    # Create and display the forecast chart
                     fig = go.Figure()
 
-                    # Add historical data
+                    # Add full historical data instead of just `train`
                     fig.add_trace(go.Scatter(
-                        x=train["ds"], 
-                        y=train["y"], 
+                        x=full_historical_data["ds"], 
+                        y=full_historical_data["y_original"], 
                         mode="lines", 
                         name="Historical", 
                         line=dict(color="black", width=2)
