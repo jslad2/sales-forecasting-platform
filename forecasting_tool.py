@@ -421,6 +421,8 @@ def main():
                 train = scenario_data.iloc[:-testing_period]
                 test = scenario_data.iloc[-testing_period:]
 
+                st.write(f"🔍 Train DataFrame: {train}")
+
                 forecast_period = 12  # Fixed to 12 months forecast
 
                 # Forecasting Models
@@ -461,6 +463,8 @@ def main():
 
                     st.write("🔍 Train DataFrame Sample:")
                     st.dataframe(train.head())
+
+                    st.write(f"🔍 Train DataFrame Shape: {train.shape}")
 
                     # Train the Prophet model
                     prophet_model.fit(train)
