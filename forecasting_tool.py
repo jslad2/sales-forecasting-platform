@@ -137,12 +137,9 @@ def check_stationarity(series):
 
 def preprocess_data(data, date_column, sales_column):
     """
-    Preprocess the uploaded data, check stationarity, and apply transformations if needed.
-    Returns a dataframe with columns "ds" and "y" for Prophet compatibility.
-    Also returns the last historical value before forecasting if differencing is applied.
+    Preprocess the uploaded data and check stationarity.
     """
     try:
-        # Convert date column to datetime
         data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
         data = data.dropna(subset=[date_column, sales_column])
 
@@ -152,53 +149,26 @@ def preprocess_data(data, date_column, sales_column):
         data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
         data["ds"] = data["ds"].dt.to_timestamp()
 
-        # Store the original values as a copy (ensuring correct alignment)
-        y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
-
         # Check stationarity
         stationarity_result = check_stationarity(data["y"])
         st.markdown(
-            f"""
-            <div style="text-align: center;">
-                <h2 style="color: #2B3A42;">📊 Stationarity Test</h2>
-                <p style="font-size: 1.2rem;">Conclusion: The series is <strong>{stationarity_result}</strong>.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+                    """
+                    <div style="text-align: center;">
+                        <h2 style="color: #2B3A42;">📊 Stationarity Test</h2>
+                        <p style="font-size: 1.2rem;">Conclusion: The series is <strong>Stationary</strong>.</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
-        # Apply differencing if non-stationary
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
-            data["y_diff"] = data["y"].diff()
+            data["y"] = data["y"].diff().dropna()
 
-            # Store the last value before differencing (for inverse differencing)
-            last_historical_value = data["y"].iloc[-1]
-
-            # Create a Plotly figure for visualization
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=data["ds"], y=data["y"], mode="lines", name="Original Series", line=dict(color="blue", width=2)))
-            fig.add_trace(go.Scatter(x=data["ds"].iloc[1:], y=data["y_diff"].dropna(), mode="lines", name="Differenced Series", line=dict(color="orange", width=2, dash="dot")))
-            fig.update_layout(title="Original vs Differenced Series", xaxis_title="Date", yaxis_title="Sales", template="plotly_white")
-            st.plotly_chart(fig, use_container_width=True)
-
-            # Return differenced data with "y" column and the last historical value
-            differenced_data = data[["ds", "y_diff"]].dropna().rename(columns={"y_diff": "y"})
-            return differenced_data, last_historical_value, y_original
-
-        else:
-            # If stationary, plot only the original series
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=data["ds"], y=data["y"], mode="lines", name="Original Series", line=dict(color="blue", width=2)))
-            fig.update_layout(title="📊 Original Series", xaxis_title="Date", yaxis_title="Sales", template="plotly_white")
-            st.plotly_chart(fig, use_container_width=True)
-
-            # Return original data and None for last_historical_value (no differencing applied)
-            return data[["ds", "y"]], None, y_original
-
+        return data
     except Exception as e:
-        st.error(f"An error occurred during preprocessing: {e}")
-        return None, None, None  # Return None in case of an error
+        st.error(f"Error during data preprocessing: {e}")
+        return None
 
 
 def inverse_difference(original_data, forecast_data, first_value):
