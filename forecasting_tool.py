@@ -590,14 +590,14 @@ def main():
                         line=dict(color="lightblue", dash="dot")
                     ))
 
-                    # Add vertical line for forecast start
-                    fig.add_vline(
-                        x=train["ds"].max(),  # Pass the Timestamp object directly
-                        line_dash="dash",
-                        line_color="red",
-                        annotation_text="Forecast Start",
-                        annotation_position="top left"
-                    )
+                    # # Add vertical line for forecast start
+                    # fig.add_vline(
+                    #     x=train["ds"].max(),  # Pass the Timestamp object directly
+                    #     line_dash="dash",
+                    #     line_color="red",
+                    #     annotation_text="Forecast Start",
+                    #     annotation_position="top left"
+                    # )
 
                     # Update layout
                     fig.update_layout(
