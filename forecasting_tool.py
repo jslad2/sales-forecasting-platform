@@ -207,6 +207,11 @@ def inverse_difference(forecast_data, first_value):
         forecast_data["yhat_lower"] = first_value + forecast_data["yhat_lower"].cumsum().shift(fill_value=first_value)
     return forecast_data
 
+    # if last_historical_value is not None:
+    #     prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum() - prophet_forecast["yhat"].iloc[0]
+    #     prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum() - prophet_forecast["yhat_upper"].iloc[0]
+    #     prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum() - prophet_forecast["yhat_lower"].iloc[0]
+
 def detect_and_add_seasonalities(model, data):
     data_frequency = pd.infer_freq(data["ds"])
     if data_frequency == "D":
@@ -457,7 +462,7 @@ def main():
                     st.write(f"🔍 Last Historical Date: {last_historical_date}")
 
                     # Determine forecast start date
-                    forecast_start_date = last_historical_date + pd.DateOffset(months=1)
+                    forecast_start_date = last_historical_date + pd.Timedelta(days=30)
                     st.write(f"🔍 Forecast Start Date: {forecast_start_date}")
 
                     # Debugging train data
