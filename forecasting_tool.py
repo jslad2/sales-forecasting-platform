@@ -137,50 +137,74 @@ def check_stationarity(series):
 
 def preprocess_data(data, date_column, sales_column):
     """
-    Preprocess the uploaded data and check stationarity.
+    Preprocess the uploaded data, check stationarity, and apply transformations if needed.
+    Returns a dataframe with columns "ds" and "y" for Prophet compatibility.
+    Also returns the last historical value before forecasting if differencing is applied.
     """
     try:
+        # Convert date column to datetime
         data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
-        data = data.dropna(subset=[date_column, sales_column])
+        data.dropna(subset=[date_column, sales_column], inplace=True)
 
-        # Aggregate to Monthly
+        # Aggregate to Monthly Data
         data = data[[date_column, sales_column]].rename(columns={date_column: "ds", sales_column: "y"})
-        data["ds"] = pd.to_datetime(data["ds"], errors="coerce")
+        data["ds"] = pd.to_datetime(data["ds"])
         data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
         data["ds"] = data["ds"].dt.to_timestamp()
+
+        # Store the original values
+        y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
 
         # Check stationarity
         stationarity_result = check_stationarity(data["y"])
         st.markdown(
-                    """
-                    <div style="text-align: center;">
-                        <h2 style="color: #2B3A42;">📊 Stationarity Test</h2>
-                        <p style="font-size: 1.2rem;">Conclusion: The series is <strong>Stationary</strong>.</p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+            f"""
+            <div style="text-align: center;">
+                <h2 style="color: #2B3A42;">📊 Stationarity Test</h2>
+                <p style="font-size: 1.2rem;">Conclusion: The series is <strong>{stationarity_result}</strong>.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
+        # Apply differencing if non-stationary
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
-            data["y"] = data["y"].diff().dropna()
+            data["y_diff"] = data["y"].diff()
+            last_historical_value = data["y"].iloc[-1]
 
-        return data
+            # Create a Plotly figure for visualization
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=data["ds"], y=data["y"], mode="lines", name="Original Series", line=dict(color="blue", width=2)))
+            fig.add_trace(go.Scatter(x=data["ds"].iloc[1:], y=data["y_diff"].dropna(), mode="lines", name="Differenced Series", line=dict(color="orange", width=2, dash="dot")))
+            fig.update_layout(title="Original vs Differenced Series", xaxis_title="Date", yaxis_title="Sales", template="plotly_white")
+            st.plotly_chart(fig, use_container_width=True)
+
+            # Remove NaNs caused by differencing
+            differenced_data = data.dropna(subset=["y_diff"]).rename(columns={"y_diff": "y"})
+            return differenced_data[["ds", "y"]], last_historical_value, y_original
+
+        else:
+            # If stationary, plot only the original series
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=data["ds"], y=data["y"], mode="lines", name="Original Series", line=dict(color="blue", width=2)))
+            fig.update_layout(title="📊 Original Series", xaxis_title="Date", yaxis_title="Sales", template="plotly_white")
+            st.plotly_chart(fig, use_container_width=True)
+
+            # Return original data and None for last_historical_value (no differencing applied)
+            return data[["ds", "y"]], None, y_original
+
     except Exception as e:
-        st.error(f"Error during data preprocessing: {e}")
-        return None
+        st.error(f"An error occurred during preprocessing: {e}")
+        return None, None, None  # Return None in case of an error
 
 
-def inverse_difference(original_data, forecast_data, first_value):
-    """
-    Reverse the differencing to bring the forecast back to the original scale.
-    """
+def inverse_difference(forecast_data, first_value):
+    """Reverse differencing to restore original scale."""
     if first_value is not None:
-        # Ensure first value aligns with the restored series
         forecast_data["yhat"] = first_value + forecast_data["yhat"].cumsum().shift(fill_value=first_value)
         forecast_data["yhat_upper"] = first_value + forecast_data["yhat_upper"].cumsum().shift(fill_value=first_value)
         forecast_data["yhat_lower"] = first_value + forecast_data["yhat_lower"].cumsum().shift(fill_value=first_value)
-    
     return forecast_data
 
 def detect_and_add_seasonalities(model, data):
@@ -313,6 +337,26 @@ def main():
             with col2:
                 sales_column = st.selectbox("💰 Select the Sales Column:", ["-- Select Column --"] + list(data.columns), key="sales_col")
 
+            # Scenario Planning Section
+            st.sidebar.markdown("### 🎯 Scenario Planning")
+
+            # Demand Shock Scenario
+            demand_shock = st.sidebar.slider(
+                "Simulate Demand Shock (% Change in Sales):",
+                min_value=-50, max_value=50, value=0, step=5
+            )
+
+            # Seasonality Adjustment
+            seasonality_adjustment = st.sidebar.slider(
+                "Adjust Seasonality Strength (% Change):",
+                min_value=-50, max_value=50, value=0, step=5
+            )
+
+            # External Shock (e.g., Economic Downturn)
+            external_shock = st.sidebar.checkbox(
+                "Simulate External Shock (e.g., Economic Downturn)"
+            )
+
             # 🚀 Disable "Start Forecast" Button Until Valid Selections
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
                 start_forecast = st.button("✅ Start Forecast", key="start_btn", help="Click to generate your AI-powered forecast")
@@ -321,11 +365,18 @@ def main():
 
             # 🏁 Run Forecast Only If Button is Clicked
             if start_forecast:
-                # Run forecast logic
                 # Preprocess Data
-                data = preprocess_data(data, date_column, sales_column)
-                if data is None:
+                processed_data, last_historical_value, y_original = preprocess_data(data, date_column, sales_column)
+                if processed_data is None:  # Check if preprocessing failed
+                    st.error("❌ Preprocessing failed. Please check your data and try again.")
                     return
+
+                # Dynamically determine the last historical date from y_original
+                last_historical_date = y_original["ds"].max()
+                st.write(f"🔍 Last Historical Date: {last_historical_date}")
+
+                # Apply scenarios to training data
+                scenario_data = apply_scenarios(processed_data.copy(), demand_shock, seasonality_adjustment, external_shock)
 
                 # ✅ Centered Header with Icon
                 st.markdown(
@@ -354,24 +405,25 @@ def main():
 
                     # ✅ Display DataFrame with Improved Spacing
                     st.dataframe(
-                        data.style.set_properties(**{"text-align": "center"}),
+                        scenario_data.style.set_properties(**{"text-align": "center"}),
                         width=1400,  # Wider Table
                         height=450   # Show More Rows
                     )
 
                 # Determine Testing Period Dynamically
-                testing_period = int(len(data) * 0.2)
-                train = data.iloc[:-testing_period]
-                test = data.iloc[-testing_period:]
+                testing_period = int(len(scenario_data) * 0.2)
+                train = scenario_data.iloc[:-testing_period]
+                test = scenario_data.iloc[-testing_period:]
 
-                forecast_period = 12  # Fixed to 12 months forecast
+                st.write(f"🔍 Train DataFrame: {train}")
+
+                forecast_period = 24  # Fixed to 12 months forecast
 
                 # Forecasting Models
                 results = {}
 
-                # Prophet Model
                 st.write("🚀 Finding the best Prophet hyperparameters...")
-                best_params, best_rmse = find_best_prophet_params(train)  # No need for 'test' parameter anymore
+                best_params, best_rmse = find_best_prophet_params(train)
 
                 if best_params is None:
                     st.error("❌ No valid Prophet parameters were found. Check your data preprocessing or parameter grid.")
@@ -380,9 +432,13 @@ def main():
                 st.write(f"✅ Best Parameters: {best_params}")
                 st.write(f"📉 Best RMSE from cross-validation: {best_rmse}")
 
-                # Step 2: Train Final Model
                 try:
                     st.write("📊 Training Prophet Model with Best Parameters...")
+
+                    # Ensure training data is valid
+                    if train.shape[0] == 0:
+                        st.error("🚨 Training data is empty! Check preprocessing.")
+                        raise ValueError("Train dataset has no rows.")
 
                     # Define Prophet model
                     prophet_model = Prophet(
@@ -396,20 +452,62 @@ def main():
                     except Exception as e:
                         st.warning(f"⚠️ Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
 
-                    # Train the model
+                    # Last available historical date
+                    last_historical_date = y_original["ds"].max()
+                    st.write(f"🔍 Last Historical Date: {last_historical_date}")
+
+                    # Determine forecast start date
+                    forecast_start_date = last_historical_date + pd.DateOffset(months=1)
+                    st.write(f"🔍 Forecast Start Date: {forecast_start_date}")
+
+                    # Debugging train data
+                    st.write("🔍 Train DataFrame Sample:")
+                    st.dataframe(train.head())
+                    st.write(f"🔍 Train DataFrame Shape: {train.shape}")
+                    st.write("🧐 Min Date in Train:", train["ds"].min())
+                    st.write("🧐 Max Date in Train:", train["ds"].max())
+
+                    # Train the Prophet model
                     prophet_model.fit(train)
 
                     # Generate future dates & predict
-                    future = prophet_model.make_future_dataframe(periods=forecast_period, freq="M", include_history=False)
+                    future = prophet_model.make_future_dataframe(
+                        periods=forecast_period,
+                        freq="M",
+                        include_history=True
+                    )
+
+                    # Debug future dates
+                    st.write("🔍 Future DataFrame Before Filtering:")
+                    st.dataframe(future.tail())
+
+                    if future["ds"].max() <= last_historical_date:
+                        st.error(f"🚨 Future data stops at {future['ds'].max()}, increase `forecast_period`!")
+                        raise ValueError("Future data does not extend beyond last historical date.")
+
+                    # Ensure only valid future dates are used
+                    future = future[future["ds"] >= forecast_start_date]
                     prophet_forecast = prophet_model.predict(future)
 
-                    # Ensure only future forecasts are used
-                    prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
+                    # Debug forecast output
+                    st.write("🔍 Future Forecast DataFrame:")
+                    st.dataframe(prophet_forecast.head())
 
                     # Ensure test set matches forecast length for metric calculation
                     matching_length = min(len(test["y"]), len(prophet_forecast))
-                    prophet_rmse = mean_squared_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]) ** 0.5
-                    prophet_mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length])
+                    prophet_rmse = mean_squared_error(
+                        test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]
+                    ) ** 0.5
+                    prophet_mape = mean_absolute_percentage_error(
+                        test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]
+                    )
+
+                    # Restore differenced values if applied
+                    if last_historical_value is not None:
+                        prophet_forecast = inverse_difference(prophet_forecast, last_historical_value)
+
+                    # Debugging: Check first forecasted value
+                    st.write("✅ First Forecasted Value After Processing:", prophet_forecast["yhat"].iloc[0])
 
                     # Identify highest & lowest forecasted sales
                     highest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmax()]
@@ -431,12 +529,53 @@ def main():
                     with st.expander("📊 Prophet Model Summary"):
                         st.markdown(summary_text)
 
+                    # Create the forecast visualization
                     fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat"], mode="lines", name="Forecast", line=dict(color="blue", width=2)))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_upper"], mode="lines", name="Upper Confidence", line=dict(color="lightblue", dash="dot")))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_lower"], mode="lines", name="Lower Confidence", line=dict(color="lightblue", dash="dot")))
 
+                    # Add historical data
+                    fig.add_trace(go.Scatter(
+                        x=y_original["ds"],
+                        y=y_original["y_original"],
+                        mode="lines",
+                        name="Historical",
+                        line=dict(color="black", width=2)
+                    ))
+
+                    # Add forecasted data
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"],
+                        y=prophet_forecast["yhat"],
+                        mode="lines",
+                        name="Forecast",
+                        line=dict(color="blue", width=2)
+                    ))
+
+                    # Add confidence intervals
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"],
+                        y=prophet_forecast["yhat_upper"],
+                        mode="lines",
+                        name="Upper Confidence",
+                        line=dict(color="lightblue", dash="dot")
+                    ))
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"],
+                        y=prophet_forecast["yhat_lower"],
+                        mode="lines",
+                        name="Lower Confidence",
+                        line=dict(color="lightblue", dash="dot")
+                    ))
+
+                    # Add vertical line for forecast start
+                    fig.add_vline(
+                        x=forecast_start_date,
+                        line_dash="dash",
+                        line_color="red",
+                        annotation_text="Forecast Start",
+                        annotation_position="top left"
+                    )
+
+                    # Update layout
                     fig.update_layout(
                         title="Prophet Forecast with Confidence Intervals",
                         xaxis_title="Date",
@@ -445,6 +584,7 @@ def main():
                         template="plotly_white"
                     )
 
+                    # Display the chart
                     st.plotly_chart(fig, use_container_width=True)
 
                     # Save results
@@ -456,6 +596,7 @@ def main():
 
                 except Exception as e:
                     st.warning(f"❌ Prophet Model failed: {e}")
+
                     
                 # ARIMA Model
                 st.write("🔄 Training ARIMA Model...")
