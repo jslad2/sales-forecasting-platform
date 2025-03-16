@@ -508,24 +508,24 @@ def main():
                     prophet_forecast = prophet_model.predict(future)
 
                     # Ensure only future forecasts are used
-                    #prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
+                    prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
 
-                    # # Debug forecast output
-                    # st.write("🔍 Future Forecast DataFrame (Filtered):")
-                    # st.dataframe(prophet_forecast.head())
+                    # Debug forecast output
+                    st.write("🔍 Future Forecast DataFrame (Filtered):")
+                    st.dataframe(prophet_forecast.head())
 
-                    # # Ensure test set matches forecast length for metric calculation
-                    # matching_length = min(len(test["y"]), len(prophet_forecast))
-                    # prophet_rmse = mean_squared_error(
-                    #     test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]
-                    # ) ** 0.5
-                    # prophet_mape = mean_absolute_percentage_error(
-                    #     test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]
-                    # )
+                    # Ensure test set matches forecast length for metric calculation
+                    matching_length = min(len(test["y"]), len(prophet_forecast))
+                    prophet_rmse = mean_squared_error(
+                        test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]
+                    ) ** 0.5
+                    prophet_mape = mean_absolute_percentage_error(
+                        test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]
+                    )
 
-                    # # Restore differenced values if applied
-                    # if isinstance(last_historical_value, (int, float)):  # Ensure it's numeric
-                    #     prophet_forecast = inverse_difference(prophet_forecast, last_historical_value)
+                    # Restore differenced values if applied
+                    if isinstance(last_historical_value, (int, float)):  # Ensure it's numeric
+                        prophet_forecast = inverse_difference(prophet_forecast, last_historical_value)
 
                     # Debugging: Check first forecasted value
                     st.write("✅ First Forecasted Value After Processing:", prophet_forecast["yhat"].iloc[0])
@@ -543,77 +543,77 @@ def main():
                         f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
                         f"- **Best Model Parameters:** {best_params}\n"
                         f"- **Performance Metrics:**\n"
-                        # f"  - 📉 RMSE: {prophet_rmse:.2f}\n"
-                        # f"  - 📉 MAPE: {prophet_mape:.2f}\n"
+                        f"  - 📉 RMSE: {prophet_rmse:.2f}\n"
+                        f"  - 📉 MAPE: {prophet_mape:.2f}\n"
                     )
 
                     with st.expander("📊 Prophet Model Summary"):
                         st.markdown(summary_text)
 
-                    # Create the forecast visualization
-                    fig = go.Figure()
+                    # # Create the forecast visualization
+                    # fig = go.Figure()
 
-                    # Add historical data
-                    fig.add_trace(go.Scatter(
-                        x=y_original["ds"],
-                        y=y_original["y_original"],
-                        mode="lines",
-                        name="Historical",
-                        line=dict(color="black", width=2)
-                    ))
+                    # # Add historical data
+                    # fig.add_trace(go.Scatter(
+                    #     x=y_original["ds"],
+                    #     y=y_original["y_original"],
+                    #     mode="lines",
+                    #     name="Historical",
+                    #     line=dict(color="black", width=2)
+                    # ))
 
-                    # Add forecasted data
-                    fig.add_trace(go.Scatter(
-                        x=prophet_forecast["ds"],
-                        y=prophet_forecast["yhat"],
-                        mode="lines",
-                        name="Forecast",
-                        line=dict(color="blue", width=2)
-                    ))
+                    # # Add forecasted data
+                    # fig.add_trace(go.Scatter(
+                    #     x=prophet_forecast["ds"],
+                    #     y=prophet_forecast["yhat"],
+                    #     mode="lines",
+                    #     name="Forecast",
+                    #     line=dict(color="blue", width=2)
+                    # ))
 
-                    # Add confidence intervals
-                    fig.add_trace(go.Scatter(
-                        x=prophet_forecast["ds"],
-                        y=prophet_forecast["yhat_upper"],
-                        mode="lines",
-                        name="Upper Confidence",
-                        line=dict(color="lightblue", dash="dot")
-                    ))
-                    fig.add_trace(go.Scatter(
-                        x=prophet_forecast["ds"],
-                        y=prophet_forecast["yhat_lower"],
-                        mode="lines",
-                        name="Lower Confidence",
-                        line=dict(color="lightblue", dash="dot")
-                    ))
+                    # # Add confidence intervals
+                    # fig.add_trace(go.Scatter(
+                    #     x=prophet_forecast["ds"],
+                    #     y=prophet_forecast["yhat_upper"],
+                    #     mode="lines",
+                    #     name="Upper Confidence",
+                    #     line=dict(color="lightblue", dash="dot")
+                    # ))
+                    # fig.add_trace(go.Scatter(
+                    #     x=prophet_forecast["ds"],
+                    #     y=prophet_forecast["yhat_lower"],
+                    #     mode="lines",
+                    #     name="Lower Confidence",
+                    #     line=dict(color="lightblue", dash="dot")
+                    # ))
 
-                    # Add vertical line for forecast start
-                    fig.add_vline(
-                        x=train["ds"].max(),
-                        line_dash="dash",
-                        line_color="red",
-                        annotation_text="Forecast Start",
-                        annotation_position="top left"
-                    )
+                    # # Add vertical line for forecast start
+                    # fig.add_vline(
+                    #     x=train["ds"].max(),
+                    #     line_dash="dash",
+                    #     line_color="red",
+                    #     annotation_text="Forecast Start",
+                    #     annotation_position="top left"
+                    # )
 
-                    # Update layout
-                    fig.update_layout(
-                        title="Prophet Forecast with Confidence Intervals",
-                        xaxis_title="Date",
-                        yaxis_title="Sales",
-                        legend_title="Legend",
-                        template="plotly_white"
-                    )
+                    # # Update layout
+                    # fig.update_layout(
+                    #     title="Prophet Forecast with Confidence Intervals",
+                    #     xaxis_title="Date",
+                    #     yaxis_title="Sales",
+                    #     legend_title="Legend",
+                    #     template="plotly_white"
+                    # )
 
-                    # Display the chart
-                    st.plotly_chart(fig, use_container_width=True)
+                    # # Display the chart
+                    # st.plotly_chart(fig, use_container_width=True)
 
-                    # Save results
-                    results["Prophet"] = {
-                        # "RMSE": float(prophet_rmse),
-                        # "MAPE": float(prophet_mape),
-                        "Forecast": prophet_forecast
-                    }
+                    # # Save results
+                    # results["Prophet"] = {
+                    #     "RMSE": float(prophet_rmse),
+                    #     "MAPE": float(prophet_mape),
+                    #     "Forecast": prophet_forecast
+                    # }
 
                 except Exception as e:
                     st.warning(f"❌ Prophet Model failed: {e}")
