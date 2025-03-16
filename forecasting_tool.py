@@ -340,6 +340,18 @@ def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock):
     # Return the modified data
     return data
 
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+from prophet import Prophet
+from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.tsa.stattools import acf
+from pmdarima import auto_arima
+from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
+from xgboost import XGBRegressor
+from flaml import AutoML
+
 def main():
     user_id = "user123"
     subscription_level = "premium"
@@ -452,13 +464,12 @@ def main():
                 train = scenario_data.iloc[:-testing_period]
                 test = scenario_data.iloc[-testing_period:]
 
-                st.write(f"🔍 Train DataFrame: {train}")
-
                 forecast_period = 24  # Fixed to 12 months forecast
 
                 # Forecasting Models
                 results = {}
 
+                # Prophet Model
                 st.write("🚀 Finding the best Prophet hyperparameters...")
                 best_params, best_rmse = find_best_prophet_params(train)
 
@@ -489,13 +500,6 @@ def main():
                     except Exception as e:
                         st.warning(f"⚠️ Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
 
-                    # Debugging train data
-                    st.write("🔍 Train DataFrame Sample:")
-                    st.dataframe(train.head())
-                    st.write(f"🔍 Train DataFrame Shape: {train.shape}")
-                    st.write("🧐 Min Date in Train:", train["ds"].min())
-                    st.write("🧐 Max Date in Train:", train["ds"].max())
-
                     # Train the Prophet model
                     prophet_model.fit(train)
 
@@ -510,11 +514,7 @@ def main():
                     # Ensure only future forecasts are used
                     prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
 
-                    # Debug forecast output
-                    st.write("🔍 Future Forecast DataFrame (Filtered):")
-                    st.dataframe(prophet_forecast.head())
-
-                    # Ensure test set matches forecast length for metric calculation
+                    # Evaluate performance
                     matching_length = min(len(test["y"]), len(prophet_forecast))
                     prophet_rmse = mean_squared_error(
                         test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]
@@ -526,9 +526,6 @@ def main():
                     # Restore differenced values if applied
                     if isinstance(last_historical_value, (int, float)):  # Ensure it's numeric
                         prophet_forecast = inverse_difference(prophet_forecast, last_historical_value)
-
-                    # Debugging: Check first forecasted value
-                    st.write("✅ First Forecasted Value After Processing:", prophet_forecast["yhat"].iloc[0])
 
                     # Identify highest & lowest forecasted sales
                     highest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmax()]
@@ -549,9 +546,6 @@ def main():
 
                     with st.expander("📊 Prophet Model Summary"):
                         st.markdown(summary_text)
-
-                        # Ensure train["ds"].max() is valid
-                    st.write("🧐 Max Date in Train (Before Plotly):", train["ds"].max())
 
                     # Create the forecast visualization
                     fig = go.Figure()
@@ -611,7 +605,7 @@ def main():
 
                 except Exception as e:
                     st.warning(f"❌ Prophet Model failed: {e}")
-                    
+
                 # ARIMA Model
                 st.write("🔄 Training ARIMA Model...")
 
@@ -770,25 +764,20 @@ def main():
 
                         # Generate lag features dynamically
                         for lag in range(1, max_lag + 1):
-                            future_row[f"lag_{lag}"] = train["y"].iloc[-lag] if lag <= len(train) else np.nan
+                            if lag == 1:
+                                future_row[f"lag_{lag}"] = xgb_data["y"].iloc[-1]
+                            else:
+                                future_row[f"lag_{lag}"] = xgb_data[f"lag_{lag - 1}"].iloc[-1]
 
                         # Generate rolling features dynamically
                         for window in rolling_windows:
-                            future_row[f"rolling_mean_{window}"] = (
-                                train["y"].rolling(window=min(window, len(train))).mean().iloc[-1]
-                                if len(train) > 1
-                                else np.nan
-                            )
-                            future_row[f"rolling_std_{window}"] = (
-                                train["y"].rolling(window=min(window, len(train))).std().iloc[-1]
-                                if len(train) > 1
-                                else np.nan
-                            )
+                            future_row[f"rolling_mean_{window}"] = xgb_data[f"rolling_mean_{window}"].iloc[-1]
+                            future_row[f"rolling_std_{window}"] = xgb_data[f"rolling_std_{window}"].iloc[-1]
 
                         # Generate seasonal features dynamically
-                        future_row["month"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).month
-                        future_row["quarter"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).quarter
-                        future_row["year"] = (train["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).year
+                        future_row["month"] = (xgb_data["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).month
+                        future_row["quarter"] = (xgb_data["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).quarter
+                        future_row["year"] = (xgb_data["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).year
                         future_row["sin_month"] = np.sin(2 * np.pi * future_row["month"] / 12)
                         future_row["cos_month"] = np.cos(2 * np.pi * future_row["month"] / 12)
 
@@ -912,10 +901,6 @@ def main():
                     if not apply_log:
                         automl_data["y_log"] = automl_data["y"]  # Ensure y_log exists for consistency
 
-                    # Debugging: Check columns
-                    st.write(f"🔹 Log transformation applied: {apply_log}")
-                    st.write(f"🔹 Columns in automl_data: {automl_data.columns}")
-
                     automl_data.dropna(inplace=True)
 
                     # ✅ Dynamically build feature list
@@ -947,9 +932,6 @@ def main():
                     # ✅ Generate Future Data
                     future_features = []
                     last_row = automl_data.iloc[-1].copy()
-
-                    # Debugging: Check columns in last_row
-                    st.write(f"🔹 Columns in last_row: {last_row.index.tolist()}")
 
                     for i in range(forecast_period):
                         future_row = {}
