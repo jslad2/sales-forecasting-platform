@@ -592,7 +592,7 @@ def main():
 
                     # Add vertical line for forecast start
                     fig.add_vline(
-                        x=str(train["ds"].max().date()),
+                        x=train["ds"].max(),  # Pass the Timestamp object directly
                         line_dash="dash",
                         line_color="red",
                         annotation_text="Forecast Start",
