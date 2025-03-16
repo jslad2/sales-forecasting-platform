@@ -229,6 +229,11 @@ def preprocess_data(data, date_column, sales_column):
 def inverse_difference(forecast_data, first_value):
     """Reverse differencing to restore original scale."""
     if first_value is not None:
+        # Ensure first_value is numeric
+        if not isinstance(first_value, (int, float)):
+            raise ValueError("first_value must be a numeric value (int or float).")
+
+        # Restore original values using cumulative sums
         forecast_data["yhat"] = first_value + forecast_data["yhat"].cumsum().shift(fill_value=first_value)
         forecast_data["yhat_upper"] = first_value + forecast_data["yhat_upper"].cumsum().shift(fill_value=first_value)
         forecast_data["yhat_lower"] = first_value + forecast_data["yhat_lower"].cumsum().shift(fill_value=first_value)
@@ -501,10 +506,6 @@ def main():
                         include_history=False  # Exclude historical data
                     )
                     prophet_forecast = prophet_model.predict(future)
-
-                    # Debugging: Check the types of prophet_forecast["ds"] and train["ds"].max()
-                    st.write("🔍 Type of prophet_forecast['ds']:", type(prophet_forecast["ds"].iloc[0]))
-                    st.write("🔍 Type of train['ds'].max():", type(train["ds"].max()))
 
                     # Ensure only future forecasts are used
                     prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
