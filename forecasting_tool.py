@@ -510,22 +510,22 @@ def main():
                     # Ensure only future forecasts are used
                     #prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
 
-                    # Debug forecast output
-                    st.write("🔍 Future Forecast DataFrame (Filtered):")
-                    st.dataframe(prophet_forecast.head())
+                    # # Debug forecast output
+                    # st.write("🔍 Future Forecast DataFrame (Filtered):")
+                    # st.dataframe(prophet_forecast.head())
 
-                    # Ensure test set matches forecast length for metric calculation
-                    matching_length = min(len(test["y"]), len(prophet_forecast))
-                    prophet_rmse = mean_squared_error(
-                        test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]
-                    ) ** 0.5
-                    prophet_mape = mean_absolute_percentage_error(
-                        test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]
-                    )
+                    # # Ensure test set matches forecast length for metric calculation
+                    # matching_length = min(len(test["y"]), len(prophet_forecast))
+                    # prophet_rmse = mean_squared_error(
+                    #     test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]
+                    # ) ** 0.5
+                    # prophet_mape = mean_absolute_percentage_error(
+                    #     test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]
+                    # )
 
-                    # Restore differenced values if applied
-                    if isinstance(last_historical_value, (int, float)):  # Ensure it's numeric
-                        prophet_forecast = inverse_difference(prophet_forecast, last_historical_value)
+                    # # Restore differenced values if applied
+                    # if isinstance(last_historical_value, (int, float)):  # Ensure it's numeric
+                    #     prophet_forecast = inverse_difference(prophet_forecast, last_historical_value)
 
                     # Debugging: Check first forecasted value
                     st.write("✅ First Forecasted Value After Processing:", prophet_forecast["yhat"].iloc[0])
@@ -543,8 +543,8 @@ def main():
                         f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
                         f"- **Best Model Parameters:** {best_params}\n"
                         f"- **Performance Metrics:**\n"
-                        f"  - 📉 RMSE: {prophet_rmse:.2f}\n"
-                        f"  - 📉 MAPE: {prophet_mape:.2f}\n"
+                        # f"  - 📉 RMSE: {prophet_rmse:.2f}\n"
+                        # f"  - 📉 MAPE: {prophet_mape:.2f}\n"
                     )
 
                     with st.expander("📊 Prophet Model Summary"):
@@ -610,8 +610,8 @@ def main():
 
                     # Save results
                     results["Prophet"] = {
-                        "RMSE": float(prophet_rmse),
-                        "MAPE": float(prophet_mape),
+                        # "RMSE": float(prophet_rmse),
+                        # "MAPE": float(prophet_mape),
                         "Forecast": prophet_forecast
                     }
 
