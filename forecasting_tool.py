@@ -462,8 +462,8 @@ def main():
                     st.write(f"🔍 Last Historical Date: {last_historical_date}")
 
                     # Determine forecast start date
-                    forecast_start_date = last_historical_date + pd.Timedelta(days=30)
-                    st.write(f"🔍 Forecast Start Date: {forecast_start_date}")
+                    # forecast_start_date = last_historical_date + pd.DateOffset(months=1)
+                    # st.write(f"🔍 Forecast Start Date: {forecast_start_date}")
 
                     # Debugging train data
                     st.write("🔍 Train DataFrame Sample:")
@@ -491,7 +491,7 @@ def main():
                         raise ValueError("Future data does not extend beyond last historical date.")
 
                     # Ensure only valid future dates are used
-                    future = future[future["ds"] >= forecast_start_date]
+                    future = future[future["ds"] > last_historical_date]
                     prophet_forecast = prophet_model.predict(future)
 
                     # Debug forecast output
@@ -573,7 +573,7 @@ def main():
 
                     # Add vertical line for forecast start
                     fig.add_vline(
-                        x=forecast_start_date,
+                        x=future.min(),
                         line_dash="dash",
                         line_color="red",
                         annotation_text="Forecast Start",
