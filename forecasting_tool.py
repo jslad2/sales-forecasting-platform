@@ -550,70 +550,73 @@ def main():
                     with st.expander("📊 Prophet Model Summary"):
                         st.markdown(summary_text)
 
-                    # # Create the forecast visualization
-                    # fig = go.Figure()
+                        # Ensure train["ds"].max() is valid
+                    st.write("🧐 Max Date in Train (Before Plotly):", train["ds"].max())
 
-                    # # Add historical data
-                    # fig.add_trace(go.Scatter(
-                    #     x=y_original["ds"],
-                    #     y=y_original["y_original"],
-                    #     mode="lines",
-                    #     name="Historical",
-                    #     line=dict(color="black", width=2)
-                    # ))
+                    # Create the forecast visualization
+                    fig = go.Figure()
 
-                    # # Add forecasted data
-                    # fig.add_trace(go.Scatter(
-                    #     x=prophet_forecast["ds"],
-                    #     y=prophet_forecast["yhat"],
-                    #     mode="lines",
-                    #     name="Forecast",
-                    #     line=dict(color="blue", width=2)
-                    # ))
+                    # Add historical data
+                    fig.add_trace(go.Scatter(
+                        x=y_original["ds"],
+                        y=y_original["y_original"],
+                        mode="lines",
+                        name="Historical",
+                        line=dict(color="black", width=2)
+                    ))
 
-                    # # Add confidence intervals
-                    # fig.add_trace(go.Scatter(
-                    #     x=prophet_forecast["ds"],
-                    #     y=prophet_forecast["yhat_upper"],
-                    #     mode="lines",
-                    #     name="Upper Confidence",
-                    #     line=dict(color="lightblue", dash="dot")
-                    # ))
-                    # fig.add_trace(go.Scatter(
-                    #     x=prophet_forecast["ds"],
-                    #     y=prophet_forecast["yhat_lower"],
-                    #     mode="lines",
-                    #     name="Lower Confidence",
-                    #     line=dict(color="lightblue", dash="dot")
-                    # ))
+                    # Add forecasted data
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"],
+                        y=prophet_forecast["yhat"],
+                        mode="lines",
+                        name="Forecast",
+                        line=dict(color="blue", width=2)
+                    ))
 
-                    # # Add vertical line for forecast start
-                    # fig.add_vline(
-                    #     x=train["ds"].max(),
-                    #     line_dash="dash",
-                    #     line_color="red",
-                    #     annotation_text="Forecast Start",
-                    #     annotation_position="top left"
-                    # )
+                    # Add confidence intervals
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"],
+                        y=prophet_forecast["yhat_upper"],
+                        mode="lines",
+                        name="Upper Confidence",
+                        line=dict(color="lightblue", dash="dot")
+                    ))
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"],
+                        y=prophet_forecast["yhat_lower"],
+                        mode="lines",
+                        name="Lower Confidence",
+                        line=dict(color="lightblue", dash="dot")
+                    ))
 
-                    # # Update layout
-                    # fig.update_layout(
-                    #     title="Prophet Forecast with Confidence Intervals",
-                    #     xaxis_title="Date",
-                    #     yaxis_title="Sales",
-                    #     legend_title="Legend",
-                    #     template="plotly_white"
-                    # )
+                    # Add vertical line for forecast start
+                    fig.add_vline(
+                        x=str(train["ds"].max().date()),
+                        line_dash="dash",
+                        line_color="red",
+                        annotation_text="Forecast Start",
+                        annotation_position="top left"
+                    )
 
-                    # # Display the chart
-                    # st.plotly_chart(fig, use_container_width=True)
+                    # Update layout
+                    fig.update_layout(
+                        title="Prophet Forecast with Confidence Intervals",
+                        xaxis_title="Date",
+                        yaxis_title="Sales",
+                        legend_title="Legend",
+                        template="plotly_white"
+                    )
 
-                    # # Save results
-                    # results["Prophet"] = {
-                    #     "RMSE": float(prophet_rmse),
-                    #     "MAPE": float(prophet_mape),
-                    #     "Forecast": prophet_forecast
-                    # }
+                    # Display the chart
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # Save results
+                    results["Prophet"] = {
+                        "RMSE": float(prophet_rmse),
+                        "MAPE": float(prophet_mape),
+                        "Forecast": prophet_forecast
+                    }
 
                 except Exception as e:
                     st.warning(f"❌ Prophet Model failed: {e}")
