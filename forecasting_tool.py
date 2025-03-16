@@ -461,9 +461,17 @@ def main():
                     last_historical_date = y_original["ds"].max()
                     st.write(f"🔍 Last Historical Date: {last_historical_date}")
 
-                    # Determine forecast start date
-                    # forecast_start_date = last_historical_date + pd.DateOffset(months=1)
-                    # st.write(f"🔍 Forecast Start Date: {forecast_start_date}")
+                    # Ensure last_historical_date is a single Timestamp
+                    if isinstance(last_historical_date, pd.Series):
+                        last_historical_date = last_historical_date.iloc[-1]
+                    from pandas.tseries.offsets import MonthBegin  # Import MonthBegin
+                    # Fix forecast_start_date calculation
+                    forecast_start_date = last_historical_date + MonthBegin(1)
+                    st.write(f"🔍 Forecast Start Date: {forecast_start_date}")
+
+                    # Fix last_historical_value check
+                    if isinstance(last_historical_value, (int, float)):  # Ensure it's numeric
+                        prophet_forecast = inverse_difference(prophet_forecast, last_historical_value)
 
                     # Debugging train data
                     st.write("🔍 Train DataFrame Sample:")
@@ -573,7 +581,7 @@ def main():
 
                     # Add vertical line for forecast start
                     fig.add_vline(
-                        x=future.min(),
+                        x=forecast_start_date,
                         line_dash="dash",
                         line_color="red",
                         annotation_text="Forecast Start",
