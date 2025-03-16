@@ -681,6 +681,10 @@ def main():
                     forecast_dates = pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M")
                     forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": arima_forecast[:forecast_period]})
 
+                        # Restore differenced values if applied
+                    if isinstance(last_historical_value, (int, float)):  # Ensure it's numeric
+                        forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
+
                     # Evaluate performance
                     matching_length = min(len(test["y"]), len(forecast_df))
                     test_y_trimmed = test["y"].iloc[:matching_length]
@@ -825,6 +829,10 @@ def main():
                         "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
                         "yhat": xgb_forecast
                     })
+
+                        # Restore differenced values if applied
+                    if isinstance(last_historical_value, (int, float)):  # Ensure it's numeric
+                        forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
 
                     highest_point = forecast_df.loc[forecast_df["yhat"].idxmax()]
                     lowest_point = forecast_df.loc[forecast_df["yhat"].idxmin()]
@@ -1014,6 +1022,12 @@ def main():
                         "yhat_lower": automl_forecast * 0.9,
                         "yhat_upper": automl_forecast * 1.1
                     })
+
+                        # Restore differenced values if applied
+                    if isinstance(last_historical_value, (int, float)):  # Ensure it's numeric
+                        forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
+                        forecast_df["yhat_lower"] = inverse_difference(forecast_df["yhat_lower"], last_historical_value)
+                        forecast_df["yhat_upper"] = inverse_difference(forecast_df["yhat_upper"], last_historical_value)
 
                     # ✅ Calculate RMSE and MAPE
                     test_y = test["y"].values
