@@ -590,19 +590,23 @@ def main():
                         line=dict(color="lightblue", dash="dot")
                     ))
 
-                    # Ensure train["ds"].max() is a valid date
+                    # Ensure train["ds"].max() is a valid timestamp
                     max_train_date = train["ds"].max()
 
-                    if pd.notna(max_train_date):  # Ensure it's not NaT
-                        fig.add_vline(
-                            x=str(max_train_date.date()),  # Convert to string
-                            line_dash="dash",
-                            line_color="red",
-                            annotation_text="Forecast Start",
-                            annotation_position="top left"
-                        )
-                    else:
-                        st.warning("⚠️ Could not determine the forecast start date!")
+                    # Convert to string in 'YYYY-MM-DD' format
+                    if isinstance(max_train_date, pd.Timestamp):
+                        max_train_date = max_train_date.strftime("%Y-%m-%d")  # Ensure string format
+
+                    # Final debug check before passing to Plotly
+                    st.write("📌 Debug: max_train_date (Final Value) →", max_train_date, "| Type:", type(max_train_date))
+
+                    fig.add_vline(
+                        x=max_train_date,  # Now guaranteed to be a string
+                        line_dash="dash",
+                        line_color="red",
+                        annotation_text="Forecast Start",
+                        annotation_position="top left"
+                    )
 
                     # Update layout
                     fig.update_layout(
