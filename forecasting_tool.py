@@ -175,9 +175,26 @@ def preprocess_data(data, date_column, sales_column):
 
             # Create a Plotly figure for visualization
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=data["ds"], y=data["y"], mode="lines", name="Original Series", line=dict(color="blue", width=2)))
-            fig.add_trace(go.Scatter(x=data["ds"].iloc[1:], y=data["y_diff"].dropna(), mode="lines", name="Differenced Series", line=dict(color="orange", width=2, dash="dot")))
-            fig.update_layout(title="Original vs Differenced Series", xaxis_title="Date", yaxis_title="Sales", template="plotly_white")
+            fig.add_trace(go.Scatter(
+                x=data["ds"],
+                y=data["y"],
+                mode="lines",
+                name="Original Series",
+                line=dict(color="blue", width=2)
+            ))
+            fig.add_trace(go.Scatter(
+                x=data["ds"].iloc[1:],
+                y=data["y_diff"].dropna(),
+                mode="lines",
+                name="Differenced Series",
+                line=dict(color="orange", width=2, dash="dot")
+            ))
+            fig.update_layout(
+                title="Original vs Differenced Series",
+                xaxis_title="Date",
+                yaxis_title="Sales",
+                template="plotly_white"
+            )
             st.plotly_chart(fig, use_container_width=True)
 
             # Remove NaNs caused by differencing
@@ -187,8 +204,19 @@ def preprocess_data(data, date_column, sales_column):
         else:
             # If stationary, plot only the original series
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=data["ds"], y=data["y"], mode="lines", name="Original Series", line=dict(color="blue", width=2)))
-            fig.update_layout(title="📊 Original Series", xaxis_title="Date", yaxis_title="Sales", template="plotly_white")
+            fig.add_trace(go.Scatter(
+                x=data["ds"],
+                y=data["y"],
+                mode="lines",
+                name="Original Series",
+                line=dict(color="blue", width=2)
+            ))
+            fig.update_layout(
+                title="📊 Original Series",
+                xaxis_title="Date",
+                yaxis_title="Sales",
+                template="plotly_white"
+            )
             st.plotly_chart(fig, use_container_width=True)
 
             # Return original data and None for last_historical_value (no differencing applied)
@@ -197,7 +225,6 @@ def preprocess_data(data, date_column, sales_column):
     except Exception as e:
         st.error(f"An error occurred during preprocessing: {e}")
         return None, None, None  # Return None in case of an error
-
 
 def inverse_difference(forecast_data, first_value):
     """Reverse differencing to restore original scale."""
@@ -440,6 +467,11 @@ def main():
                 try:
                     st.write("📊 Training Prophet Model with Best Parameters...")
 
+                    # Ensure training data is valid
+                    if train.shape[0] == 0:
+                        st.error("🚨 Training data is empty! Check preprocessing.")
+                        raise ValueError("Train dataset has no rows.")
+
                     # Define Prophet model
                     prophet_model = Prophet(
                         seasonality_mode=best_params["seasonality_mode"],
@@ -452,20 +484,46 @@ def main():
                     except Exception as e:
                         st.warning(f"⚠️ Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
 
-                    # Train the model
+                    # Debugging train data
+                    st.write("🔍 Train DataFrame Sample:")
+                    st.dataframe(train.head())
+                    st.write(f"🔍 Train DataFrame Shape: {train.shape}")
+                    st.write("🧐 Min Date in Train:", train["ds"].min())
+                    st.write("🧐 Max Date in Train:", train["ds"].max())
+
+                    # Train the Prophet model
                     prophet_model.fit(train)
 
                     # Generate future dates & predict
-                    future = prophet_model.make_future_dataframe(periods=forecast_period, freq="M", include_history=False)
+                    future = prophet_model.make_future_dataframe(
+                        periods=forecast_period,
+                        freq="M",
+                        include_history=False  # Exclude historical data
+                    )
                     prophet_forecast = prophet_model.predict(future)
 
                     # Ensure only future forecasts are used
                     prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
 
+                    # Debug forecast output
+                    st.write("🔍 Future Forecast DataFrame (Filtered):")
+                    st.dataframe(prophet_forecast.head())
+
                     # Ensure test set matches forecast length for metric calculation
                     matching_length = min(len(test["y"]), len(prophet_forecast))
-                    prophet_rmse = mean_squared_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]) ** 0.5
-                    prophet_mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length])
+                    prophet_rmse = mean_squared_error(
+                        test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]
+                    ) ** 0.5
+                    prophet_mape = mean_absolute_percentage_error(
+                        test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]
+                    )
+
+                    # Restore differenced values if applied
+                    if isinstance(last_historical_value, (int, float)):  # Ensure it's numeric
+                        prophet_forecast = inverse_difference(prophet_forecast, last_historical_value)
+
+                    # Debugging: Check first forecasted value
+                    st.write("✅ First Forecasted Value After Processing:", prophet_forecast["yhat"].iloc[0])
 
                     # Identify highest & lowest forecasted sales
                     highest_point = prophet_forecast.loc[prophet_forecast["yhat"].idxmax()]
@@ -487,12 +545,53 @@ def main():
                     with st.expander("📊 Prophet Model Summary"):
                         st.markdown(summary_text)
 
+                    # Create the forecast visualization
                     fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat"], mode="lines", name="Forecast", line=dict(color="blue", width=2)))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_upper"], mode="lines", name="Upper Confidence", line=dict(color="lightblue", dash="dot")))
-                    fig.add_trace(go.Scatter(x=prophet_forecast["ds"], y=prophet_forecast["yhat_lower"], mode="lines", name="Lower Confidence", line=dict(color="lightblue", dash="dot")))
 
+                    # Add historical data
+                    fig.add_trace(go.Scatter(
+                        x=y_original["ds"],
+                        y=y_original["y_original"],
+                        mode="lines",
+                        name="Historical",
+                        line=dict(color="black", width=2)
+                    ))
+
+                    # Add forecasted data
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"],
+                        y=prophet_forecast["yhat"],
+                        mode="lines",
+                        name="Forecast",
+                        line=dict(color="blue", width=2)
+                    ))
+
+                    # Add confidence intervals
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"],
+                        y=prophet_forecast["yhat_upper"],
+                        mode="lines",
+                        name="Upper Confidence",
+                        line=dict(color="lightblue", dash="dot")
+                    ))
+                    fig.add_trace(go.Scatter(
+                        x=prophet_forecast["ds"],
+                        y=prophet_forecast["yhat_lower"],
+                        mode="lines",
+                        name="Lower Confidence",
+                        line=dict(color="lightblue", dash="dot")
+                    ))
+
+                    # Add vertical line for forecast start
+                    fig.add_vline(
+                        x=train["ds"].max(),
+                        line_dash="dash",
+                        line_color="red",
+                        annotation_text="Forecast Start",
+                        annotation_position="top left"
+                    )
+
+                    # Update layout
                     fig.update_layout(
                         title="Prophet Forecast with Confidence Intervals",
                         xaxis_title="Date",
@@ -501,6 +600,7 @@ def main():
                         template="plotly_white"
                     )
 
+                    # Display the chart
                     st.plotly_chart(fig, use_container_width=True)
 
                     # Save results
