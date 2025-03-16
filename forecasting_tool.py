@@ -149,8 +149,15 @@ def preprocess_data(data, date_column, sales_column):
         # Aggregate to Monthly Data
         data = data[[date_column, sales_column]].rename(columns={date_column: "ds", sales_column: "y"})
         data["ds"] = pd.to_datetime(data["ds"])
+        
+        # Group by month and sum sales, ensuring no duplicate dates
         data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
         data["ds"] = data["ds"].dt.to_timestamp()
+
+        # Check for duplicate dates after aggregation
+        if data.duplicated(subset=["ds"]).any():
+            st.warning("⚠️ Duplicate dates found after aggregation. Removing duplicates...")
+            data = data.drop_duplicates(subset=["ds"], keep="last")
 
         # Store the original values
         y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
@@ -199,6 +206,7 @@ def preprocess_data(data, date_column, sales_column):
 
             # Remove NaNs caused by differencing
             differenced_data = data.dropna(subset=["y_diff"]).rename(columns={"y_diff": "y"})
+            differenced_data = differenced_data.reset_index(drop=True)  # Ensure unique index
             return differenced_data[["ds", "y"]], last_historical_value, y_original
 
         else:
@@ -220,10 +228,12 @@ def preprocess_data(data, date_column, sales_column):
             st.plotly_chart(fig, use_container_width=True)
 
             # Return original data and None for last_historical_value (no differencing applied)
+            data = data.reset_index(drop=True)  # Ensure unique index
             return data[["ds", "y"]], None, y_original
 
     except Exception as e:
         st.error(f"An error occurred during preprocessing: {e}")
+        st.error(f"Debug Info: Columns in data - {data.columns}, Data Shape - {data.shape}")
         return None, None, None  # Return None in case of an error
 
 def inverse_difference(forecast_data, first_value):
@@ -427,29 +437,29 @@ def main():
                     unsafe_allow_html=True,
                 )
 
-                # # ✅ Use Streamlit's Expander to Organize Data
-                # with st.expander("📊 View Processed Data"):
-                #     # ✅ Adjust Column Widths Dynamically
-                #     st.markdown(
-                #         """
-                #         <style>
-                #         .stDataFrame { text-align: center; margin: auto; }
-                #         .stDataFrame table { width: 100% !important; }
-                #         </style>
-                #         """,
-                #         unsafe_allow_html=True,
-                #     )
+                # ✅ Use Streamlit's Expander to Organize Data
+                with st.expander("📊 View Processed Data"):
+                    # ✅ Adjust Column Widths Dynamically
+                    st.markdown(
+                        """
+                        <style>
+                        .stDataFrame { text-align: center; margin: auto; }
+                        .stDataFrame table { width: 100% !important; }
+                        </style>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
-                #     # ✅ Ensure the DataFrame has unique column names and a unique index
-                #     scenario_data = scenario_data.reset_index(drop=True)  # Reset index to ensure uniqueness
-                #     scenario_data.columns = scenario_data.columns.astype(str)  # Ensure column names are unique
+                    # ✅ Ensure the DataFrame has unique column names and a unique index
+                    scenario_data = scenario_data.reset_index(drop=True)  # Reset index to ensure uniqueness
+                    scenario_data.columns = scenario_data.columns.astype(str)  # Ensure column names are unique
 
-                #     # ✅ Display DataFrame with Improved Spacing
-                #     st.dataframe(
-                #         scenario_data.style.set_properties(**{"text-align": "center"}),
-                #         width=1400,  # Wider Table
-                #         height=450   # Show More Rows
-                #     )
+                    # ✅ Display DataFrame with Improved Spacing
+                    st.dataframe(
+                        scenario_data.style.set_properties(**{"text-align": "center"}),
+                        width=1400,  # Wider Table
+                        height=450   # Show More Rows
+                    )
 
                 # Determine Testing Period Dynamically
                 testing_period = int(len(scenario_data) * 0.2)
