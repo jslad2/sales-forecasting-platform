@@ -502,6 +502,10 @@ def main():
                     )
                     prophet_forecast = prophet_model.predict(future)
 
+                    # Debugging: Check the types of prophet_forecast["ds"] and train["ds"].max()
+                    st.write("🔍 Type of prophet_forecast['ds']:", type(prophet_forecast["ds"].iloc[0]))
+                    st.write("🔍 Type of train['ds'].max():", type(train["ds"].max()))
+
                     # Ensure only future forecasts are used
                     prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
 
@@ -612,7 +616,6 @@ def main():
 
                 except Exception as e:
                     st.warning(f"❌ Prophet Model failed: {e}")
-
                     
                 # ARIMA Model
                 st.write("🔄 Training ARIMA Model...")
