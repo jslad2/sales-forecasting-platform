@@ -508,7 +508,7 @@ def main():
                     prophet_forecast = prophet_model.predict(future)
 
                     # Ensure only future forecasts are used
-                    prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
+                    #prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
 
                     # Debug forecast output
                     st.write("🔍 Future Forecast DataFrame (Filtered):")
