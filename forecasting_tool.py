@@ -215,10 +215,11 @@ def preprocess_data(data, date_column, sales_column):
             st.plotly_chart(fig, use_container_width=True)
 
             # Remove NaNs caused by differencing
-            differenced_data = data.dropna(subset=["y_diff"]).rename(columns={"y_diff": "y"})
+            differenced_data = data.dropna(subset=["y_diff"]).drop(columns=["y"])  # Drop the original "y" column
+            differenced_data = differenced_data.rename(columns={"y_diff": "y"})  # Rename "y_diff" to "y"
             
             # Debug: Inspect differenced data
-            st.write("🔍 Differenced data after dropping NaNs:")
+            st.write("🔍 Differenced data after dropping NaNs and renaming:")
             st.write(differenced_data.head())
 
             # Ensure unique index and column names
