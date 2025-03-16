@@ -177,8 +177,18 @@ def preprocess_data(data, date_column, sales_column):
         # Apply differencing if non-stationary
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
+            
+            # Debug: Inspect data before differencing
+            st.write("🔍 Data before differencing:")
+            st.write(data.head())
+
+            # Apply differencing
             data["y_diff"] = data["y"].diff()
             last_historical_value = data["y"].iloc[-1]
+
+            # Debug: Inspect data after differencing
+            st.write("🔍 Data after differencing:")
+            st.write(data.head())
 
             # Create a Plotly figure for visualization
             fig = go.Figure()
@@ -206,7 +216,19 @@ def preprocess_data(data, date_column, sales_column):
 
             # Remove NaNs caused by differencing
             differenced_data = data.dropna(subset=["y_diff"]).rename(columns={"y_diff": "y"})
-            differenced_data = differenced_data.reset_index(drop=True)  # Ensure unique index
+            
+            # Debug: Inspect differenced data
+            st.write("🔍 Differenced data after dropping NaNs:")
+            st.write(differenced_data.head())
+
+            # Ensure unique index and column names
+            differenced_data = differenced_data.reset_index(drop=True)
+            differenced_data.columns = differenced_data.columns.astype(str)
+
+            # Debug: Inspect final data to be returned
+            st.write("🔍 Differenced data to be returned:")
+            st.write(differenced_data[["ds", "y"]].head())
+
             return differenced_data[["ds", "y"]], last_historical_value, y_original
 
         else:
@@ -449,10 +471,6 @@ def main():
                         """,
                         unsafe_allow_html=True,
                     )
-
-                    # ✅ Ensure the DataFrame has unique column names and a unique index
-                    scenario_data = scenario_data.reset_index(drop=True)  # Reset index to ensure uniqueness
-                    scenario_data.columns = scenario_data.columns.astype(str)  # Ensure column names are unique
 
                     # ✅ Display DataFrame with Improved Spacing
                     st.dataframe(
