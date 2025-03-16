@@ -457,22 +457,6 @@ def main():
                     except Exception as e:
                         st.warning(f"⚠️ Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
 
-                    # Last available historical date
-                    last_historical_date = y_original["ds"].max()
-                    st.write(f"🔍 Last Historical Date: {last_historical_date}")
-
-                    # Ensure last_historical_date is a single Timestamp
-                    if isinstance(last_historical_date, pd.Series):
-                        last_historical_date = last_historical_date.iloc[-1]
-                    from pandas.tseries.offsets import MonthBegin  # Import MonthBegin
-                    # Fix forecast_start_date calculation
-                    forecast_start_date = last_historical_date + MonthBegin(1)
-                    st.write(f"🔍 Forecast Start Date: {forecast_start_date}")
-
-                    # Fix last_historical_value check
-                    if isinstance(last_historical_value, (int, float)):  # Ensure it's numeric
-                        prophet_forecast = inverse_difference(prophet_forecast, last_historical_value)
-
                     # Debugging train data
                     st.write("🔍 Train DataFrame Sample:")
                     st.dataframe(train.head())
@@ -487,23 +471,15 @@ def main():
                     future = prophet_model.make_future_dataframe(
                         periods=forecast_period,
                         freq="M",
-                        include_history=True
+                        include_history=False  # Exclude historical data
                     )
-
-                    # Debug future dates
-                    st.write("🔍 Future DataFrame Before Filtering:")
-                    st.dataframe(future.tail())
-
-                    if future["ds"].max() <= last_historical_date:
-                        st.error(f"🚨 Future data stops at {future['ds'].max()}, increase `forecast_period`!")
-                        raise ValueError("Future data does not extend beyond last historical date.")
-
-                    # Ensure only valid future dates are used
-                    future = future[future["ds"] > last_historical_date]
                     prophet_forecast = prophet_model.predict(future)
 
+                    # Ensure only future forecasts are used
+                    prophet_forecast = prophet_forecast[prophet_forecast["ds"] > train["ds"].max()]
+
                     # Debug forecast output
-                    st.write("🔍 Future Forecast DataFrame:")
+                    st.write("🔍 Future Forecast DataFrame (Filtered):")
                     st.dataframe(prophet_forecast.head())
 
                     # Ensure test set matches forecast length for metric calculation
@@ -516,7 +492,7 @@ def main():
                     )
 
                     # Restore differenced values if applied
-                    if last_historical_value is not None:
+                    if isinstance(last_historical_value, (int, float)):  # Ensure it's numeric
                         prophet_forecast = inverse_difference(prophet_forecast, last_historical_value)
 
                     # Debugging: Check first forecasted value
@@ -581,7 +557,7 @@ def main():
 
                     # Add vertical line for forecast start
                     fig.add_vline(
-                        x=forecast_start_date,
+                        x=train["ds"].max(),
                         line_dash="dash",
                         line_color="red",
                         annotation_text="Forecast Start",
