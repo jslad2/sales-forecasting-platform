@@ -438,24 +438,15 @@ def main():
                 st.write(f"📉 Best RMSE from cross-validation: {best_rmse}")
 
                 try:
-                    st.write("📊 Training Prophet Model with Best Parameters...")
+                    st.write("📊 Training Prophet Model...")
 
                     # Ensure training data is valid
                     if train.shape[0] == 0:
                         st.error("🚨 Training data is empty! Check preprocessing.")
                         raise ValueError("Train dataset has no rows.")
 
-                    # Define Prophet model
-                    prophet_model = Prophet(
-                        seasonality_mode=best_params["seasonality_mode"],
-                        changepoint_prior_scale=best_params["changepoint_prior_scale"]
-                    )
-
-                    # Detect & dynamically add seasonalities
-                    try:
-                        prophet_model = detect_and_add_seasonalities(prophet_model, train)
-                    except Exception as e:
-                        st.warning(f"⚠️ Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
+                    # Define Prophet model (simple configuration)
+                    prophet_model = Prophet()
 
                     # Debugging train data
                     st.write("🔍 Train DataFrame Sample:")
@@ -491,10 +482,6 @@ def main():
                         test["y"].iloc[:matching_length], prophet_forecast["yhat"].iloc[:matching_length]
                     )
 
-                    # Restore differenced values if applied
-                    if isinstance(last_historical_value, (int, float)):  # Ensure it's numeric
-                        prophet_forecast = inverse_difference(prophet_forecast, last_historical_value)
-
                     # Debugging: Check first forecasted value
                     st.write("✅ First Forecasted Value After Processing:", prophet_forecast["yhat"].iloc[0])
 
@@ -509,7 +496,6 @@ def main():
                         f"by {abs(((prophet_forecast['yhat'].iloc[-1] - test['y'].iloc[-1]) / test['y'].iloc[-1]) * 100):.2f}% in the next period.\n"
                         f"- **Highest Predicted Sales:** {highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}\n"
                         f"- **Lowest Predicted Sales:** {lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}\n"
-                        f"- **Best Model Parameters:** {best_params}\n"
                         f"- **Performance Metrics:**\n"
                         f"  - 📉 RMSE: {prophet_rmse:.2f}\n"
                         f"  - 📉 MAPE: {prophet_mape:.2f}\n"
@@ -523,11 +509,11 @@ def main():
 
                     # Add historical data
                     fig.add_trace(go.Scatter(
-                        x=y_original["ds"],
-                        y=y_original["y_original"],
+                        x=train["ds"],
+                        y=train["y"],
                         mode="lines",
                         name="Historical",
-                        line=dict(color="black", width=2)
+                        line=dict(color="blue", width=2)
                     ))
 
                     # Add forecasted data
@@ -536,7 +522,7 @@ def main():
                         y=prophet_forecast["yhat"],
                         mode="lines",
                         name="Forecast",
-                        line=dict(color="blue", width=2)
+                        line=dict(color="orange", width=2)
                     ))
 
                     # Add confidence intervals
@@ -545,14 +531,14 @@ def main():
                         y=prophet_forecast["yhat_upper"],
                         mode="lines",
                         name="Upper Confidence",
-                        line=dict(color="lightblue", dash="dot")
+                        line=dict(color="lightgray", dash="dot")
                     ))
                     fig.add_trace(go.Scatter(
                         x=prophet_forecast["ds"],
                         y=prophet_forecast["yhat_lower"],
                         mode="lines",
                         name="Lower Confidence",
-                        line=dict(color="lightblue", dash="dot")
+                        line=dict(color="lightgray", dash="dot")
                     ))
 
                     # Add vertical line for forecast start
@@ -584,7 +570,7 @@ def main():
                     }
 
                 except Exception as e:
-                    st.warning(f"❌ Prophet Model failed: {e}")
+                    st.error(f"❌ Prophet Model failed: {e}")
 
                     
                 # ARIMA Model
