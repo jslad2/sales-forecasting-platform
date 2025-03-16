@@ -340,18 +340,6 @@ def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock):
     # Return the modified data
     return data
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-from prophet import Prophet
-from statsmodels.tsa.seasonal import seasonal_decompose
-from statsmodels.tsa.stattools import acf
-from pmdarima import auto_arima
-from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
-from xgboost import XGBRegressor
-from flaml import AutoML
-
 def main():
     user_id = "user123"
     subscription_level = "premium"
@@ -451,6 +439,10 @@ def main():
                         """,
                         unsafe_allow_html=True,
                     )
+
+                    # ✅ Ensure the DataFrame has unique column names and a unique index
+                    scenario_data = scenario_data.reset_index(drop=True)  # Reset index to ensure uniqueness
+                    scenario_data.columns = scenario_data.columns.astype(str)  # Ensure column names are unique
 
                     # ✅ Display DataFrame with Improved Spacing
                     st.dataframe(
