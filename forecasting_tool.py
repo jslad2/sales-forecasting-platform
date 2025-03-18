@@ -363,12 +363,22 @@ def find_best_prophet_params(train):
 
     return best_params, best_rmse
 
-def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock, selected_categories=None, category_adjustment=0, start_date=None, end_date=None):
+def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock, category_columns=None, category_adjustments=None, start_date=None, end_date=None):
     """
     Apply scenario adjustments to the training data.
     Supports global adjustments (demand shock, seasonality, external shock) and category-specific adjustments.
     """
     try:
+        # Validate input data
+        if data is None or data.empty:
+            st.error("❌ No data provided. Please check your input.")
+            return data
+
+        # Ensure required columns are present
+        if "ds" not in data.columns or "y" not in data.columns:
+            st.error("❌ Required columns 'ds' (date) and 'y' (sales) are missing.")
+            return data
+
         # Apply global demand shock
         if demand_shock != 0:
             data["y"] = data["y"] * (1 + demand_shock / 100)
@@ -387,25 +397,37 @@ def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock, 
             st.write("✅ Applied global external shock: 20% reduction in sales")
 
         # Apply category-specific adjustments if categories are selected
-        if selected_categories and start_date and end_date and "category" in data.columns:
+        if category_columns and start_date and end_date:
             st.write("🔍 Applying category-specific adjustments...")
             
+            # Convert start_date and end_date to datetime
+            start_date = pd.to_datetime(start_date)
+            end_date = pd.to_datetime(end_date)
+
             # Filter data for the selected time period
             scenario_data = data[
-                (data["ds"] >= pd.to_datetime(start_date)) & 
-                (data["ds"] <= pd.to_datetime(end_date))
+                (data["ds"] >= start_date) & 
+                (data["ds"] <= end_date)
             ]
             
-            # Apply adjustments to selected categories
-            for category in selected_categories:
-                # Increase or decrease sales for the selected category
-                scenario_data.loc[scenario_data["category"] == category, "y"] *= (1 + category_adjustment / 100)
-                st.write(f"✅ Applied {category_adjustment}% adjustment to {category}")
+            # Apply adjustments to each category column
+            for category_column, category_adjustment in zip(category_columns, category_adjustments):
+                if category_column in scenario_data.columns:
+                    # Extract unique categories for the current category column
+                    categories = scenario_data[category_column].unique().tolist()
+
+                    # Apply adjustments to all categories in the column
+                    for category in categories:
+                        # Increase or decrease sales for the selected category
+                        scenario_data.loc[scenario_data[category_column] == category, "y"] *= (1 + category_adjustment / 100)
+                        st.write(f"✅ Applied {category_adjustment}% adjustment to {category_column}: {category}")
+                else:
+                    st.warning(f"⚠️ Column '{category_column}' not found in the dataset. Skipping adjustments for this category.")
 
             # Update the main data with the adjusted values
             data.update(scenario_data)
-        elif selected_categories and "category" not in data.columns:
-            st.warning("⚠️ No 'category' column found in the dataset. Category-specific adjustments skipped.")
+        elif category_columns:
+            st.warning("⚠️ No time period selected for category-specific adjustments. Skipping.")
 
         # Return the modified data
         return data
@@ -443,16 +465,16 @@ def main():
             )
 
             # 🗂 Dropdowns for Column Selection (Centered)
-            col1, col2, col3 = st.columns([1, 1, 1])  # Add a third column for category selection
+            col1, col2, col3 = st.columns([1, 1, 1])
             with col1:
                 date_column = st.selectbox("📅 Select the Date Column:", ["-- Select Column --"] + list(data.columns), key="date_col")
             with col2:
                 sales_column = st.selectbox("💰 Select the Sales Column:", ["-- Select Column --"] + list(data.columns), key="sales_col")
             with col3:
-                category_column = st.selectbox(
-                    "🏷️ Select the Category Column (Optional):", 
-                    ["-- Select Column --"] + list(data.columns), 
-                    key="category_col"
+                category_columns = st.multiselect(
+                    "🏷️ Select Category Columns (Optional):", 
+                    options=[col for col in data.columns if col not in [date_column, sales_column]],  # Exclude date and sales columns
+                    key="category_cols"
                 )
 
             # Scenario Planning Section
@@ -474,21 +496,21 @@ def main():
             )
 
             # Category-Specific Scenario Adjustments
-            if category_column and category_column != "-- Select Column --":
+            if category_columns:
                 st.sidebar.markdown("### 🎯 Scenario Planning by Category")
 
-                # Extract unique categories dynamically
-                categories = data[category_column].unique().tolist()
-
-                # Multiselect widget for categories
-                selected_categories = st.sidebar.multiselect(
-                    "Select Categories to Adjust:",
-                    options=categories,
-                    default=categories[:1]  # Default to the first category
-                )
-
-                # Convert date_column to datetime for min/max operations
-                data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
+                # Sliders for percentage change for each category column
+                category_adjustments = []
+                for i, category_column in enumerate(category_columns):
+                    adjustment = st.sidebar.slider(
+                        f"Adjust Sales for {category_column} (% Change):",
+                        min_value=-50,  # 50% decrease
+                        max_value=50,   # 50% increase
+                        value=10,       # Default: 10% increase
+                        step=5,
+                        key=f"category_adjustment_{i}"
+                    )
+                    category_adjustments.append(adjustment)
 
                 # Date input for start and end dates
                 start_date = st.sidebar.date_input(
@@ -503,6 +525,11 @@ def main():
                 # Ensure end date is after start date
                 if end_date < start_date:
                     st.sidebar.error("❌ End date must be after start date.")
+            else:
+                st.sidebar.markdown("ℹ️ No category columns selected. Category-based scenario planning is disabled.")
+                category_adjustments = None
+                start_date = None
+                end_date = None
 
                 # Slider for percentage change
                 category_adjustment = st.sidebar.slider(
