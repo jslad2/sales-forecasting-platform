@@ -539,12 +539,6 @@ def main():
                     value=10,       # Default: 10% increase
                     step=5
                 )
-            else:
-                st.sidebar.markdown("ℹ️ No category column selected. Category-based scenario planning is disabled.")
-                selected_categories = None
-                start_date = None
-                end_date = None
-                category_adjustment = 0
 
             # 🚀 Disable "Start Forecast" Button Until Valid Selections
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
