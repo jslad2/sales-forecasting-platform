@@ -260,16 +260,29 @@ def preprocess_data(data, date_column, sales_column):
         return None, None, None  # Return None in case of an error
 
 def inverse_difference(forecast_data, first_value):
-    """Reverse differencing to restore original scale."""
+    """
+    Reverse differencing to restore original scale.
+    
+    :param forecast_data: DataFrame containing the forecasted values.
+    :param first_value: The last historical value before differencing.
+    :return: DataFrame with restored values.
+    """
     if first_value is not None:
         # Ensure first_value is numeric
         if not isinstance(first_value, (int, float)):
             raise ValueError("first_value must be a numeric value (int or float).")
 
         # Restore original values using cumulative sums
-        forecast_data["yhat"] = first_value + forecast_data["yhat"].cumsum().shift(fill_value=first_value)
-        forecast_data["yhat_upper"] = first_value + forecast_data["yhat_upper"].cumsum().shift(fill_value=first_value)
-        forecast_data["yhat_lower"] = first_value + forecast_data["yhat_lower"].cumsum().shift(fill_value=first_value)
+        if "yhat" in forecast_data.columns:
+            forecast_data["yhat"] = first_value + forecast_data["yhat"].cumsum()
+        
+        # Restore upper and lower bounds if they exist
+        if "yhat_upper" in forecast_data.columns:
+            forecast_data["yhat_upper"] = first_value + forecast_data["yhat_upper"].cumsum()
+        
+        if "yhat_lower" in forecast_data.columns:
+            forecast_data["yhat_lower"] = first_value + forecast_data["yhat_lower"].cumsum()
+    
     return forecast_data
 
     # if last_historical_value is not None:
