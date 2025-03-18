@@ -135,10 +135,10 @@ def check_stationarity(series):
     else:
         return "Inconclusive"
 
-def preprocess_data(data, date_column, sales_column):
+def preprocess_data(data, date_column, sales_column, category_column=None):
     """
     Preprocess the uploaded data, check stationarity, and apply transformations if needed.
-    Returns a dataframe with columns "ds" and "y" for Prophet compatibility.
+    Returns a dataframe with columns "ds" and "y" (and optionally "category") for Prophet compatibility.
     Also returns the last historical value before forecasting if differencing is applied.
     """
     try:
@@ -147,11 +147,22 @@ def preprocess_data(data, date_column, sales_column):
         data.dropna(subset=[date_column, sales_column], inplace=True)
 
         # Aggregate to Monthly Data
-        data = data[[date_column, sales_column]].rename(columns={date_column: "ds", sales_column: "y"})
-        data["ds"] = pd.to_datetime(data["ds"])
-        
-        # Group by month and sum sales, ensuring no duplicate dates
-        data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
+        if category_column and category_column in data.columns:
+            # If a category column is provided, group by both date and category
+            data = data[[date_column, sales_column, category_column]].rename(
+                columns={date_column: "ds", sales_column: "y", category_column: "category"}
+            )
+            data["ds"] = pd.to_datetime(data["ds"])
+            data = data.groupby([data["ds"].dt.to_period("M"), "category"]).agg({"y": "sum"}).reset_index()
+        else:
+            # If no category column is provided, group by date only
+            data = data[[date_column, sales_column]].rename(
+                columns={date_column: "ds", sales_column: "y"}
+            )
+            data["ds"] = pd.to_datetime(data["ds"])
+            data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
+
+        # Convert period to timestamp
         data["ds"] = data["ds"].dt.to_timestamp()
 
         # Check for duplicate dates after aggregation
@@ -177,18 +188,10 @@ def preprocess_data(data, date_column, sales_column):
         # Apply differencing if non-stationary
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
-            
-            # Debug: Inspect data before differencing
-            st.write("🔍 Data before differencing:")
-            st.write(data.head())
 
             # Apply differencing
             data["y_diff"] = data["y"].diff()
             last_historical_value = data["y"].iloc[-1]
-
-            # Debug: Inspect data after differencing
-            st.write("🔍 Data after differencing:")
-            st.write(data.head())
 
             # Create a Plotly figure for visualization
             fig = go.Figure()
@@ -217,18 +220,10 @@ def preprocess_data(data, date_column, sales_column):
             # Remove NaNs caused by differencing
             differenced_data = data.dropna(subset=["y_diff"]).drop(columns=["y"])  # Drop the original "y" column
             differenced_data = differenced_data.rename(columns={"y_diff": "y"})  # Rename "y_diff" to "y"
-            
-            # Debug: Inspect differenced data
-            st.write("🔍 Differenced data after dropping NaNs and renaming:")
-            st.write(differenced_data.head())
 
             # Ensure unique index and column names
             differenced_data = differenced_data.reset_index(drop=True)
             differenced_data.columns = differenced_data.columns.astype(str)
-
-            # Debug: Inspect final data to be returned
-            st.write("🔍 Differenced data to be returned:")
-            st.write(differenced_data[["ds", "y"]].head())
 
             return differenced_data[["ds", "y"]], last_historical_value, y_original
 
@@ -373,40 +368,52 @@ def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock, 
     Apply scenario adjustments to the training data.
     Supports global adjustments (demand shock, seasonality, external shock) and category-specific adjustments.
     """
-    # Apply global demand shock
-    if demand_shock != 0:
-        data["y"] = data["y"] * (1 + demand_shock / 100)
+    try:
+        # Apply global demand shock
+        if demand_shock != 0:
+            data["y"] = data["y"] * (1 + demand_shock / 100)
+            st.write(f"✅ Applied global demand shock: {demand_shock}%")
 
-    # Apply global seasonality adjustment
-    if seasonality_adjustment != 0:
-        data["month"] = data["ds"].dt.month
-        seasonality_multiplier = 1 + seasonality_adjustment / 100
-        data["y"] = data["y"] * (1 + (data["month"] - 1) * (seasonality_multiplier - 1) / 12)
+        # Apply global seasonality adjustment
+        if seasonality_adjustment != 0:
+            data["month"] = data["ds"].dt.month
+            seasonality_multiplier = 1 + seasonality_adjustment / 100
+            data["y"] = data["y"] * (1 + (data["month"] - 1) * (seasonality_multiplier - 1) / 12)
+            st.write(f"✅ Applied global seasonality adjustment: {seasonality_adjustment}%")
 
-    # Apply global external shock
-    if external_shock:
-        data["y"] = data["y"] * 0.8  # Simulate a 20% reduction in sales
+        # Apply global external shock
+        if external_shock:
+            data["y"] = data["y"] * 0.8  # Simulate a 20% reduction in sales
+            st.write("✅ Applied global external shock: 20% reduction in sales")
 
-    # Apply category-specific adjustments if categories are selected
-    if selected_categories and start_date and end_date and "category" in data.columns:
-        st.write("🔍 Applying category-specific adjustments...")
-        
-        # Filter data for the selected time period
-        scenario_data = data[
-            (data["ds"] >= pd.to_datetime(start_date)) & 
-            (data["ds"] <= pd.to_datetime(end_date))
-        ]
-        
-        # Apply adjustments to selected categories
-        for category in selected_categories:
-            # Increase or decrease sales for the selected category
-            scenario_data.loc[scenario_data["category"] == category, "y"] *= (1 + category_adjustment / 100)
-        
-        # Update the main data with the adjusted values
-        data.update(scenario_data)
+        # Apply category-specific adjustments if categories are selected
+        if selected_categories and start_date and end_date and "category" in data.columns:
+            st.write("🔍 Applying category-specific adjustments...")
+            
+            # Filter data for the selected time period
+            scenario_data = data[
+                (data["ds"] >= pd.to_datetime(start_date)) & 
+                (data["ds"] <= pd.to_datetime(end_date))
+            ]
+            
+            # Apply adjustments to selected categories
+            for category in selected_categories:
+                # Increase or decrease sales for the selected category
+                scenario_data.loc[scenario_data["category"] == category, "y"] *= (1 + category_adjustment / 100)
+                st.write(f"✅ Applied {category_adjustment}% adjustment to {category}")
 
-    # Return the modified data
-    return data
+            # Update the main data with the adjusted values
+            data.update(scenario_data)
+        elif selected_categories and "category" not in data.columns:
+            st.warning("⚠️ No 'category' column found in the dataset. Category-specific adjustments skipped.")
+
+        # Return the modified data
+        return data
+
+    except Exception as e:
+        st.error(f"❌ An error occurred while applying scenarios: {e}")
+        st.error(f"Debug Info: Columns in data - {data.columns}, Data Shape - {data.shape}")
+        return data  # Return the original data in case of an error
 
 def main():
     user_id = "user123"
@@ -436,11 +443,17 @@ def main():
             )
 
             # 🗂 Dropdowns for Column Selection (Centered)
-            col1, col2 = st.columns([1, 1])
+            col1, col2, col3 = st.columns([1, 1, 1])  # Add a third column for category selection
             with col1:
                 date_column = st.selectbox("📅 Select the Date Column:", ["-- Select Column --"] + list(data.columns), key="date_col")
             with col2:
                 sales_column = st.selectbox("💰 Select the Sales Column:", ["-- Select Column --"] + list(data.columns), key="sales_col")
+            with col3:
+                category_column = st.selectbox(
+                    "🏷️ Select the Category Column (Optional):", 
+                    ["-- Select Column --"] + list(data.columns), 
+                    key="category_col"
+                )
 
             # Scenario Planning Section
             st.sidebar.markdown("### 🎯 Scenario Planning")
@@ -461,11 +474,11 @@ def main():
             )
 
             # Category-Specific Scenario Adjustments
-            if "category" in data.columns:
+            if category_column and category_column != "-- Select Column --":
                 st.sidebar.markdown("### 🎯 Scenario Planning by Category")
 
                 # Extract unique categories dynamically
-                categories = data["category"].unique().tolist()
+                categories = data[category_column].unique().tolist()
 
                 # Multiselect widget for categories
                 selected_categories = st.sidebar.multiselect(
@@ -497,7 +510,7 @@ def main():
                     step=5
                 )
             else:
-                st.sidebar.markdown("ℹ️ No 'category' column found in the dataset. Category-based scenario planning is disabled.")
+                st.sidebar.markdown("ℹ️ No category column selected. Category-based scenario planning is disabled.")
                 selected_categories = None
                 start_date = None
                 end_date = None
@@ -512,7 +525,13 @@ def main():
             # 🏁 Run Forecast Only If Button is Clicked
             if start_forecast:
                 # Preprocess Data
-                processed_data, last_historical_value, y_original = preprocess_data(data, date_column, sales_column)
+                st.write("🔍 Preprocessing data...")
+                processed_data, last_historical_value, y_original = preprocess_data(
+                    data, 
+                    date_column, 
+                    sales_column, 
+                    category_column if category_column != "-- Select Column --" else None
+                )
                 if processed_data is None:  # Check if preprocessing failed
                     st.error("❌ Preprocessing failed. Please check your data and try again.")
                     return
@@ -522,6 +541,7 @@ def main():
                 st.write(f"🔍 Last Historical Date: {last_historical_date}")
 
                 # Apply scenarios to training data
+                st.write("🔍 Applying scenarios to training data...")
                 scenario_data = apply_scenarios(
                     processed_data.copy(),
                     demand_shock,
@@ -574,6 +594,7 @@ def main():
 
                 # Forecasting Models
                 results = {}
+                st.write("🚀 Starting forecasting process...")
 
                 # Prophet Model
                 st.write("🚀 Finding the best Prophet hyperparameters...")
