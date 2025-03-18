@@ -263,14 +263,18 @@ def inverse_difference(forecast_data, first_value):
     """
     Reverse differencing to restore original scale.
     
-    :param forecast_data: DataFrame containing the forecasted values.
+    :param forecast_data: DataFrame or Series containing the forecasted values.
     :param first_value: The last historical value before differencing.
-    :return: DataFrame with restored values.
+    :return: DataFrame or Series with restored values.
     """
     if first_value is not None:
         # Ensure first_value is numeric
         if not isinstance(first_value, (int, float)):
             raise ValueError("first_value must be a numeric value (int or float).")
+
+        # Convert Series to DataFrame if necessary
+        if isinstance(forecast_data, pd.Series):
+            forecast_data = forecast_data.to_frame(name="yhat")
 
         # Restore original values using cumulative sums
         if "yhat" in forecast_data.columns:
