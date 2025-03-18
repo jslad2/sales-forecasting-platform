@@ -681,6 +681,10 @@ def main():
                     forecast_dates = pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M")
                     forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": arima_forecast[:forecast_period]})
 
+                    # Debug: Inspect forecast DataFrame
+                    st.write("🔍 Forecast DataFrame (Before Differencing Restoration):")
+                    st.write(forecast_df.head())
+
                         # Restore differenced values if applied
                     if isinstance(last_historical_value, (int, float)):  # Ensure it's numeric
                         forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
