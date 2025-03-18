@@ -571,8 +571,8 @@ def main():
                     demand_shock,
                     seasonality_adjustment,
                     external_shock,
-                    selected_categories,
-                    category_adjustment,
+                    category_columns,  # Pass the list of category columns (e.g., ["Brand", "Color"])
+                    category_adjustments,  # Pass the list of adjustments (e.g., [10, -5] for 10% increase in Brand, 5% decrease in Color)
                     start_date,
                     end_date
                 )
