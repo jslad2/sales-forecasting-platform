@@ -487,6 +487,9 @@ def main():
                     default=categories[:1]  # Default to the first category
                 )
 
+                # Convert date_column to datetime for min/max operations
+                data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
+
                 # Date input for start and end dates
                 start_date = st.sidebar.date_input(
                     "Start Date",
