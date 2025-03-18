@@ -1123,6 +1123,21 @@ def main():
                     automl_rmse = np.sqrt(mean_squared_error(test_y, forecast_df["yhat"][:len(test_y)]))
                     automl_mape = mean_absolute_percentage_error(test_y, forecast_df["yhat"][:len(test_y)])
 
+                    # Plot AutoML Forecast
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=y_original["ds"], y=y_original["y_original"], mode="lines", name="Historical", line=dict(color="black", width=2)))
+                    fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"], mode="lines", name="Forecast", line=dict(color="green", width=2)))
+
+                    fig.update_layout(
+                        title="📈 AutoML Forecast",
+                        xaxis_title="Date",
+                        yaxis_title="Sales",
+                        legend_title="Legend",
+                        template="plotly_white"
+                    )
+
+                    st.plotly_chart(fig, use_container_width=True)
+
                     # Populate results dictionary
                     results["AutoML"] = {
                         "RMSE": float(automl_rmse),
@@ -1229,8 +1244,8 @@ def main():
 
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(
-                    x=train["ds"],
-                    y=train["y"],
+                    x=y_original["ds"], 
+                    y=y_original["y_original"],
                     mode="lines",
                     name="Historical Data",
                     line=dict(color="black", width=2)
