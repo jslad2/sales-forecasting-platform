@@ -368,24 +368,42 @@ def find_best_prophet_params(train):
 
     return best_params, best_rmse
 
-def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock):
+def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock, selected_categories=None, category_adjustment=0, start_date=None, end_date=None):
     """
     Apply scenario adjustments to the training data.
+    Supports global adjustments (demand shock, seasonality, external shock) and category-specific adjustments.
     """
-    # Apply demand shock
+    # Apply global demand shock
     if demand_shock != 0:
         data["y"] = data["y"] * (1 + demand_shock / 100)
 
-    # Apply seasonality adjustment
+    # Apply global seasonality adjustment
     if seasonality_adjustment != 0:
-        # Example: Adjust monthly seasonality
         data["month"] = data["ds"].dt.month
         seasonality_multiplier = 1 + seasonality_adjustment / 100
         data["y"] = data["y"] * (1 + (data["month"] - 1) * (seasonality_multiplier - 1) / 12)
 
-    # Apply external shock (e.g., economic downturn)
+    # Apply global external shock
     if external_shock:
         data["y"] = data["y"] * 0.8  # Simulate a 20% reduction in sales
+
+    # Apply category-specific adjustments if categories are selected
+    if selected_categories and start_date and end_date and "category" in data.columns:
+        st.write("🔍 Applying category-specific adjustments...")
+        
+        # Filter data for the selected time period
+        scenario_data = data[
+            (data["ds"] >= pd.to_datetime(start_date)) & 
+            (data["ds"] <= pd.to_datetime(end_date))
+        ]
+        
+        # Apply adjustments to selected categories
+        for category in selected_categories:
+            # Increase or decrease sales for the selected category
+            scenario_data.loc[scenario_data["category"] == category, "y"] *= (1 + category_adjustment / 100)
+        
+        # Update the main data with the adjusted values
+        data.update(scenario_data)
 
     # Return the modified data
     return data
@@ -427,22 +445,63 @@ def main():
             # Scenario Planning Section
             st.sidebar.markdown("### 🎯 Scenario Planning")
 
-            # Demand Shock Scenario
+            # Global Scenario Adjustments
             demand_shock = st.sidebar.slider(
                 "Simulate Demand Shock (% Change in Sales):",
                 min_value=-50, max_value=50, value=0, step=5
             )
 
-            # Seasonality Adjustment
             seasonality_adjustment = st.sidebar.slider(
                 "Adjust Seasonality Strength (% Change):",
                 min_value=-50, max_value=50, value=0, step=5
             )
 
-            # External Shock (e.g., Economic Downturn)
             external_shock = st.sidebar.checkbox(
                 "Simulate External Shock (e.g., Economic Downturn)"
             )
+
+            # Category-Specific Scenario Adjustments
+            if "category" in data.columns:
+                st.sidebar.markdown("### 🎯 Scenario Planning by Category")
+
+                # Extract unique categories dynamically
+                categories = data["category"].unique().tolist()
+
+                # Multiselect widget for categories
+                selected_categories = st.sidebar.multiselect(
+                    "Select Categories to Adjust:",
+                    options=categories,
+                    default=categories[:1]  # Default to the first category
+                )
+
+                # Date input for start and end dates
+                start_date = st.sidebar.date_input(
+                    "Start Date",
+                    value=data[date_column].min().to_pydatetime()  # Default to the earliest date in the dataset
+                )
+                end_date = st.sidebar.date_input(
+                    "End Date",
+                    value=data[date_column].max().to_pydatetime()  # Default to the latest date in the dataset
+                )
+
+                # Ensure end date is after start date
+                if end_date < start_date:
+                    st.sidebar.error("❌ End date must be after start date.")
+
+                # Slider for percentage change
+                category_adjustment = st.sidebar.slider(
+                    "Adjust Sales for Selected Categories (% Change):",
+                    min_value=-50,  # 50% decrease
+                    max_value=50,   # 50% increase
+                    value=10,       # Default: 10% increase
+                    step=5
+                )
+            else:
+                st.sidebar.markdown("ℹ️ No 'category' column found in the dataset. Category-based scenario planning is disabled.")
+                selected_categories = None
+                start_date = None
+                end_date = None
+                category_adjustment = 0
 
             # 🚀 Disable "Start Forecast" Button Until Valid Selections
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
@@ -463,7 +522,16 @@ def main():
                 st.write(f"🔍 Last Historical Date: {last_historical_date}")
 
                 # Apply scenarios to training data
-                scenario_data = apply_scenarios(processed_data.copy(), demand_shock, seasonality_adjustment, external_shock)
+                scenario_data = apply_scenarios(
+                    processed_data.copy(),
+                    demand_shock,
+                    seasonality_adjustment,
+                    external_shock,
+                    selected_categories,
+                    category_adjustment,
+                    start_date,
+                    end_date
+                )
 
                 # ✅ Centered Header with Icon
                 st.markdown(
