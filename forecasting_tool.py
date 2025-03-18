@@ -735,7 +735,7 @@ def main():
 
                     # Plot ARIMA Forecast
                     fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
+                    fig.add_trace(go.Scatter(x=y_original["ds"], y=y_original["y_original"], mode="lines", name="Historical", line=dict(color="black", width=2)))
                     fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"], mode="lines", name="Forecast", line=dict(color="green", width=2)))
 
                     fig.update_layout(
@@ -871,9 +871,9 @@ def main():
 
                     with st.expander("📊 XGBoost Model Summary"):
                         st.markdown(summary_text)
-
+                        
                     fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=train["ds"], y=train["y"], mode="lines", name="Historical", line=dict(color="black", width=2)))
+                    fig.add_trace(go.Scatter(x=y_original["ds"], y=y_original["y_original"], mode="lines", name="Historical", line=dict(color="black", width=2)))
                     fig.add_trace(go.Scatter(x=forecast_df["ds"], y=forecast_df["yhat"], mode="lines", name="Forecast", line=dict(color="red", width=2)))
 
                     fig.update_layout(
