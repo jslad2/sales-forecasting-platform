@@ -471,74 +471,73 @@ def main():
             with col2:
                 sales_column = st.selectbox("💰 Select the Sales Column:", ["-- Select Column --"] + list(data.columns), key="sales_col")
             with col3:
-                category_columns = st.multiselect(
-                    "🏷️ Select Category Columns (Optional):", 
-                    options=[col for col in data.columns if col not in [date_column, sales_column]],  # Exclude date and sales columns
-                    key="category_cols"
-                )
+                # Disable category selection until date and sales columns are selected
+                if date_column == "-- Select Column --" or sales_column == "-- Select Column --":
+                    st.warning("⚠️ Please select the Date and Sales columns first.")
+                    category_columns = None
+                else:
+                    category_columns = st.multiselect(
+                        "🏷️ Select Category Columns (Optional):", 
+                        options=[col for col in data.columns if col not in [date_column, sales_column]],  # Exclude date and sales columns
+                        key="category_cols"
+                    )
 
             # Scenario Planning Section
-            st.sidebar.markdown("### 🎯 Scenario Planning")
+            if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
+                st.sidebar.markdown("### 🎯 Scenario Planning")
 
-            # Global Scenario Adjustments
-            demand_shock = st.sidebar.slider(
-                "Simulate Demand Shock (% Change in Sales):",
-                min_value=-50, max_value=50, value=0, step=5
-            )
+                # Global Scenario Adjustments
+                demand_shock = st.sidebar.slider(
+                    "Simulate Demand Shock (% Change in Sales):",
+                    min_value=-50, max_value=50, value=0, step=5
+                )
 
-            seasonality_adjustment = st.sidebar.slider(
-                "Adjust Seasonality Strength (% Change):",
-                min_value=-50, max_value=50, value=0, step=5
-            )
+                seasonality_adjustment = st.sidebar.slider(
+                    "Adjust Seasonality Strength (% Change):",
+                    min_value=-50, max_value=50, value=0, step=5
+                )
 
-            external_shock = st.sidebar.checkbox(
-                "Simulate External Shock (e.g., Economic Downturn)"
-            )
+                external_shock = st.sidebar.checkbox(
+                    "Simulate External Shock (e.g., Economic Downturn)"
+                )
 
-            # Category-Specific Scenario Adjustments
-            if category_columns:
-                st.sidebar.markdown("### 🎯 Scenario Planning by Category")
+                # Category-Specific Scenario Adjustments
+                if category_columns:
+                    st.sidebar.markdown("### 🎯 Scenario Planning by Category")
 
-                # Sliders for percentage change for each category column
-                category_adjustments = []
-                for i, category_column in enumerate(category_columns):
-                    adjustment = st.sidebar.slider(
-                        f"Adjust Sales for {category_column} (% Change):",
-                        min_value=-50,  # 50% decrease
-                        max_value=50,   # 50% increase
-                        value=10,       # Default: 10% increase
-                        step=5,
-                        key=f"category_adjustment_{i}"
+                    # Sliders for percentage change for each category column
+                    category_adjustments = []
+                    for i, category_column in enumerate(category_columns):
+                        adjustment = st.sidebar.slider(
+                            f"Adjust Sales for {category_column} (% Change):",
+                            min_value=-50,  # 50% decrease
+                            max_value=50,   # 50% increase
+                            value=10,       # Default: 10% increase
+                            step=5,
+                            key=f"category_adjustment_{i}"
+                        )
+                        category_adjustments.append(adjustment)
+
+                    # Date input for start and end dates
+                    start_date = st.sidebar.date_input(
+                        "Start Date",
+                        value=data[date_column].min().to_pydatetime()  # Default to the earliest date in the dataset
                     )
-                    category_adjustments.append(adjustment)
+                    end_date = st.sidebar.date_input(
+                        "End Date",
+                        value=data[date_column].max().to_pydatetime()  # Default to the latest date in the dataset
+                    )
 
-                # Date input for start and end dates
-                start_date = st.sidebar.date_input(
-                    "Start Date",
-                    value=data[date_column].min().to_pydatetime()  # Default to the earliest date in the dataset
-                )
-                end_date = st.sidebar.date_input(
-                    "End Date",
-                    value=data[date_column].max().to_pydatetime()  # Default to the latest date in the dataset
-                )
-
-                # Ensure end date is after start date
-                if end_date < start_date:
-                    st.sidebar.error("❌ End date must be after start date.")
+                    # Ensure end date is after start date
+                    if end_date < start_date:
+                        st.sidebar.error("❌ End date must be after start date.")
+                else:
+                    st.sidebar.markdown("ℹ️ No category columns selected. Category-based scenario planning is disabled.")
+                    category_adjustments = None
+                    start_date = None
+                    end_date = None
             else:
-                st.sidebar.markdown("ℹ️ No category columns selected. Category-based scenario planning is disabled.")
-                category_adjustments = None
-                start_date = None
-                end_date = None
-
-                # Slider for percentage change
-                category_adjustment = st.sidebar.slider(
-                    "Adjust Sales for Selected Categories (% Change):",
-                    min_value=-50,  # 50% decrease
-                    max_value=50,   # 50% increase
-                    value=10,       # Default: 10% increase
-                    step=5
-                )
+                st.sidebar.warning("⚠️ Please select the Date and Sales columns to enable scenario planning.")
 
             # 🚀 Disable "Start Forecast" Button Until Valid Selections
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
@@ -554,7 +553,7 @@ def main():
                     data, 
                     date_column, 
                     sales_column, 
-                    category_column if category_column != "-- Select Column --" else None
+                    category_columns  # Pass the list of category columns
                 )
                 if processed_data is None:  # Check if preprocessing failed
                     st.error("❌ Preprocessing failed. Please check your data and try again.")
@@ -571,11 +570,54 @@ def main():
                     demand_shock,
                     seasonality_adjustment,
                     external_shock,
-                    category_columns,  # Pass the list of category columns (e.g., ["Brand", "Color"])
-                    category_adjustments,  # Pass the list of adjustments (e.g., [10, -5] for 10% increase in Brand, 5% decrease in Color)
+                    category_columns,  # Pass the list of category columns
+                    category_adjustments,  # Pass the list of adjustments
                     start_date,
                     end_date
                 )
+
+                # ✅ Centered Header with Icon
+                st.markdown(
+                    """
+                    <div style="text-align: center;">
+                        <h2 style="color: #2B3A42; font-size: 1.8em;">
+                            📅 Preprocessed Monthly Data
+                        </h2>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+                # ✅ Use Streamlit's Expander to Organize Data
+                with st.expander("📊 View Processed Data"):
+                    # ✅ Adjust Column Widths Dynamically
+                    st.markdown(
+                        """
+                        <style>
+                        .stDataFrame { text-align: center; margin: auto; }
+                        .stDataFrame table { width: 100% !important; }
+                        </style>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+                    # ✅ Display DataFrame with Improved Spacing
+                    st.dataframe(
+                        scenario_data.style.set_properties(**{"text-align": "center"}),
+                        width=1400,  # Wider Table
+                        height=450   # Show More Rows
+                    )
+
+                # Determine Testing Period Dynamically
+                testing_period = int(len(scenario_data) * 0.2)
+                train = scenario_data.iloc[:-testing_period]
+                test = scenario_data.iloc[-testing_period:]
+
+                forecast_period = 24  # Fixed to 12 months forecast
+
+                # Forecasting Models
+                results = {}
+                st.write("🚀 Starting forecasting process...")
 
                 # ✅ Centered Header with Icon
                 st.markdown(
