@@ -482,6 +482,10 @@ def main():
                         key="category_cols"
                     )
 
+            # Convert date_column to datetime immediately after selection
+            if date_column != "-- Select Column --":
+                data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
+
             # Scenario Planning Section
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
                 st.sidebar.markdown("### 🎯 Scenario Planning")
