@@ -363,7 +363,7 @@ def find_best_prophet_params(train):
 
     return best_params, best_rmse
 
-def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock, category_columns=None, category_adjustments=None, start_date=None, end_date=None):
+def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock, category_columns=None, category_adjustments=None, category_date_ranges=None):
     """
     Apply scenario adjustments to the training data.
     Supports global adjustments (demand shock, seasonality, external shock) and category-specific adjustments.
@@ -397,35 +397,34 @@ def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock, 
             st.write("✅ Applied global external shock: 20% reduction in sales")
 
         # Apply category-specific adjustments if categories are selected
-        if category_columns and start_date and end_date:
+        if category_columns and category_adjustments and category_date_ranges:
             st.write("🔍 Applying category-specific adjustments...")
             
-            # Convert start_date and end_date to datetime
-            start_date = pd.to_datetime(start_date)
-            end_date = pd.to_datetime(end_date)
-
-            # Filter data for the selected time period
-            scenario_data = data[
-                (data["ds"] >= start_date) & 
-                (data["ds"] <= end_date)
-            ]
-            
-            # Apply adjustments to each category column
             for category_column, category_adjustment in zip(category_columns, category_adjustments):
-                if category_column in scenario_data.columns:
-                    # Extract unique categories for the current category column
-                    categories = scenario_data[category_column].unique().tolist()
+                if category_column in data.columns:
+                    # Get the date range for the current category
+                    start_date, end_date = category_date_ranges[category_column]
 
+                    # Convert start_date and end_date to datetime
+                    start_date = pd.to_datetime(start_date)
+                    end_date = pd.to_datetime(end_date)
+
+                    # Filter data for the selected time period
+                    scenario_data = data[
+                        (data["ds"] >= start_date) & 
+                        (data["ds"] <= end_date)
+                    ]
+                    
                     # Apply adjustments to all categories in the column
-                    for category in categories:
+                    for category in scenario_data[category_column].unique():
                         # Increase or decrease sales for the selected category
                         scenario_data.loc[scenario_data[category_column] == category, "y"] *= (1 + category_adjustment / 100)
-                        st.write(f"✅ Applied {category_adjustment}% adjustment to {category_column}: {category}")
+                        st.write(f"✅ Applied {category_adjustment}% adjustment to {category_column}: {category} (from {start_date.date()} to {end_date.date()})")
+
+                    # Update the main data with the adjusted values
+                    data.update(scenario_data)
                 else:
                     st.warning(f"⚠️ Column '{category_column}' not found in the dataset. Skipping adjustments for this category.")
-
-            # Update the main data with the adjusted values
-            data.update(scenario_data)
         elif category_columns:
             st.warning("⚠️ No time period selected for category-specific adjustments. Skipping.")
 
@@ -511,7 +510,11 @@ def main():
 
                     # Sliders for percentage change for each category column
                     category_adjustments = []
+                    category_date_ranges = {}  # Store date ranges for each category
                     for i, category_column in enumerate(category_columns):
+                        st.sidebar.markdown(f"#### {category_column} Adjustments")
+
+                        # Percentage adjustment slider
                         adjustment = st.sidebar.slider(
                             f"Adjust Sales for {category_column} (% Change):",
                             min_value=-50,  # 50% decrease
@@ -522,24 +525,28 @@ def main():
                         )
                         category_adjustments.append(adjustment)
 
-                    # Date input for start and end dates
-                    start_date = st.sidebar.date_input(
-                        "Start Date",
-                        value=data[date_column].min().to_pydatetime()  # Default to the earliest date in the dataset
-                    )
-                    end_date = st.sidebar.date_input(
-                        "End Date",
-                        value=data[date_column].max().to_pydatetime()  # Default to the latest date in the dataset
-                    )
+                        # Date range inputs for the current category
+                        start_date = st.sidebar.date_input(
+                            f"Start Date for {category_column}",
+                            value=data[date_column].min().to_pydatetime(),  # Default to the earliest date in the dataset
+                            key=f"start_date_{i}"
+                        )
+                        end_date = st.sidebar.date_input(
+                            f"End Date for {category_column}",
+                            value=data[date_column].max().to_pydatetime(),  # Default to the latest date in the dataset
+                            key=f"end_date_{i}"
+                        )
 
-                    # Ensure end date is after start date
-                    if end_date < start_date:
-                        st.sidebar.error("❌ End date must be after start date.")
+                        # Ensure end date is after start date
+                        if end_date < start_date:
+                            st.sidebar.error(f"❌ End date must be after start date for {category_column}.")
+
+                        # Store the date range for the current category
+                        category_date_ranges[category_column] = (start_date, end_date)
                 else:
                     st.sidebar.markdown("ℹ️ No category columns selected. Category-based scenario planning is disabled.")
                     category_adjustments = None
-                    start_date = None
-                    end_date = None
+                    category_date_ranges = None
             else:
                 st.sidebar.warning("⚠️ Please select the Date and Sales columns to enable scenario planning.")
 
@@ -576,8 +583,7 @@ def main():
                     external_shock,
                     category_columns,  # Pass the list of category columns
                     category_adjustments,  # Pass the list of adjustments
-                    start_date,
-                    end_date
+                    category_date_ranges  # Pass the dictionary of date ranges
                 )
 
                 # ✅ Centered Header with Icon
