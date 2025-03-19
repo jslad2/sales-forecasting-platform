@@ -135,7 +135,7 @@ def check_stationarity(series):
     else:
         return "Inconclusive"
 
-def preprocess_data(data, date_column, sales_column, category_column=None):
+def preprocess_data(data, date_column, sales_column, category_columns=None):
     """
     Preprocess the uploaded data, check stationarity, and apply transformations if needed.
     Returns a dataframe with columns "ds" and "y" (and optionally "category") for Prophet compatibility.
@@ -146,24 +146,20 @@ def preprocess_data(data, date_column, sales_column, category_column=None):
         data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
         data.dropna(subset=[date_column, sales_column], inplace=True)
 
-        # Aggregate to Monthly Data
-        if category_column and category_column in data.columns:
-            # If a category column is provided, group by both date and category
-            data = data[[date_column, sales_column, category_column]].rename(
-                columns={date_column: "ds", sales_column: "y", category_column: "category"}
-            )
-            data["ds"] = pd.to_datetime(data["ds"])
-            data = data.groupby([data["ds"].dt.to_period("M"), "category"]).agg({"y": "sum"}).reset_index()
-        else:
-            # If no category column is provided, group by date only
-            data = data[[date_column, sales_column]].rename(
-                columns={date_column: "ds", sales_column: "y"}
-            )
-            data["ds"] = pd.to_datetime(data["ds"])
-            data = data.groupby(data["ds"].dt.to_period("M")).agg({"y": "sum"}).reset_index()
+        # Rename columns for Prophet compatibility
+        data = data.rename(columns={date_column: "ds", sales_column: "y"})
 
-        # Convert period to timestamp
-        data["ds"] = data["ds"].dt.to_timestamp()
+        # Aggregate to Monthly Data
+        if category_columns:
+            # Ensure category_columns is a list (even if it's a single column)
+            if not isinstance(category_columns, list):
+                category_columns = [category_columns]
+
+            # Group by date and category columns
+            data = data.groupby(["ds"] + category_columns).agg({"y": "sum"}).reset_index()
+        else:
+            # Group by date only
+            data = data.groupby("ds").agg({"y": "sum"}).reset_index()
 
         # Check for duplicate dates after aggregation
         if data.duplicated(subset=["ds"]).any():
