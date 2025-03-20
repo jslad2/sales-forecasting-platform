@@ -657,6 +657,14 @@ def main():
     if subscription_level != "premium":
         st.warning("Upgrade to Premium to unlock advanced features!")
         st.stop()
+
+    # Create overall status placeholders
+    overall_status = st.empty()
+    prophet_status = st.empty()
+    arima_status = st.empty()
+    xgb_status = st.empty()
+    automl_status = st.empty()
+
     uploaded_file = st.file_uploader("Upload your sales data file", type=["csv"])
     if uploaded_file:
         try:
@@ -681,13 +689,17 @@ def main():
                     st.warning("Please select the Date and Sales columns first.")
                     category_columns = None
                 else:
-                    category_columns = st.multiselect("🏷️ Select Category Columns (Optional):", options=[col for col in data.columns if col not in [date_column, sales_column]], key="category_cols")
+                    category_columns = st.multiselect("🏷️ Select Category Columns (Optional):", 
+                                                      options=[col for col in data.columns if col not in [date_column, sales_column]],
+                                                      key="category_cols")
             if date_column != "-- Select Column --":
                 data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
                 st.sidebar.markdown("### 🎯 Scenario Planning")
-                demand_shock = st.sidebar.slider("Simulate Demand Shock (% Change in Sales):", min_value=-50, max_value=50, value=0, step=5)
-                seasonality_adjustment = st.sidebar.slider("Adjust Seasonality Strength (% Change):", min_value=-50, max_value=50, value=0, step=5)
+                demand_shock = st.sidebar.slider("Simulate Demand Shock (% Change in Sales):", 
+                                                 min_value=-50, max_value=50, value=0, step=5)
+                seasonality_adjustment = st.sidebar.slider("Adjust Seasonality Strength (% Change):", 
+                                                           min_value=-50, max_value=50, value=0, step=5)
                 external_shock = st.sidebar.checkbox("Simulate External Shock (e.g., Economic Downturn)")
                 if category_columns:
                     st.sidebar.markdown("### 🎯 Scenario Planning by Category")
@@ -695,10 +707,13 @@ def main():
                     category_date_ranges = {}
                     for i, category_column in enumerate(category_columns):
                         st.sidebar.markdown(f"#### {category_column} Adjustments")
-                        adjustment = st.sidebar.slider(f"Adjust Sales for {category_column} (% Change):", min_value=-50, max_value=50, value=10, step=5, key=f"category_adjustment_{i}")
+                        adjustment = st.sidebar.slider(f"Adjust Sales for {category_column} (% Change):", 
+                                                       min_value=-50, max_value=50, value=10, step=5, key=f"category_adjustment_{i}")
                         category_adjustments.append(adjustment)
-                        start_date = st.sidebar.date_input(f"Start Date for {category_column}", value=data[date_column].min().to_pydatetime(), key=f"start_date_{i}")
-                        end_date = st.sidebar.date_input(f"End Date for {category_column}", value=data[date_column].max().to_pydatetime(), key=f"end_date_{i}")
+                        start_date = st.sidebar.date_input(f"Start Date for {category_column}", 
+                                                           value=data[date_column].min().to_pydatetime(), key=f"start_date_{i}")
+                        end_date = st.sidebar.date_input(f"End Date for {category_column}", 
+                                                         value=data[date_column].max().to_pydatetime(), key=f"end_date_{i}")
                         if end_date < start_date:
                             st.sidebar.error(f"End date must be after start date for {category_column}.")
                         category_date_ranges[category_column] = (start_date, end_date)
@@ -709,19 +724,22 @@ def main():
             else:
                 st.sidebar.warning("Please select the Date and Sales columns to enable scenario planning.")
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
-                start_forecast = st.button("✅ Start Forecast", key="start_btn", help="Click to generate your AI-powered forecast")
+                start_forecast = st.button("✅ Start Forecast", key="start_btn", 
+                                           help="Click to generate your AI-powered forecast")
             else:
                 start_forecast = st.button("⏳ Select Columns First", disabled=True, key="start_disabled")
+                
             if start_forecast:
-                st.write("🔍 Preprocessing data...")
+                overall_status.info("🔍 Preprocessing data...")
                 processed_data, last_historical_value, y_original = preprocess_data(data, date_column, sales_column, category_columns)
                 if processed_data is None:
                     st.error("Preprocessing failed. Please check your data.")
                     return
                 last_historical_date = y_original["ds"].max()
-                st.write(f"🔍 Last Historical Date: {last_historical_date}")
-                st.write("🔍 Applying scenarios to training data...")
-                scenario_data = apply_scenarios(processed_data.copy(), demand_shock, seasonality_adjustment, external_shock, category_columns, category_adjustments, category_date_ranges)
+                overall_status.write(f"🔍 Last Historical Date: {last_historical_date}")
+                overall_status.info("🔍 Applying scenarios to training data...")
+                scenario_data = apply_scenarios(processed_data.copy(), demand_shock, seasonality_adjustment,
+                                                external_shock, category_columns, category_adjustments, category_date_ranges)
                 st.markdown(
                     """
                     <div style="text-align: center;">
@@ -732,32 +750,54 @@ def main():
                 )
                 with st.expander("📊 View Processed Data"):
                     st.dataframe(scenario_data.style.set_properties(**{"text-align": "center"}), width=1400, height=450)
+                    
                 testing_period = int(len(scenario_data) * 0.2)
                 train = scenario_data.iloc[:-testing_period]
                 test = scenario_data.iloc[-testing_period:]
                 forecast_period = 24
-                st.write("🚀 Starting forecasting process...")
-                st.write("🚀 Finding the best Prophet hyperparameters...")
+
+                overall_status.info("🚀 Starting forecasting process...")
+
+                # Prophet Model: Hyperparameter tuning
+                overall_status.info("🚀 Finding the best Prophet hyperparameters...")
                 best_params, best_rmse = find_best_prophet_params(train)
                 if best_params is None:
                     st.error("No valid Prophet parameters were found.")
                     return
-                st.write(f"✅ Best Parameters: {best_params}")
-                st.write(f"📉 Best RMSE from cross-validation: {best_rmse}")
-                
-                # Run all model trainings concurrently
+                overall_status.success(f"✅ Prophet Hyperparameters Found: {best_params}")
+                overall_status.write(f"📉 Best RMSE from cross-validation: {best_rmse}")
+
+                # Run all model trainings concurrently and update status for each
                 results = {}
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     futures = []
+                    prophet_status.info("🚀 Training Prophet Model...")
                     futures.append(executor.submit(train_prophet_model, train, test, forecast_period, best_params, last_historical_value, y_original))
+                    
+                    arima_status.info("🚀 Training ARIMA Model...")
                     futures.append(executor.submit(train_arima_model, train, test, forecast_period, last_historical_value, y_original))
+                    
+                    xgb_status.info("🚀 Training XGBoost Model...")
                     futures.append(executor.submit(train_xgb_model, train, test, forecast_period, last_historical_value, y_original))
+                    
+                    automl_status.info("🚀 Training AutoML Model...")
                     futures.append(executor.submit(train_automl_model, train, test, forecast_period, last_historical_value, y_original))
+                    
                     for future in concurrent.futures.as_completed(futures):
                         model_name, res = future.result()
                         results[model_name] = res
+                        if model_name == "Prophet":
+                            prophet_status.success("✅ Prophet Model Training Complete!")
+                        elif model_name == "ARIMA":
+                            arima_status.success("✅ ARIMA Model Training Complete!")
+                        elif model_name == "XGBoost":
+                            xgb_status.success("✅ XGBoost Model Training Complete!")
+                        elif model_name == "AutoML":
+                            automl_status.success("✅ AutoML Model Training Complete!")
 
-                # Display performance comparison table and further visualizations as in your original code...
+                overall_status.success("🎉 Forecasting process completed!")
+
+                # Performance Comparison
                 st.subheader("📌 Model Performance Comparison")
                 comparison_data = []
                 for model, res in results.items():
@@ -783,30 +823,24 @@ def main():
                     best_model = None
                     forecast_data = None
 
-                # 🔥 Detect High-Risk Periods in Forecast
+                # Detect high-risk periods and display AI-powered insights
                 if forecast_data is not None:
                     try:
                         forecast_data["volatility"] = forecast_data["yhat"].rolling(3).std()
-
-                        # Define risk levels dynamically
                         forecast_data["risk"] = "✅ Stable"
                         forecast_data.loc[forecast_data["volatility"] > forecast_data["volatility"].quantile(0.75), "risk"] = "⚠️ High Volatility"
                         forecast_data.loc[forecast_data["volatility"] > forecast_data["volatility"].quantile(0.9), "risk"] = "❌ Major Decline"
-
                         st.markdown("### 🚨 High-Risk Sales Periods Identified")
                         st.dataframe(forecast_data[["ds", "yhat", "volatility", "risk"]].style.applymap(
                             lambda x: "background-color: #FFDDC1" if x == "❌ Major Decline" else
-                                    "background-color: #FFEEAA" if x == "⚠️ High Volatility" else
-                                    "background-color: #C6ECAE",
+                                      "background-color: #FFEEAA" if x == "⚠️ High Volatility" else
+                                      "background-color: #C6ECAE",
                             subset=["risk"]
                         ))
-
-                        # 📊 AI-Powered Insights
                         highest_point = forecast_data.loc[forecast_data["yhat"].idxmax()]
                         lowest_point = forecast_data.loc[forecast_data["yhat"].idxmin()]
                         projected_growth = ((forecast_data["yhat"].iloc[-1] - test["y"].iloc[-1]) / test["y"].iloc[-1]) * 100
                         trend = "📈 **Growth Expected**" if projected_growth > 0 else "📉 **Potential Decline**"
-
                         insights_text = f"""
                         - **Projected Sales Growth:** {abs(projected_growth):.2f}% {trend}
                         - **Peak Sales Expected:** ${highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}
@@ -815,13 +849,12 @@ def main():
                         - **Risk Zones Identified:** Check months marked as 🔥 'High-Risk' above
                         - **Volatility Analysis:** Forecast suggests a {'stable' if abs(projected_growth) < 5 else 'fluctuating'} trend
                         """
-
                         with st.expander("🔮 AI-Powered Future Insights"):
                             st.markdown(insights_text)
                     except Exception as e:
                         st.error(f"❌ Error analyzing forecast data: {e}")
 
-                # 📊 Multi-Model Forecast Visualization
+                # Multi-Model Forecast Visualization
                 st.markdown("### 🔍 Forecast Comparison Across Models")
                 model_colors = {
                     "Prophet": "blue",
@@ -829,7 +862,6 @@ def main():
                     "XGBoost": "red",
                     "AutoML": "purple"
                 }
-
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(
                     x=y_original["ds"], 
@@ -838,10 +870,9 @@ def main():
                     name="Historical Data",
                     line=dict(color="black", width=2)
                 ))
-
-                for model, result in results.items():
-                    if "Forecast" in result and result["Forecast"] is not None and not result["Forecast"].empty:
-                        forecast_df = result["Forecast"]
+                for model, res in results.items():
+                    if "Forecast" in res and res["Forecast"] is not None and not res["Forecast"].empty:
+                        forecast_df = res["Forecast"]
                         fig.add_trace(go.Scatter(
                             x=forecast_df["ds"],
                             y=forecast_df["yhat"],
@@ -849,7 +880,6 @@ def main():
                             name=f"{model} Forecast",
                             line=dict(width=2, color=model_colors.get(model, "gray"))
                         ))
-
                 fig.update_layout(
                     title="📊 Multi-Model Sales Forecast",
                     xaxis_title="Date",
@@ -859,7 +889,7 @@ def main():
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
-                # 📥 Download Forecast Data
+                # Download forecast data
                 st.markdown("### 📥 Download Forecast Data")
                 if forecast_data is not None:
                     try:
@@ -874,7 +904,7 @@ def main():
                         st.error(f"❌ Error generating download file: {e}")
                 else:
                     st.warning("⚠️ No forecast data available for download.")
-
+                    
         except Exception as e:
             st.error(f"Error processing file: {e}")
 
