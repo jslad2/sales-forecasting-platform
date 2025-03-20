@@ -650,6 +650,12 @@ def train_automl_model(train, test, forecast_period, last_historical_value, y_or
         st.error(f"AutoML Model failed: {e}")
     return ("AutoML", result)
 
+import time
+import pandas as pd
+import streamlit as st
+import plotly.graph_objects as go
+# ... (other imports like prophet, pmdarima, xgboost, flaml, etc.)
+
 def main():
     user_id = "user123"
     subscription_level = "premium"
@@ -657,12 +663,12 @@ def main():
         st.warning("Upgrade to Premium to unlock advanced features!")
         st.stop()
 
-    # -- Create placeholders for real-time status messages --
-    overall_status = st.empty()  # For major steps
-    prophet_status = st.empty()  # Prophet model updates
-    arima_status = st.empty()    # ARIMA model updates
-    xgb_status = st.empty()      # XGBoost model updates
-    automl_status = st.empty()   # AutoML model updates
+    # Placeholders for status (optional; spinners provide the main feedback)
+    overall_status = st.empty()
+    prophet_status = st.empty()
+    arima_status = st.empty()
+    xgb_status = st.empty()
+    automl_status = st.empty()
 
     uploaded_file = st.file_uploader("Upload your sales data file", type=["csv"])
     if uploaded_file:
@@ -766,37 +772,35 @@ def main():
 
             # ------------------- MAIN FORECAST LOGIC ------------------- #
             if start_forecast:
-                # 1) Preprocessing
-                overall_status.info("🔍 Preprocessing data...")
-                processed_data, last_historical_value, y_original = preprocess_data(
-                    data, date_column, sales_column, category_columns
-                )
-                # Give Streamlit time to render
-                time.sleep(1.0)
 
+                # 1) Preprocessing
+                with st.spinner("🔍 Preprocessing data..."):
+                    processed_data, last_historical_value, y_original = preprocess_data(
+                        data, date_column, sales_column, category_columns
+                    )
+                    time.sleep(1)  # Let the spinner be visible for a bit
                 if processed_data is None:
                     st.error("Preprocessing failed. Please check your data.")
                     return
-
-                overall_status.success("✅ Data Preprocessed Successfully!")
-                time.sleep(0.5)
+                st.success("✅ Data Preprocessed Successfully!")
 
                 last_historical_date = y_original["ds"].max()
-                overall_status.write(f"🔍 Last Historical Date: {last_historical_date}")
+                overall_status.info(f"🔍 Last Historical Date: {last_historical_date}")
+                time.sleep(0.5)
 
                 # 2) Apply scenarios
-                overall_status.info("🔍 Applying scenarios to training data...")
-                scenario_data = apply_scenarios(
-                    processed_data.copy(),
-                    demand_shock,
-                    seasonality_adjustment,
-                    external_shock,
-                    category_columns,
-                    category_adjustments,
-                    category_date_ranges
-                )
-                time.sleep(1.0)
-                overall_status.success("✅ Scenarios Applied!")
+                with st.spinner("🔍 Applying scenarios to training data..."):
+                    scenario_data = apply_scenarios(
+                        processed_data.copy(),
+                        demand_shock,
+                        seasonality_adjustment,
+                        external_shock,
+                        category_columns,
+                        category_adjustments,
+                        category_date_ranges
+                    )
+                    time.sleep(1)
+                st.success("✅ Scenarios Applied!")
                 time.sleep(0.5)
 
                 st.markdown(
@@ -818,58 +822,58 @@ def main():
                 forecast_period = 24
 
                 overall_status.info("🚀 Starting forecasting process...")
-                time.sleep(1.0)
+                time.sleep(1)
 
                 # 4) Find best Prophet hyperparameters
-                overall_status.info("🚀 Finding the best Prophet hyperparameters...")
-                best_params, best_rmse = find_best_prophet_params(train)
-                time.sleep(1.0)
+                with st.spinner("🚀 Finding the best Prophet hyperparameters..."):
+                    best_params, best_rmse = find_best_prophet_params(train)
+                    time.sleep(1)
                 if best_params is None:
                     st.error("No valid Prophet parameters were found.")
                     return
-                overall_status.success(f"✅ Best Prophet Params: {best_params}")
+                st.success(f"✅ Best Prophet Params: {best_params}")
                 overall_status.write(f"📉 Best RMSE (CV): {best_rmse:.2f}")
-                time.sleep(1.0)
+                time.sleep(1)
 
                 # 5) Train Prophet Model
-                prophet_status.info("🚀 Training Prophet Model...")
-                prophet_model_name, prophet_res = train_prophet_model(
-                    train, test, forecast_period, best_params,
-                    last_historical_value, y_original
-                )
-                time.sleep(1.0)
+                with st.spinner("🚀 Training Prophet Model..."):
+                    prophet_model_name, prophet_res = train_prophet_model(
+                        train, test, forecast_period, best_params,
+                        last_historical_value, y_original
+                    )
+                    time.sleep(1)
                 prophet_status.success("✅ Prophet Model Training Complete!")
 
                 # 6) Train ARIMA Model
-                arima_status.info("🚀 Training ARIMA Model...")
-                arima_model_name, arima_res = train_arima_model(
-                    train, test, forecast_period,
-                    last_historical_value, y_original
-                )
-                time.sleep(1.0)
+                with st.spinner("🚀 Training ARIMA Model..."):
+                    arima_model_name, arima_res = train_arima_model(
+                        train, test, forecast_period,
+                        last_historical_value, y_original
+                    )
+                    time.sleep(1)
                 arima_status.success("✅ ARIMA Model Training Complete!")
 
                 # 7) Train XGBoost Model
-                xgb_status.info("🚀 Training XGBoost Model...")
-                xgb_model_name, xgb_res = train_xgb_model(
-                    train, test, forecast_period,
-                    last_historical_value, y_original
-                )
-                time.sleep(1.0)
+                with st.spinner("🚀 Training XGBoost Model..."):
+                    xgb_model_name, xgb_res = train_xgb_model(
+                        train, test, forecast_period,
+                        last_historical_value, y_original
+                    )
+                    time.sleep(1)
                 xgb_status.success("✅ XGBoost Model Training Complete!")
 
                 # 8) Train AutoML Model
-                automl_status.info("🚀 Training AutoML Model...")
-                automl_model_name, automl_res = train_automl_model(
-                    train, test, forecast_period,
-                    last_historical_value, y_original
-                )
-                time.sleep(1.0)
+                with st.spinner("🚀 Training AutoML Model..."):
+                    automl_model_name, automl_res = train_automl_model(
+                        train, test, forecast_period,
+                        last_historical_value, y_original
+                    )
+                    time.sleep(1)
                 automl_status.success("✅ AutoML Model Training Complete!")
 
                 # 9) Compile results
-                overall_status.success("🎉 Forecasting process completed!")
-                time.sleep(1.0)
+                st.success("🎉 Forecasting process completed!")
+                time.sleep(1)
 
                 # Store results in a dictionary for easy comparison
                 results = {
@@ -958,7 +962,7 @@ def main():
                     }
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(
-                        x=y_original["ds"], 
+                        x=y_original["ds"],
                         y=y_original["y_original"],
                         mode="lines",
                         name="Historical Data",
