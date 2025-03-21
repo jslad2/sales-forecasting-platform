@@ -709,24 +709,19 @@ def train_automl_model(train, test, forecast_period, last_historical_value, y_or
     return ("AutoML", result)
 
 def shape_score(actual, forecast):
-    """
-    Compute the Pearson correlation coefficient between actual and forecast arrays.
-    """
-    if len(actual) != len(forecast):
-        min_len = min(len(actual), len(forecast))
-        actual = actual[:min_len]
-        forecast = forecast[:min_len]
-    corr, _ = pearsonr(actual, forecast)
+    m = min(len(actual), len(forecast))
+    if m == 0:
+        return 0
+    actual_series = actual.iloc[:m]
+    forecast_series = forecast.iloc[:m]
+    corr, _ = pearsonr(actual_series, forecast_series)
     return corr
 
-def combined_score(rmse, corr, max_rmse, alpha, beta):
-    """
-    Compute a combined score that weighs normalized RMSE and (1 - correlation).
-    Lower combined scores are better.
-    """
-    norm_rmse = rmse / max_rmse
-    return alpha * norm_rmse + beta * (1 - corr)
+def combined_score(rmse, shape, max_rmse, alpha, beta):
+    norm_rmse = rmse / max_rmse if max_rmse != 0 else 0
+    return alpha * norm_rmse + beta * (1 - shape)
 
+# Cache heavy computations so slider changes don't force re-training.
 @st.experimental_memo(show_spinner=False)
 def compute_forecasting_results(data, date_column, sales_column, category_columns, 
                                 demand_shock, seasonality_adjustment, external_shock,
@@ -784,7 +779,7 @@ def main():
         st.warning("Upgrade to Premium to unlock advanced features!")
         st.stop()
 
-    # Reset button to clear session state if needed
+    # Reset button to clear session state
     if st.button("🔄 Reset App"):
         st.session_state.clear()
         st.experimental_rerun()
@@ -904,7 +899,7 @@ def main():
 
             # ------------------- MAIN FORECAST LOGIC ------------------- #
             if start_forecast:
-                # Check if results are already cached in session state
+                # Use caching so heavy computations are only run once
                 if "model_results" not in st.session_state:
                     with st.spinner("Computing forecasts. This may take a moment..."):
                         forecast_results = compute_forecasting_results(
@@ -914,21 +909,21 @@ def main():
                         )
                         time.sleep(1)
                     overall_status.success("✅ Forecasts computed and cached!")
-                    st.session_state.model_results = forecast_results["results"]
-                    st.session_state.y_original = forecast_results["y_original"]
-                    st.session_state.test = forecast_results["test"]
-                    st.session_state.best_params = forecast_results["best_params"]
-                    st.session_state.best_rmse = forecast_results["best_rmse"]
-                    st.session_state.last_historical_value = forecast_results["last_historical_value"]
+                    st.session_state["model_results"] = forecast_results["results"]
+                    st.session_state["y_original"] = forecast_results["y_original"]
+                    st.session_state["test"] = forecast_results["test"]
+                    st.session_state["best_params"] = forecast_results["best_params"]
+                    st.session_state["best_rmse"] = forecast_results["best_rmse"]
+                    st.session_state["last_historical_value"] = forecast_results["last_historical_value"]
                 else:
                     overall_status.info("Using cached forecasting results...")
 
-                # Retrieve cached results
-                results = st.session_state.model_results
-                y_original = st.session_state.y_original
-                test = st.session_state.test
-                best_params = st.session_state.best_params
-                best_rmse = st.session_state.best_rmse
+                # Retrieve cached results using dictionary syntax
+                results = st.session_state["model_results"]
+                y_original = st.session_state["y_original"]
+                test = st.session_state["test"]
+                best_params = st.session_state["best_params"]
+                best_rmse = st.session_state["best_rmse"]
 
                 st.write(f"🔍 Best Prophet Params: {best_params}")
                 st.write(f"📉 Best RMSE (CV): {best_rmse:.2f}")
