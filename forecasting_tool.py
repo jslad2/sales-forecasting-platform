@@ -727,6 +727,56 @@ def combined_score(rmse, corr, max_rmse, alpha, beta):
     norm_rmse = rmse / max_rmse
     return alpha * norm_rmse + beta * (1 - corr)
 
+@st.experimental_memo(show_spinner=False)
+def compute_forecasting_results(data, date_column, sales_column, category_columns, 
+                                demand_shock, seasonality_adjustment, external_shock,
+                                category_adjustments, category_date_ranges, time_budget):
+    # Heavy computations: preprocessing, scenario application, model training/forecasting
+    processed_data, last_historical_value, y_original = preprocess_data(
+        data, date_column, sales_column, category_columns
+    )
+    scenario_data = apply_scenarios(
+        processed_data.copy(),
+        demand_shock,
+        seasonality_adjustment,
+        external_shock,
+        category_columns,
+        category_adjustments,
+        category_date_ranges
+    )
+    testing_period = int(len(scenario_data) * 0.2)
+    train = scenario_data.iloc[:-testing_period]
+    test = scenario_data.iloc[-testing_period:]
+    forecast_period = 24
+
+    best_params, best_rmse = find_best_prophet_params(train)
+    prophet_model_name, prophet_res = train_prophet_model(
+        train, test, forecast_period, best_params, last_historical_value, y_original
+    )
+    arima_model_name, arima_res = train_arima_model(
+        train, test, forecast_period, last_historical_value, y_original
+    )
+    xgb_model_name, xgb_res = train_xgb_model(
+        train, test, forecast_period, last_historical_value, y_original
+    )
+    automl_model_name, automl_res = train_automl_model(
+        train, test, forecast_period, last_historical_value, y_original, time_budget
+    )
+    results = {
+        prophet_model_name: prophet_res,
+        arima_model_name: arima_res,
+        xgb_model_name: xgb_res,
+        automl_model_name: automl_res
+    }
+    return {
+        "results": results,
+        "y_original": y_original,
+        "test": test,
+        "best_params": best_params,
+        "best_rmse": best_rmse,
+        "last_historical_value": last_historical_value
+    }
+
 def main():
     user_id = "user123"
     subscription_level = "premium"
@@ -734,7 +784,7 @@ def main():
         st.warning("Upgrade to Premium to unlock advanced features!")
         st.stop()
 
-    # Reset button
+    # Reset button to clear session state if needed
     if st.button("🔄 Reset App"):
         st.session_state.clear()
         st.experimental_rerun()
@@ -789,7 +839,7 @@ def main():
             if date_column != "-- Select Column --":
                 data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
 
-            # Add Time Budget Slider
+            # Add Time Budget Slider for AutoML
             st.markdown("### ⏱️ AutoML Time Budget")
             time_budget = st.slider(
                 "Set the time budget for AutoML training (in seconds):",
@@ -812,7 +862,6 @@ def main():
                     min_value=-50, max_value=50, value=0, step=5
                 )
                 external_shock = st.sidebar.checkbox("Simulate External Shock (e.g., Economic Downturn)")
-
                 if category_columns:
                     st.sidebar.markdown("### 🎯 Scenario Planning by Category")
                     category_adjustments = []
@@ -855,117 +904,36 @@ def main():
 
             # ------------------- MAIN FORECAST LOGIC ------------------- #
             if start_forecast:
-                # 1) Preprocessing
-                with st.spinner("🔍 Preprocessing data..."):
-                    processed_data, last_historical_value, y_original = preprocess_data(
-                        data, date_column, sales_column, category_columns
-                    )
-                    time.sleep(1)
-                if processed_data is None:
-                    st.error("Preprocessing failed. Please check your data.")
-                    return
-                st.success("✅ Data Preprocessed Successfully!")
-                last_historical_date = y_original["ds"].max()
-                overall_status.info(f"🔍 Last Historical Date: {last_historical_date}")
-                time.sleep(0.5)
+                # Check if results are already cached in session state
+                if "model_results" not in st.session_state:
+                    with st.spinner("Computing forecasts. This may take a moment..."):
+                        forecast_results = compute_forecasting_results(
+                            data, date_column, sales_column, category_columns,
+                            demand_shock, seasonality_adjustment, external_shock,
+                            category_adjustments, category_date_ranges, time_budget
+                        )
+                        time.sleep(1)
+                    overall_status.success("✅ Forecasts computed and cached!")
+                    st.session_state.model_results = forecast_results["results"]
+                    st.session_state.y_original = forecast_results["y_original"]
+                    st.session_state.test = forecast_results["test"]
+                    st.session_state.best_params = forecast_results["best_params"]
+                    st.session_state.best_rmse = forecast_results["best_rmse"]
+                    st.session_state.last_historical_value = forecast_results["last_historical_value"]
+                else:
+                    overall_status.info("Using cached forecasting results...")
 
-                # 2) Apply scenarios
-                with st.spinner("🔍 Applying scenarios to training data..."):
-                    scenario_data = apply_scenarios(
-                        processed_data.copy(),
-                        demand_shock,
-                        seasonality_adjustment,
-                        external_shock,
-                        category_columns,
-                        category_adjustments,
-                        category_date_ranges
-                    )
-                    time.sleep(1)
-                st.success("✅ Scenarios Applied!")
-                time.sleep(0.5)
+                # Retrieve cached results
+                results = st.session_state.model_results
+                y_original = st.session_state.y_original
+                test = st.session_state.test
+                best_params = st.session_state.best_params
+                best_rmse = st.session_state.best_rmse
 
-                st.markdown(
-                    """
-                    <div style="text-align: center;">
-                        <h2 style="color: #2B3A42; font-size: 1.8em;">📅 Preprocessed Monthly Data</h2>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-                with st.expander("📊 View Processed Data"):
-                    st.dataframe(scenario_data.style.set_properties(**{"text-align": "center"}),
-                                 width=1400, height=450)
+                st.write(f"🔍 Best Prophet Params: {best_params}")
+                st.write(f"📉 Best RMSE (CV): {best_rmse:.2f}")
 
-                # 3) Split data
-                testing_period = int(len(scenario_data) * 0.2)
-                train = scenario_data.iloc[:-testing_period]
-                test = scenario_data.iloc[-testing_period:]
-                forecast_period = 24
-
-                overall_status.info("🚀 Starting forecasting process...")
-                time.sleep(1)
-
-                # 4) Find best Prophet hyperparameters
-                with st.spinner("🚀 Finding the best Prophet hyperparameters..."):
-                    best_params, best_rmse = find_best_prophet_params(train)
-                    time.sleep(1)
-                if best_params is None:
-                    st.error("No valid Prophet parameters were found.")
-                    return
-                st.success(f"✅ Best Prophet Params: {best_params}")
-                overall_status.write(f"📉 Best RMSE (CV): {best_rmse:.2f}")
-                time.sleep(1)
-
-                # 5) Train Prophet Model
-                with st.spinner("🚀 Training Prophet Model..."):
-                    prophet_model_name, prophet_res = train_prophet_model(
-                        train, test, forecast_period, best_params,
-                        last_historical_value, y_original
-                    )
-                    time.sleep(1)
-                prophet_status.success("✅ Prophet Model Training Complete!")
-
-                # 6) Train ARIMA Model
-                with st.spinner("🚀 Training ARIMA Model..."):
-                    arima_model_name, arima_res = train_arima_model(
-                        train, test, forecast_period,
-                        last_historical_value, y_original
-                    )
-                    time.sleep(1)
-                arima_status.success("✅ ARIMA Model Training Complete!")
-
-                # 7) Train XGBoost Model
-                with st.spinner("🚀 Training XGBoost Model..."):
-                    xgb_model_name, xgb_res = train_xgb_model(
-                        train, test, forecast_period,
-                        last_historical_value, y_original
-                    )
-                    time.sleep(1)
-                xgb_status.success("✅ XGBoost Model Training Complete!")
-
-                # 8) Train AutoML Model
-                with st.spinner("🚀 Training AutoML Model..."):
-                    automl_model_name, automl_res = train_automl_model(
-                        train, test, forecast_period,
-                        last_historical_value, y_original, time_budget
-                    )
-                    time.sleep(1)
-                automl_status.success("✅ AutoML Model Training Complete!")
-
-                # 9) Compile results
-                st.success("🎉 Forecasting process completed!")
-                time.sleep(1)
-                results = {
-                    prophet_model_name: prophet_res,
-                    arima_model_name: arima_res,
-                    xgb_model_name: xgb_res,
-                    automl_model_name: automl_res
-                }
-
-                # Store model results in session state
-                st.session_state.model_results = results
-
-                # 10) Display numerical performance comparison
+                # --- Display Numerical Performance Comparison ---
                 st.subheader("📌 Model Performance Comparison (Numerical)")
                 comparison_data = []
                 for model, res in results.items():
@@ -983,100 +951,135 @@ def main():
                 else:
                     st.error("No valid model results available for numerical comparison.")
 
-                # 11) Compute Shape Score and Combined Score for model selection
-                # Let the user adjust weights via sidebar
+                # --- Compute Shape Score and Combined Score for model selection ---
                 st.sidebar.markdown("### ⚖️ Model Selection Weights")
                 alpha = st.sidebar.slider("Weight for RMSE", 0.0, 1.0, 0.5)
                 beta = st.sidebar.slider("Weight for Shape Fit (Correlation)", 0.0, 1.0, 0.5)
-
-                # Check if model results are already computed
-                if "model_results" in st.session_state:
-                    # Retrieve model results from session state
-                    model_results = st.session_state.model_results
-
-                    # Compute shape scores and combined scores using the updated alpha and beta
-                    for model, res in model_results.items():
+                metrics_list = []
+                max_rmse_val = 0
+                for model, res in results.items():
+                    if isinstance(res, dict) and "Forecast" in res and res["Forecast"] is not None:
                         forecast_df = res["Forecast"]
-                        # Align test data and forecast predictions
+                        rmse = res["RMSE"]
+                        mape = res["MAPE"]
                         match_len = min(len(test["y"]), len(forecast_df))
-                        actual = test["y"].iloc[:match_len].values
-                        pred = forecast_df["yhat"].iloc[:match_len].values
+                        actual = test["y"].iloc[:match_len]
+                        pred = forecast_df["yhat"].iloc[:match_len]
                         corr = shape_score(actual, pred)
-                        res["Shape"] = corr
-
-                    # Compute combined scores
-                    max_rmse = max(res["RMSE"] for res in model_results.values())
-                    for model, res in model_results.items():
-                        res["Combined"] = combined_score(res["RMSE"], res["Shape"], max_rmse, alpha, beta)
-
-                    # Create a new comparison dataframe including shape and combined scores
-                    combined_data = []
-                    for model, res in model_results.items():
-                        combined_data.append({
+                        metrics_list.append({
                             "Model": model,
-                            "RMSE": res["RMSE"],
-                            "MAPE": res["MAPE"],
-                            "Shape (corr)": res["Shape"],
-                            "Combined Score": res["Combined"]
+                            "RMSE": rmse,
+                            "MAPE": mape,
+                            "Shape (corr)": corr
                         })
-                    combined_df = pd.DataFrame(combined_data).sort_values(by="Combined Score")
+                        if rmse > max_rmse_val:
+                            max_rmse_val = rmse
 
-                    # Display the updated comparison
-                    st.subheader("📌 Model Performance Comparison (Weighted)")
-                    st.dataframe(combined_df.style.highlight_min(subset=["Combined Score"], color="lightgreen"))
-
-                    best_model = combined_df.iloc[0]["Model"]
-                    st.success(f"✨ **AI-Selected Best Model (Combined):** {best_model}")
-                else:
-                    st.warning("No model results found. Please train the models first.")
-
-                # 12) Plot forecast (e.g., Multi-Model Forecast Visualization)
-                st.markdown("### 🔍 Forecast Comparison Across Models")
-                model_colors = {
-                    "Prophet": "blue",
-                    "ARIMA": "green",
-                    "XGBoost": "red",
-                    "AutoML": "purple"
-                }
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=y_original["ds"],
-                    y=y_original["y_original"],
-                    mode="lines",
-                    name="Historical Data",
-                    line=dict(color="black", width=2)
-                ))
-                for model_name, res in results.items():
-                    if "Forecast" in res and res["Forecast"] is not None and not res["Forecast"].empty:
-                        forecast_df = res["Forecast"]
-                        fig.add_trace(go.Scatter(
-                            x=forecast_df["ds"],
-                            y=forecast_df["yhat"],
-                            mode="lines",
-                            name=f"{model_name} Forecast",
-                            line=dict(width=2, color=model_colors.get(model_name, "gray"))
-                        ))
-                fig.update_layout(
-                    title="📊 Multi-Model Sales Forecast",
-                    xaxis_title="Date",
-                    yaxis_title="Sales",
-                    legend_title="Models",
-                    template="plotly_white"
-                )
-                st.plotly_chart(fig, use_container_width=True)
-
-                # 13) Download forecast data
-                st.markdown("### 📥 Download Forecast Data")
-                try:
-                    csv = results[best_model]["Forecast"].to_csv(index=False)
-                    st.download_button(
-                        label="📩 Download Best Model Forecast (CSV)",
-                        data=csv,
-                        file_name="forecast.csv",
-                        mime="text/csv"
+                if metrics_list:
+                    metrics_df = pd.DataFrame(metrics_list)
+                    st.write("### Raw Metrics (Including Shape)")
+                    st.dataframe(metrics_df)
+                    metrics_df["Combined Score"] = metrics_df.apply(
+                        lambda row: combined_score(row["RMSE"], row["Shape (corr)"], max_rmse_val, alpha, beta),
+                        axis=1
                     )
-                except Exception as e:
-                    st.error(f"❌ Error generating download file: {e}")
+                    st.write("### Combined Model Ranking")
+                    st.dataframe(metrics_df.sort_values("Combined Score").style.highlight_min(subset=["Combined Score"], color="lightgreen"))
+                    best_model = metrics_df.sort_values("Combined Score").iloc[0]["Model"]
+                    st.success(f"✨ **AI-Selected Best Model (Combined):** {best_model}")
+                    if best_model in results and "Forecast" in results[best_model]:
+                        forecast_data = results[best_model]["Forecast"]
+                    else:
+                        st.warning("No valid forecast data available.")
+                        forecast_data = None
+                else:
+                    st.error("No valid model results available for comparison.")
+                    best_model = None
+                    forecast_data = None
+
+                # --- Visualization and Insights ---
+                if forecast_data is not None and not forecast_data.empty:
+                    try:
+                        forecast_data["volatility"] = forecast_data["yhat"].rolling(3).std()
+                        forecast_data["risk"] = "✅ Stable"
+                        forecast_data.loc[forecast_data["volatility"] > forecast_data["volatility"].quantile(0.75), "risk"] = "⚠️ High Volatility"
+                        forecast_data.loc[forecast_data["volatility"] > forecast_data["volatility"].quantile(0.9), "risk"] = "❌ Major Decline"
+
+                        st.markdown("### 🚨 High-Risk Sales Periods Identified")
+                        st.dataframe(
+                            forecast_data[["ds", "yhat", "volatility", "risk"]].style.applymap(
+                                lambda x: "background-color: #FFDDC1" if x == "❌ Major Decline"
+                                else "background-color: #FFEEAA" if x == "⚠️ High Volatility"
+                                else "background-color: #C6ECAE",
+                                subset=["risk"]
+                            )
+                        )
+
+                        highest_point = forecast_data.loc[forecast_data["yhat"].idxmax()]
+                        lowest_point = forecast_data.loc[forecast_data["yhat"].idxmin()]
+                        projected_growth = ((forecast_data["yhat"].iloc[-1] - test["y"].iloc[-1]) / test["y"].iloc[-1]) * 100
+                        trend = "📈 **Growth Expected**" if projected_growth > 0 else "📉 **Potential Decline**"
+
+                        insights_text = f"""
+                        - **Projected Sales Growth:** {abs(projected_growth):.2f}% {trend}
+                        - **Peak Sales Expected:** ${highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}
+                        - **Lowest Predicted Sales:** ${lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}
+                        - **Optimal Decision Window:** Plan around peak sales in {highest_point['ds'].strftime('%B %Y')}
+                        - **Risk Zones Identified:** Check months marked as 🔥 'High-Risk' above
+                        - **Volatility Analysis:** Forecast suggests a {'stable' if abs(projected_growth) < 5 else 'fluctuating'} trend
+                        """
+                        with st.expander("🔮 AI-Powered Future Insights"):
+                            st.markdown(insights_text)
+                    except Exception as e:
+                        st.error(f"❌ Error analyzing forecast data: {e}")
+
+                    st.markdown("### 🔍 Forecast Comparison Across Models")
+                    model_colors = {
+                        "Prophet": "blue",
+                        "ARIMA": "green",
+                        "XGBoost": "red",
+                        "AutoML": "purple"
+                    }
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=y_original["ds"],
+                        y=y_original["y_original"],
+                        mode="lines",
+                        name="Historical Data",
+                        line=dict(color="black", width=2)
+                    ))
+                    for model_name, res in results.items():
+                        if "Forecast" in res and res["Forecast"] is not None and not res["Forecast"].empty:
+                            forecast_df = res["Forecast"]
+                            fig.add_trace(go.Scatter(
+                                x=forecast_df["ds"],
+                                y=forecast_df["yhat"],
+                                mode="lines",
+                                name=f"{model_name} Forecast",
+                                line=dict(width=2, color=model_colors.get(model_name, "gray"))
+                            ))
+                    fig.update_layout(
+                        title="📊 Multi-Model Sales Forecast",
+                        xaxis_title="Date",
+                        yaxis_title="Sales",
+                        legend_title="Models",
+                        template="plotly_white"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    st.markdown("### 📥 Download Forecast Data")
+                    try:
+                        csv = forecast_data.to_csv(index=False)
+                        st.download_button(
+                            label="📩 Download Best Model Forecast (CSV)",
+                            data=csv,
+                            file_name="forecast.csv",
+                            mime="text/csv"
+                        )
+                    except Exception as e:
+                        st.error(f"❌ Error generating download file: {e}")
+                else:
+                    st.warning("⚠️ No forecast data available for download or risk analysis.")
 
         except Exception as e:
             st.error(f"Error processing file: {e}")
