@@ -721,12 +721,11 @@ def combined_score(rmse, shape, max_rmse, alpha, beta):
     norm_rmse = rmse / max_rmse if max_rmse != 0 else 0
     return alpha * norm_rmse + beta * (1 - shape)
 
-# Cache heavy computations so slider changes don't force re-training.
 @st.experimental_memo(show_spinner=False)
 def compute_forecasting_results(data, date_column, sales_column, category_columns, 
                                 demand_shock, seasonality_adjustment, external_shock,
                                 category_adjustments, category_date_ranges, time_budget):
-    # Heavy computations: preprocessing, scenario application, model training/forecasting
+    # Preprocessing and scenario application
     processed_data, last_historical_value, y_original = preprocess_data(
         data, date_column, sales_column, category_columns
     )
@@ -772,6 +771,8 @@ def compute_forecasting_results(data, date_column, sales_column, category_column
         "last_historical_value": last_historical_value
     }
 
+# ---------- Main App ----------
+
 def main():
     user_id = "user123"
     subscription_level = "premium"
@@ -779,19 +780,19 @@ def main():
         st.warning("Upgrade to Premium to unlock advanced features!")
         st.stop()
 
-    # Define status placeholders at the very top so they're always available.
+    # Define status placeholders at the top
     overall_status = st.empty()
     prophet_status = st.empty()
     arima_status = st.empty()
     xgb_status = st.empty()
     automl_status = st.empty()
 
-    # Reset button
+    # Reset button to clear session state if needed.
     if st.button("🔄 Reset App"):
         st.session_state.clear()
         st.experimental_rerun()
 
-    # File uploader: store uploaded file in session state if needed.
+    # Store the uploaded file in session state
     if "data" not in st.session_state:
         st.session_state["data"] = None
 
@@ -818,52 +819,27 @@ def main():
 
     col1, col2, col3 = st.columns([1, 1, 1])
     with col1:
-        date_column = st.selectbox(
-            "📅 Select the Date Column:",
-            ["-- Select Column --"] + list(data.columns),
-            key="date_col"
-        )
+        date_column = st.selectbox("📅 Select the Date Column:", ["-- Select Column --"] + list(data.columns), key="date_col")
     with col2:
-        sales_column = st.selectbox(
-            "💰 Select the Sales Column:",
-            ["-- Select Column --"] + list(data.columns),
-            key="sales_col"
-        )
+        sales_column = st.selectbox("💰 Select the Sales Column:", ["-- Select Column --"] + list(data.columns), key="sales_col")
     with col3:
         if date_column == "-- Select Column --" or sales_column == "-- Select Column --":
             st.warning("Please select the Date and Sales columns first.")
             category_columns = None
         else:
-            category_columns = st.multiselect(
-                "🏷️ Select Category Columns (Optional):",
-                options=[col for col in data.columns if col not in [date_column, sales_column]],
-                key="category_cols"
-            )
+            category_columns = st.multiselect("🏷️ Select Category Columns (Optional):", options=[col for col in data.columns if col not in [date_column, sales_column]], key="category_cols")
 
     if date_column != "-- Select Column --":
         data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
 
     st.markdown("### ⏱️ AutoML Time Budget")
-    time_budget = st.slider(
-        "Set the time budget for AutoML training (in seconds):",
-        min_value=60,
-        max_value=1200,
-        value=300,
-        step=60,
-        help="Increase the time budget for larger datasets or more complex models."
-    )
+    time_budget = st.slider("Set the time budget for AutoML training (in seconds):", min_value=60, max_value=1200, value=300, step=60, help="Increase the time budget for larger datasets or more complex models.")
 
     # Scenario Planning on Sidebar
     if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
         st.sidebar.markdown("### 🎯 Scenario Planning")
-        demand_shock = st.sidebar.slider(
-            "Simulate Demand Shock (% Change in Sales):",
-            min_value=-50, max_value=50, value=0, step=5
-        )
-        seasonality_adjustment = st.sidebar.slider(
-            "Adjust Seasonality Strength (% Change):",
-            min_value=-50, max_value=50, value=0, step=5
-        )
+        demand_shock = st.sidebar.slider("Simulate Demand Shock (% Change in Sales):", min_value=-50, max_value=50, value=0, step=5)
+        seasonality_adjustment = st.sidebar.slider("Adjust Seasonality Strength (% Change):", min_value=-50, max_value=50, value=0, step=5)
         external_shock = st.sidebar.checkbox("Simulate External Shock (e.g., Economic Downturn)")
         if category_columns:
             st.sidebar.markdown("### 🎯 Scenario Planning by Category")
@@ -871,25 +847,10 @@ def main():
             category_date_ranges = {}
             for i, category_column in enumerate(category_columns):
                 st.sidebar.markdown(f"#### {category_column} Adjustments")
-                adjustment = st.sidebar.slider(
-                    f"Adjust Sales for {category_column} (% Change):",
-                    min_value=-50,
-                    max_value=50,
-                    value=10,
-                    step=5,
-                    key=f"category_adjustment_{i}"
-                )
+                adjustment = st.sidebar.slider(f"Adjust Sales for {category_column} (% Change):", min_value=-50, max_value=50, value=10, step=5, key=f"category_adjustment_{i}")
                 category_adjustments.append(adjustment)
-                start_date = st.sidebar.date_input(
-                    f"Start Date for {category_column}",
-                    value=data[date_column].min().to_pydatetime(),
-                    key=f"start_date_{i}"
-                )
-                end_date = st.sidebar.date_input(
-                    f"End Date for {category_column}",
-                    value=data[date_column].max().to_pydatetime(),
-                    key=f"end_date_{i}"
-                )
+                start_date = st.sidebar.date_input(f"Start Date for {category_column}", value=data[date_column].min().to_pydatetime(), key=f"start_date_{i}")
+                end_date = st.sidebar.date_input(f"End Date for {category_column}", value=data[date_column].max().to_pydatetime(), key=f"end_date_{i}")
                 if end_date < start_date:
                     st.sidebar.error(f"End date must be after start date for {category_column}.")
                 category_date_ranges[category_column] = (start_date, end_date)
@@ -907,6 +868,7 @@ def main():
 
     # ------------------- MAIN FORECAST LOGIC ------------------- #
     if start_forecast:
+        # Compute heavy forecasting results only once and cache them.
         if "model_results" not in st.session_state:
             with st.spinner("Computing forecasts. This may take a moment..."):
                 forecast_results = compute_forecasting_results(
@@ -951,6 +913,7 @@ def main():
         else:
             st.error("No valid model results available for numerical comparison.")
 
+        # Sidebar sliders for weighting (these are NOT part of the cached inputs)
         st.sidebar.markdown("### ⚖️ Model Selection Weights")
         alpha = st.sidebar.slider("Weight for RMSE", 0.0, 1.0, 0.5)
         beta = st.sidebar.slider("Weight for Shape Fit (Correlation)", 0.0, 1.0, 0.5)
@@ -1079,7 +1042,6 @@ def main():
         else:
             st.warning("⚠️ No forecast data available for download or risk analysis.")
 
-        # End of start_forecast block
     else:
         st.info("Please upload a sales data file to start forecasting.")
 
