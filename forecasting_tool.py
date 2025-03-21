@@ -965,23 +965,69 @@ def main():
                 # Store model results in session state
                 st.session_state.model_results = results
 
-                # 10) Display numerical performance comparison
-                st.subheader("📌 Model Performance Comparison (Numerical)")
-                comparison_data = []
-                for model, res in results.items():
-                    if isinstance(res, dict) and "RMSE" in res and "MAPE" in res:
-                        comparison_data.append({
-                            "Model": model,
-                            "RMSE": float(res["RMSE"]),
-                            "MAPE": float(res["MAPE"])
-                        })
+                # 10) Display numerical performance comparison and weighted comparison side by side
+                st.subheader("📌 Model Performance Comparison")
+
+                # Create two columns
+                col1, col2 = st.columns(2)
+
+                # Column 1: Numerical Performance Comparison
+                with col1:
+                    st.markdown("#### Numerical Performance")
+                    comparison_data = []
+                    for model, res in results.items():
+                        if isinstance(res, dict) and "RMSE" in res and "MAPE" in res:
+                            comparison_data.append({
+                                "Model": model,
+                                "RMSE": float(res["RMSE"]),
+                                "MAPE": float(res["MAPE"])
+                            })
+                        else:
+                            st.warning(f"Invalid result format for {model}.")
+                    if comparison_data:
+                        comparison_df = pd.DataFrame(comparison_data).sort_values(by="RMSE")
+                        st.dataframe(comparison_df.style.highlight_min(subset=["RMSE", "MAPE"], color="lightgreen"))
                     else:
-                        st.warning(f"Invalid result format for {model}.")
-                if comparison_data:
-                    comparison_df = pd.DataFrame(comparison_data).sort_values(by="RMSE")
-                    st.dataframe(comparison_df.style.highlight_min(subset=["RMSE", "MAPE"], color="lightgreen"))
-                else:
-                    st.error("No valid model results available for numerical comparison.")
+                        st.error("No valid model results available for numerical comparison.")
+
+                # Column 2: Weighted Performance Comparison
+                with col2:
+                    st.markdown("#### Weighted Performance")
+                    if st.session_state.model_results:
+                        # Compute shape scores and combined scores using the fixed alpha and beta
+                        for model, res in st.session_state.model_results.items():
+                            forecast_df = res["Forecast"]
+                            # Align test data and forecast predictions
+                            match_len = min(len(test["y"]), len(forecast_df))
+                            actual = test["y"].iloc[:match_len].values
+                            pred = forecast_df["yhat"].iloc[:match_len].values
+                            corr = shape_score(actual, pred)
+                            res["Shape"] = corr
+
+                        # Compute combined scores
+                        max_rmse = max(res["RMSE"] for res in st.session_state.model_results.values())
+                        for model, res in st.session_state.model_results.items():
+                            res["Combined"] = combined_score(res["RMSE"], res["Shape"], max_rmse, 0.5, 1.0)
+
+                        # Create a new comparison dataframe including shape and combined scores
+                        combined_data = []
+                        for model, res in st.session_state.model_results.items():
+                            combined_data.append({
+                                "Model": model,
+                                "RMSE": res["RMSE"],
+                                "MAPE": res["MAPE"],
+                                "Shape (corr)": res["Shape"],
+                                "Combined Score": res["Combined"]
+                            })
+                        combined_df = pd.DataFrame(combined_data).sort_values(by="Combined Score")
+
+                        # Display the weighted comparison
+                        st.dataframe(combined_df.style.highlight_min(subset=["Combined Score"], color="lightgreen"))
+
+                        best_model = combined_df.iloc[0]["Model"]
+                        st.success(f"✨ **AI-Selected Best Model (Combined):** {best_model}")
+                    else:
+                        st.warning("No model results found. Please train the models first.")
 
                 # 11) Compute Shape Score and Combined Score for model selection
                 if st.session_state.model_results:
