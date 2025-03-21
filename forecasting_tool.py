@@ -990,9 +990,12 @@ def main():
                 beta = st.sidebar.slider("Weight for Shape Fit (Correlation)", 0.0, 1.0, 0.5)
 
                 # Check if model results are already computed
-                if st.session_state.model_results:
+                if "model_results" in st.session_state:
+                    # Retrieve model results from session state
+                    model_results = st.session_state.model_results
+
                     # Compute shape scores and combined scores using the updated alpha and beta
-                    for model, res in st.session_state.model_results.items():
+                    for model, res in model_results.items():
                         forecast_df = res["Forecast"]
                         # Align test data and forecast predictions
                         match_len = min(len(test["y"]), len(forecast_df))
@@ -1002,13 +1005,13 @@ def main():
                         res["Shape"] = corr
 
                     # Compute combined scores
-                    max_rmse = max(res["RMSE"] for res in st.session_state.model_results.values())
-                    for model, res in st.session_state.model_results.items():
+                    max_rmse = max(res["RMSE"] for res in model_results.values())
+                    for model, res in model_results.items():
                         res["Combined"] = combined_score(res["RMSE"], res["Shape"], max_rmse, alpha, beta)
 
                     # Create a new comparison dataframe including shape and combined scores
                     combined_data = []
-                    for model, res in st.session_state.model_results.items():
+                    for model, res in model_results.items():
                         combined_data.append({
                             "Model": model,
                             "RMSE": res["RMSE"],
