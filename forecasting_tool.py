@@ -734,7 +734,12 @@ def main():
         st.warning("Upgrade to Premium to unlock advanced features!")
         st.stop()
 
-    # Placeholders for status messages (in addition to spinners)
+    # Reset button
+    if st.button("🔄 Reset App"):
+        st.session_state.clear()
+        st.experimental_rerun()
+
+    # Placeholders for status messages
     overall_status = st.empty()
     prophet_status = st.empty()
     arima_status = st.empty()
@@ -942,7 +947,7 @@ def main():
                 with st.spinner("🚀 Training AutoML Model..."):
                     automl_model_name, automl_res = train_automl_model(
                         train, test, forecast_period,
-                        last_historical_value, y_original
+                        last_historical_value, y_original, time_budget
                     )
                     time.sleep(1)
                 automl_status.success("✅ AutoML Model Training Complete!")
@@ -956,6 +961,9 @@ def main():
                     xgb_model_name: xgb_res,
                     automl_model_name: automl_res
                 }
+
+                # Store model results in session state
+                st.session_state.model_results = results
 
                 # 10) Display numerical performance comparison
                 st.subheader("📌 Model Performance Comparison (Numerical)")
@@ -981,36 +989,43 @@ def main():
                 alpha = st.sidebar.slider("Weight for RMSE", 0.0, 1.0, 0.5)
                 beta = st.sidebar.slider("Weight for Shape Fit (Correlation)", 0.0, 1.0, 0.5)
 
-                # For each model, compute the shape score on the test window and a combined score
-                for model, res in results.items():
-                    forecast_df = res["Forecast"]
-                    # Align test data and forecast predictions
-                    match_len = min(len(test["y"]), len(forecast_df))
-                    actual = test["y"].iloc[:match_len].values
-                    pred = forecast_df["yhat"].iloc[:match_len].values
-                    corr = shape_score(actual, pred)
-                    res["Shape"] = corr
+                # Check if model results are already computed
+                if st.session_state.model_results:
+                    # Compute shape scores and combined scores using the updated alpha and beta
+                    for model, res in st.session_state.model_results.items():
+                        forecast_df = res["Forecast"]
+                        # Align test data and forecast predictions
+                        match_len = min(len(test["y"]), len(forecast_df))
+                        actual = test["y"].iloc[:match_len].values
+                        pred = forecast_df["yhat"].iloc[:match_len].values
+                        corr = shape_score(actual, pred)
+                        res["Shape"] = corr
 
-                max_rmse = max(res["RMSE"] for res in results.values())
-                for model, res in results.items():
-                    res["Combined"] = combined_score(res["RMSE"], res["Shape"], max_rmse, alpha, beta)
+                    # Compute combined scores
+                    max_rmse = max(res["RMSE"] for res in st.session_state.model_results.values())
+                    for model, res in st.session_state.model_results.items():
+                        res["Combined"] = combined_score(res["RMSE"], res["Shape"], max_rmse, alpha, beta)
 
-                # Create a new comparison dataframe including shape and combined scores
-                combined_data = []
-                for model, res in results.items():
-                    combined_data.append({
-                        "Model": model,
-                        "RMSE": res["RMSE"],
-                        "MAPE": res["MAPE"],
-                        "Shape (corr)": res["Shape"],
-                        "Combined Score": res["Combined"]
-                    })
-                combined_df = pd.DataFrame(combined_data).sort_values(by="Combined Score")
-                st.subheader("📌 Model Performance Comparison (Weighted)")
-                st.dataframe(combined_df.style.highlight_min(subset=["Combined Score"], color="lightgreen"))
+                    # Create a new comparison dataframe including shape and combined scores
+                    combined_data = []
+                    for model, res in st.session_state.model_results.items():
+                        combined_data.append({
+                            "Model": model,
+                            "RMSE": res["RMSE"],
+                            "MAPE": res["MAPE"],
+                            "Shape (corr)": res["Shape"],
+                            "Combined Score": res["Combined"]
+                        })
+                    combined_df = pd.DataFrame(combined_data).sort_values(by="Combined Score")
 
-                best_model = combined_df.iloc[0]["Model"]
-                st.success(f"✨ **AI-Selected Best Model (Combined):** {best_model}")
+                    # Display the updated comparison
+                    st.subheader("📌 Model Performance Comparison (Weighted)")
+                    st.dataframe(combined_df.style.highlight_min(subset=["Combined Score"], color="lightgreen"))
+
+                    best_model = combined_df.iloc[0]["Model"]
+                    st.success(f"✨ **AI-Selected Best Model (Combined):** {best_model}")
+                else:
+                    st.warning("No model results found. Please train the models first.")
 
                 # 12) Plot forecast (e.g., Multi-Model Forecast Visualization)
                 st.markdown("### 🔍 Forecast Comparison Across Models")
