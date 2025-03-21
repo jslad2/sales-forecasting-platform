@@ -36,6 +36,8 @@ lightgbm = "==3.3.5"
 supabase = "*"
 python-dotenv = "*"
 catboost = "*"
+shap = "*"
+fpdf = "*"
 
 [dev-packages]
 

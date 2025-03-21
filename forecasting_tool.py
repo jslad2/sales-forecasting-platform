@@ -26,6 +26,8 @@ import catboost
 from tqdm import tqdm
 import concurrent.futures
 from scipy.stats import pearsonr
+import shap
+from fpdf import FPDF
 
 # Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
 st.set_page_config(layout="wide", page_title="Time Series Forecasting", page_icon="📈")
@@ -727,6 +729,53 @@ def combined_score(rmse, corr, max_rmse, alpha, beta):
     norm_rmse = rmse / max_rmse
     return alpha * norm_rmse + beta * (1 - corr)
 
+# Add customizable dashboard
+if st.button("Customize Dashboard"):
+    st.session_state.customize_dashboard = True
+
+if st.session_state.get("customize_dashboard", False):
+    st.write("### Customize Your Dashboard")
+    selected_models = st.multiselect(
+        "Select Models to Display",
+        options=["Prophet", "ARIMA", "XGBoost", "AutoML"],
+        default=["Prophet", "ARIMA", "XGBoost", "AutoML"]
+    )
+    st.session_state.selected_models = selected_models
+    if st.button("Save Preferences"):
+        st.session_state.customize_dashboard = False
+        st.experimental_rerun()
+
+# Add SHAP explainability
+def explain_model(model, X_train):
+    explainer = shap.Explainer(model)
+    shap_values = explainer(X_train)
+    return shap_values
+
+# Add ensemble forecasting
+def ensemble_forecast(results):
+    forecasts = []
+    for model_name, res in results.items():
+        if "Forecast" in res:
+            forecast_df = res["Forecast"].copy()
+            forecast_df = forecast_df.rename(columns={"yhat": model_name})
+            forecasts.append(forecast_df.set_index("ds"))
+    
+    if forecasts:
+        combined_forecast = pd.concat(forecasts, axis=1)
+        combined_forecast["Ensemble"] = combined_forecast.mean(axis=1)
+        return combined_forecast.reset_index()
+    return None
+
+# Add automated reporting
+def generate_report(results, best_model):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt="Forecast Report", ln=True, align="C")
+    pdf.cell(200, 10, txt=f"Best Model: {best_model}", ln=True, align="C")
+    pdf.output("forecast_report.pdf")
+
+# Main function
 def main():
     user_id = "user123"
     subscription_level = "premium"
@@ -1029,45 +1078,7 @@ def main():
                     else:
                         st.warning("No model results found. Please train the models first.")
 
-                # 11) Compute Shape Score and Combined Score for model selection
-                if st.session_state.model_results:
-                    # Compute shape scores and combined scores using the updated alpha and beta
-                    for model, res in st.session_state.model_results.items():
-                        forecast_df = res["Forecast"]
-                        # Align test data and forecast predictions
-                        match_len = min(len(test["y"]), len(forecast_df))
-                        actual = test["y"].iloc[:match_len].values
-                        pred = forecast_df["yhat"].iloc[:match_len].values
-                        corr = shape_score(actual, pred)
-                        res["Shape"] = corr
-
-                    # Compute combined scores
-                    max_rmse = max(res["RMSE"] for res in st.session_state.model_results.values())
-                    for model, res in st.session_state.model_results.items():
-                        res["Combined"] = combined_score(res["RMSE"], res["Shape"], max_rmse, 0.5, 1.0)
-
-                    # Create a new comparison dataframe including shape and combined scores
-                    combined_data = []
-                    for model, res in st.session_state.model_results.items():
-                        combined_data.append({
-                            "Model": model,
-                            "RMSE": res["RMSE"],
-                            "MAPE": res["MAPE"],
-                            "Shape (corr)": res["Shape"],
-                            "Combined Score": res["Combined"]
-                        })
-                    combined_df = pd.DataFrame(combined_data).sort_values(by="Combined Score")
-
-                    # Display the updated comparison
-                    st.subheader("📌 Model Performance Comparison (Weighted)")
-                    st.dataframe(combined_df.style.highlight_min(subset=["Combined Score"], color="lightgreen"))
-
-                    best_model = combined_df.iloc[0]["Model"]
-                    st.success(f"✨ **AI-Selected Best Model (Combined):** {best_model}")
-                else:
-                    st.warning("No model results found. Please train the models first.")
-
-                # 12) Plot forecast (e.g., Multi-Model Forecast Visualization)
+                # 11) Plot forecast (e.g., Multi-Model Forecast Visualization)
                 st.markdown("### 🔍 Forecast Comparison Across Models")
                 model_colors = {
                     "Prophet": "blue",
@@ -1102,7 +1113,7 @@ def main():
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
-                # 13) Download forecast data
+                # 12) Download forecast data
                 st.markdown("### 📥 Download Forecast Data")
                 try:
                     csv = results[best_model]["Forecast"].to_csv(index=False)
@@ -1114,6 +1125,17 @@ def main():
                     )
                 except Exception as e:
                     st.error(f"❌ Error generating download file: {e}")
+
+                # 13) Generate and download report
+                if st.button("Generate Report"):
+                    generate_report(results, best_model)
+                    with open("forecast_report.pdf", "rb") as f:
+                        st.download_button(
+                            label="Download Report",
+                            data=f,
+                            file_name="forecast_report.pdf",
+                            mime="application/pdf"
+                        )
 
         except Exception as e:
             st.error(f"Error processing file: {e}")
