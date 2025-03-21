@@ -925,14 +925,14 @@ def main():
                     time.sleep(1)
                 prophet_status.success("✅ Prophet Model Training Complete!")
 
-                # 6) Train ARIMA Model
-                with st.spinner("🚀 Training ARIMA Model..."):
-                    arima_model_name, arima_res = train_arima_model(
-                        train, test, forecast_period,
-                        last_historical_value, y_original
-                    )
-                    time.sleep(1)
-                arima_status.success("✅ ARIMA Model Training Complete!")
+                # # 6) Train ARIMA Model
+                # with st.spinner("🚀 Training ARIMA Model..."):
+                #     arima_model_name, arima_res = train_arima_model(
+                #         train, test, forecast_period,
+                #         last_historical_value, y_original
+                #     )
+                #     time.sleep(1)
+                # arima_status.success("✅ ARIMA Model Training Complete!")
 
                 # 7) Train XGBoost Model
                 with st.spinner("🚀 Training XGBoost Model..."):
