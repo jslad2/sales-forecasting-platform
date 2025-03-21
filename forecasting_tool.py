@@ -779,18 +779,24 @@ def main():
         st.warning("Upgrade to Premium to unlock advanced features!")
         st.stop()
 
-    # Reset button to clear session state if needed.
+    # Define status placeholders at the very top so they're always available.
+    overall_status = st.empty()
+    prophet_status = st.empty()
+    arima_status = st.empty()
+    xgb_status = st.empty()
+    automl_status = st.empty()
+
+    # Reset button
     if st.button("🔄 Reset App"):
         st.session_state.clear()
         st.experimental_rerun()
 
-    # Preserve the uploaded file in session state.
+    # File uploader: store uploaded file in session state if needed.
     if "data" not in st.session_state:
         st.session_state["data"] = None
 
     uploaded_file = st.file_uploader("Upload your sales data file", type=["csv"])
     if uploaded_file is not None:
-        # If a file is uploaded, store it in session state.
         st.session_state["data"] = pd.read_csv(uploaded_file)
 
     if st.session_state["data"] is None:
@@ -837,7 +843,6 @@ def main():
     if date_column != "-- Select Column --":
         data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
 
-    # Add Time Budget Slider for AutoML
     st.markdown("### ⏱️ AutoML Time Budget")
     time_budget = st.slider(
         "Set the time budget for AutoML training (in seconds):",
@@ -902,7 +907,6 @@ def main():
 
     # ------------------- MAIN FORECAST LOGIC ------------------- #
     if start_forecast:
-        # Use caching so heavy computations are only run once.
         if "model_results" not in st.session_state:
             with st.spinner("Computing forecasts. This may take a moment..."):
                 forecast_results = compute_forecasting_results(
@@ -921,7 +925,6 @@ def main():
         else:
             overall_status.info("Using cached forecasting results...")
 
-        # Retrieve cached results
         results = st.session_state["model_results"]
         y_original = st.session_state["y_original"]
         test = st.session_state["test"]
@@ -931,7 +934,6 @@ def main():
         st.write(f"🔍 Best Prophet Params: {best_params}")
         st.write(f"📉 Best RMSE (CV): {best_rmse:.2f}")
 
-        # --- Display Numerical Performance Comparison ---
         st.subheader("📌 Model Performance Comparison (Numerical)")
         comparison_data = []
         for model, res in results.items():
@@ -949,7 +951,6 @@ def main():
         else:
             st.error("No valid model results available for numerical comparison.")
 
-        # --- Compute Shape Score and Combined Score for model selection ---
         st.sidebar.markdown("### ⚖️ Model Selection Weights")
         alpha = st.sidebar.slider("Weight for RMSE", 0.0, 1.0, 0.5)
         beta = st.sidebar.slider("Weight for Shape Fit (Correlation)", 0.0, 1.0, 0.5)
@@ -995,7 +996,6 @@ def main():
             best_model = None
             forecast_data = None
 
-        # --- Visualization and Insights ---
         if forecast_data is not None and not forecast_data.empty:
             try:
                 forecast_data["volatility"] = forecast_data["yhat"].rolling(3).std()
@@ -1080,20 +1080,6 @@ def main():
             st.warning("⚠️ No forecast data available for download or risk analysis.")
 
         # End of start_forecast block
-
-        # End of try block
-        # If an error occurs, it will be caught below.
-        # (Optional: You might log errors to session state or a file.)
-        # End of uploaded_file block
-
-        # End of main()
-        # st.session_state keys remain for slider changes.
-        # Changing sliders now will re-run the script but use cached heavy results.
-        # The combined score table will update dynamically.
-        # Meanwhile, the file and heavy forecasting results remain in session state.
-        # This provides a smoother experience when adjusting model weights.
-        # 
-        # (If you still experience resets, ensure that you are not clearing session_state elsewhere.)
     else:
         st.info("Please upload a sales data file to start forecasting.")
 
