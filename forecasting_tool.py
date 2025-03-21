@@ -984,12 +984,6 @@ def main():
                     st.error("No valid model results available for numerical comparison.")
 
                 # 11) Compute Shape Score and Combined Score for model selection
-                # Let the user adjust weights via sidebar
-                st.sidebar.markdown("### ⚖️ Model Selection Weights")
-                alpha = st.sidebar.slider("Weight for RMSE", 0.0, 1.0, 0.5)
-                beta = st.sidebar.slider("Weight for Shape Fit (Correlation)", 0.0, 1.0, 0.5)
-
-                # Check if model results are already computed
                 if st.session_state.model_results:
                     # Compute shape scores and combined scores using the updated alpha and beta
                     for model, res in st.session_state.model_results.items():
@@ -1004,7 +998,7 @@ def main():
                     # Compute combined scores
                     max_rmse = max(res["RMSE"] for res in st.session_state.model_results.values())
                     for model, res in st.session_state.model_results.items():
-                        res["Combined"] = combined_score(res["RMSE"], res["Shape"], max_rmse, alpha, beta)
+                        res["Combined"] = combined_score(res["RMSE"], res["Shape"], max_rmse, 0.5, 1.0)
 
                     # Create a new comparison dataframe including shape and combined scores
                     combined_data = []
