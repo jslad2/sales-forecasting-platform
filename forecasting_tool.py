@@ -552,6 +552,8 @@ def train_automl_model(train, test, forecast_period, last_historical_value, y_or
             "yhat_lower": automl_forecast * 0.9,
             "yhat_upper": automl_forecast * 1.1
         })
+        # Apply forecast adjustments only (global and category-specific)
+        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
         if isinstance(last_historical_value, (int, float)):
             forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
             forecast_df["yhat_lower"] = inverse_difference(forecast_df["yhat_lower"], last_historical_value)
@@ -807,7 +809,8 @@ def main():
                 step_message.text(f"Step {step} of {total_steps}: Training XGBoost model...")
                 with st.spinner("🚀 Training XGBoost Model..."):
                     xgb_model_name, xgb_res = train_xgb_model(
-                        train, test, forecast_period, last_historical_value, y_original
+                        train, test, forecast_period, last_historical_value, y_original,
+                        demand_shock, seasonality_adjustment, external_shock, category_scenarios
                     )
                     time.sleep(1)
                 xgb_status.success("✅ XGBoost Model Training Complete!")
@@ -819,7 +822,8 @@ def main():
                 step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
                 with st.spinner("🚀 Training AutoML Model..."):
                     automl_model_name, automl_res = train_automl_model(
-                        train, test, forecast_period, last_historical_value, y_original, time_budget
+                        train, test, forecast_period, last_historical_value, y_original, time_budget,
+                        demand_shock, seasonality_adjustment, external_shock, category_scenarios
                     )
                     time.sleep(1)
                 automl_status.success("✅ AutoML Model Training Complete!")
