@@ -794,7 +794,8 @@ def main():
                 step_message.text(f"Step {step} of {total_steps}: Training ARIMA model...")
                 with st.spinner("🚀 Training ARIMA Model..."):
                     arima_model_name, arima_res = train_arima_model(
-                        train, test, forecast_period, last_historical_value, y_original, category_scenarios
+                        train, test, forecast_period, last_historical_value, y_original, 
+                        demand_shock, seasonality_adjustment, external_shock, category_scenarios
                     )
                     time.sleep(1)
                 arima_status.success("✅ ARIMA Model Training Complete!")
