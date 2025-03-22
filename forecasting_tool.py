@@ -34,10 +34,10 @@ st.set_page_config(layout="wide", page_title="Time Series Forecasting", page_ico
 if "theme" not in st.session_state:
     st.session_state.theme = "light"
 
-theme = st.radio("🌙 Theme Mode:", ["Light", "Dark"], index=0 if st.session_state.theme == "light" else 1)
+theme = st.radio("🌙 Theme Mode:", ["Light", "Dark"], index=0 if st.session_state.theme=="light" else 1)
 st.session_state.theme = theme
 
-if st.session_state.theme == "dark":
+if st.session_state.theme=="dark":
     st.markdown(
         """
         <style>
@@ -49,9 +49,7 @@ if st.session_state.theme == "dark":
             .stRadio div { color: white; }
             .stMarkdown { color: white; }
         </style>
-        """,
-        unsafe_allow_html=True,
-    )
+        """, unsafe_allow_html=True)
 else:
     st.markdown(
         """
@@ -64,9 +62,7 @@ else:
             .stRadio div { color: black; }
             .stMarkdown { color: black; }
         </style>
-        """,
-        unsafe_allow_html=True,
-    )
+        """, unsafe_allow_html=True)
 
 def check_stationarity(series):
     adf_result = adfuller(series, autolag="AIC")
@@ -82,25 +78,25 @@ def check_stationarity(series):
 
 def preprocess_data(data, date_column, sales_column, category_columns=None):
     """
-    Preprocess the uploaded data, check stationarity, and apply transformations if needed.
-    Returns a tuple of:
-        1) A DataFrame with columns "ds" and "y" (and optionally category columns) for further processing/scenario planning
-        2) The last historical value before differencing (if applied)
-        3) A copy of the original data for inspection
-    Also, it creates a re_agg_chart DataFrame aggregated by "ds" only for a cleaner single-line chart.
+    Preprocess the uploaded data for Prophet.
+    Returns:
+      - data: DataFrame with columns ds, y, and category columns (if provided)
+      - last_historical_value: The last y value (if differencing applied)
+      - y_original: A copy of the processed data for inspection
+      Also, creates a re-aggregated DataFrame for a clean monthly chart.
     """
     try:
-        # 1. Convert date column to datetime
+        # 1. Convert date column to datetime and drop missing rows
         data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
         data.dropna(subset=[date_column, sales_column], inplace=True)
 
-        # 2. Rename columns for Prophet compatibility
+        # 2. Rename columns for Prophet
         data = data.rename(columns={date_column: "ds", sales_column: "y"})
 
-        # 3. Create a 'monthly' period column
+        # 3. Create monthly period column
         data["year_month"] = data["ds"].dt.to_period("M")
 
-        # 4. Determine grouping columns
+        # 4. Group by year_month and category columns (if provided)
         if category_columns:
             if not isinstance(category_columns, list):
                 category_columns = [category_columns]
@@ -108,14 +104,14 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
         else:
             grouping_cols = ["year_month"]
 
-        # 5. Aggregate (sum) sales at the monthly + category level
         data = data.groupby(grouping_cols, as_index=False)["y"].sum()
 
-        # 6. Convert 'year_month' back to datetime (start-of-month)
-        data["ds"] = data["year_month"].dt.to_timestamp(how="start")
+        # 5. Convert year_month back to datetime (start-of-month)
+        data["ds"] = pd.to_datetime(data["year_month"].dt.to_timestamp(how="start").dt.strftime("%Y-%m"),
+                                    format="%Y-%m")
         data.drop(columns=["year_month"], inplace=True)
 
-        # 7. Remove duplicates if any
+        # 6. Remove duplicates
         if category_columns:
             subset_cols = ["ds", "y"] + category_columns
         else:
@@ -124,17 +120,16 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             st.warning("⚠️ Duplicate date/category combinations found. Removing duplicates...")
             data = data.drop_duplicates(subset=subset_cols, keep="last")
 
-        # 8. Keep a copy for inspection. If categories exist, keep them all; otherwise, just ds,y.
+        # 7. Save original processed data for inspection (keep category columns if exist)
         if category_columns:
             y_original = data.copy()
         else:
             y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
 
-        # 9. For a single-line chart, re-aggregate to monthly totals only (dropping categories).
-        #    This ensures the chart won't look "crazy" when categories are present.
+        # 8. Re-aggregate data by ds for charting (to get a single line per month)
         re_agg_chart = data.groupby("ds", as_index=False)["y"].sum()
 
-        # 10. Check stationarity on the *aggregated* values
+        # 9. Check stationarity on the aggregated series
         stationarity_result = check_stationarity(re_agg_chart["y"])
         st.markdown(
             f"""
@@ -146,15 +141,12 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             unsafe_allow_html=True,
         )
 
-        # 11. If non-stationary, apply differencing
+        # 10. If non-stationary, apply differencing to the aggregated series (for chart)
         if stationarity_result == "Non-Stationary":
-            st.warning("Applying differencing to stabilize the series.")
-
-            # Perform differencing on the aggregated chart data
+            st.warning("Applying differencing to stabilize the aggregated series.")
             re_agg_chart["y_diff"] = re_agg_chart["y"].diff()
             last_historical_value = re_agg_chart["y"].iloc[-1]
 
-            # Visualization: Original vs Differenced (aggregated)
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=re_agg_chart["ds"],
@@ -178,19 +170,8 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
                 xaxis_tickformat="%Y-%m"
             )
             st.plotly_chart(fig, use_container_width=True)
-
-            # Also differencing the main data (with categories) if needed
-            # For scenario planning, you might want to keep categories undifferenced.
-            # But if you want the entire dataset differenced, do similarly:
-            # data["y_diff"] = data.groupby(category_columns)["y"].transform(lambda x: x.diff())  # If you want to differ by group
-            # ...
-            # For simplicity, let's just differ the aggregated chart. The main data can remain as-is.
-
-            # Return the main data + the last historical value + original
             return data, last_historical_value, y_original
-
         else:
-            # Visualization for stationary aggregated data
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=re_agg_chart["ds"],
@@ -207,7 +188,6 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
                 xaxis_tickformat="%Y-%m"
             )
             st.plotly_chart(fig, use_container_width=True)
-
             data = data.reset_index(drop=True)
             return data, None, y_original
 
@@ -292,18 +272,9 @@ def find_best_prophet_params(train):
 def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     """
     Apply global and category-specific scenario adjustments.
-    
     Global adjustments (demand shock, seasonality, external shock) are applied first.
     Then, if provided, category-specific adjustments from the dynamic dictionary 'category_scenarios'
-    are applied. The expected structure is:
-    
-    {
-      "col1": {
-           "cat1": {"adjustment": 10, "start_date": <date>, "end_date": <date>},
-           "cat2": {"adjustment": -20, "start_date": <date>, "end_date": <date>}
-      },
-      "col2": { ... }
-    }
+    are applied.
     """
     try:
         if data is None or data.empty:
@@ -326,7 +297,7 @@ def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock, 
             data["y"] = data["y"] * 0.8
             st.write("✅ Applied global external shock: 20% reduction in sales")
 
-        # Category-specific adjustments using the dynamic dictionary
+        # Category-specific adjustments
         if category_scenarios:
             st.write("🔍 Applying category-specific adjustments...")
             for col, cat_dict in category_scenarios.items():
@@ -342,10 +313,7 @@ def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock, 
                         st.write(f"ℹ️ No rows found for '{cat_val}' in '{col}' between {start_date.date()} and {end_date.date()}.")
                         continue
                     data.loc[mask, "y"] *= (1 + adjustment / 100)
-                    st.write(
-                        f"✅ Applied {adjustment}% adjustment to '{cat_val}' in '{col}' "
-                        f"(from {start_date.date()} to {end_date.date()})"
-                    )
+                    st.write(f"✅ Applied {adjustment}% adjustment to '{cat_val}' in '{col}' (from {start_date.date()} to {end_date.date()}).")
         else:
             st.warning("⚠️ No category-specific adjustments provided. Skipping this step.")
 
@@ -433,6 +401,7 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, y_origi
         max_lag = min(12, len(train) - 1)
         rolling_windows = [3, 6] if len(train) > 6 else [3]
         data_xgb = train.copy()
+        # Create lag features
         for lag in range(1, max_lag + 1):
             data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
         for window in rolling_windows:
@@ -444,7 +413,8 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, y_origi
         data_xgb["sin_month"] = np.sin(2 * np.pi * data_xgb["month"] / 12)
         data_xgb["cos_month"] = np.cos(2 * np.pi * data_xgb["month"] / 12)
         data_xgb.dropna(inplace=True)
-        feature_cols = [col for col in data_xgb.columns if col not in ["y", "ds"]]
+        # Drop non-numeric columns (e.g., CUSTOMERNAME) from features
+        feature_cols = [col for col in data_xgb.columns if col not in ["y", "ds"] and np.issubdtype(data_xgb[col].dtype, np.number)]
         X_train = data_xgb[feature_cols]
         y_train = data_xgb["y"]
         model = XGBRegressor(
@@ -456,6 +426,7 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, y_origi
             n_jobs=-1
         )
         model.fit(X_train, y_train)
+        # Iterative forecasting
         future_forecasts = []
         last_row = data_xgb.iloc[-1].copy()
         last_date = train["ds"].iloc[-1]
@@ -472,6 +443,7 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, y_origi
             X_future = pd.DataFrame([future_row])
             pred = model.predict(X_future)[0]
             future_forecasts.append(pred)
+            # Shift lag features
             for lag in range(max_lag, 1, -1):
                 last_row[f"lag_{lag}"] = last_row[f"lag_{lag-1}"]
             last_row["lag_1"] = pred
@@ -589,8 +561,10 @@ def train_automl_model(train, test, forecast_period, last_historical_value, y_or
             forecast_df["yhat_lower"] = inverse_difference(forecast_df["yhat_lower"], last_historical_value)
             forecast_df["yhat_upper"] = inverse_difference(forecast_df["yhat_upper"], last_historical_value)
         matching_length = min(len(test["y"]), len(forecast_df))
-        rmse = np.sqrt(mean_squared_error(test["y"].values, forecast_df["yhat"][:len(test["y"])]))
-        mape = mean_absolute_percentage_error(test["y"].values, forecast_df["yhat"][:len(test["y"])])
+        rmse = np.sqrt(mean_squared_error(test["y"].iloc[:matching_length].values,
+                                          forecast_df["yhat"].iloc[:matching_length].values))
+        mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length].values,
+                                               forecast_df["yhat"].iloc[:matching_length].values)
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
     except Exception as e:
         st.error(f"AutoML Model failed: {e}")
@@ -767,7 +741,20 @@ def main():
                         category_scenarios=category_scenarios
                     )
                     time.sleep(1)
-                st.success("✅ Scenarios Applied!")
+                # Only display success message if any adjustment was made
+                adjustments_made = (demand_shock != 0 or seasonality_adjustment != 0 or external_shock)
+                if category_scenarios:
+                    for col, cat_dict in category_scenarios.items():
+                        for cat_val, details in cat_dict.items():
+                            if details.get("adjustment", 0) != 0:
+                                adjustments_made = True
+                                break
+                        if adjustments_made:
+                            break
+                if adjustments_made:
+                    st.success("✅ Scenarios Applied!")
+                else:
+                    st.info("No scenario adjustments were made.")
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(0.5)
                 step += 1
@@ -807,9 +794,7 @@ def main():
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training Prophet model...")
                 with st.spinner("🚀 Training Prophet Model..."):
-                    prophet_model_name, prophet_res = train_prophet_model(
-                        train, test, forecast_period, best_params, last_historical_value, y_original
-                    )
+                    prophet_model_name, prophet_res = train_prophet_model(train, test, forecast_period, best_params, last_historical_value, y_original)
                     time.sleep(1)
                 prophet_status.success("✅ Prophet Model Training Complete!")
                 progress_bar.progress(int((step / total_steps) * 100))
@@ -817,9 +802,7 @@ def main():
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training ARIMA model...")
                 with st.spinner("🚀 Training ARIMA Model..."):
-                    arima_model_name, arima_res = train_arima_model(
-                        train, test, forecast_period, last_historical_value, y_original
-                    )
+                    arima_model_name, arima_res = train_arima_model(train, test, forecast_period, last_historical_value, y_original)
                     time.sleep(1)
                 arima_status.success("✅ ARIMA Model Training Complete!")
                 progress_bar.progress(int((step / total_steps) * 100))
@@ -827,9 +810,7 @@ def main():
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training XGBoost model...")
                 with st.spinner("🚀 Training XGBoost Model..."):
-                    xgb_model_name, xgb_res = train_xgb_model(
-                        train, test, forecast_period, last_historical_value, y_original
-                    )
+                    xgb_model_name, xgb_res = train_xgb_model(train, test, forecast_period, last_historical_value, y_original)
                     time.sleep(1)
                 xgb_status.success("✅ XGBoost Model Training Complete!")
                 progress_bar.progress(int((step / total_steps) * 100))
@@ -837,9 +818,7 @@ def main():
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
                 with st.spinner("🚀 Training AutoML Model..."):
-                    automl_model_name, automl_res = train_automl_model(
-                        train, test, forecast_period, last_historical_value, y_original, time_budget
-                    )
+                    automl_model_name, automl_res = train_automl_model(train, test, forecast_period, last_historical_value, y_original, time_budget)
                     time.sleep(1)
                 automl_status.success("✅ AutoML Model Training Complete!")
                 progress_bar.progress(int((step / total_steps) * 100))
@@ -854,31 +833,36 @@ def main():
                     xgb_model_name: xgb_res,
                     automl_model_name: automl_res
                 }
-                st.session_state.model_results = results
+                # Only keep models that successfully produced a forecast
+                valid_results = {model: res for model, res in results.items() if res.get("Forecast") is not None}
+                if not valid_results:
+                    st.error("No valid model forecasts produced.")
+                    return
+                st.session_state.model_results = valid_results
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Displaying model performance comparison...")
-                if st.session_state.model_results:
-                    for model, res in st.session_state.model_results.items():
-                        forecast_df = res["Forecast"]
-                        match_len = min(len(test["y"]), len(forecast_df))
-                        actual = test["y"].iloc[:match_len].values
-                        pred = forecast_df["yhat"].iloc[:match_len].values
-                        corr = shape_score(actual, pred)
-                        res["Shape (corr)"] = corr
+                comparison_data = []
+                for model, res in st.session_state.model_results.items():
+                    forecast_df = res["Forecast"]
+                    match_len = min(len(test["y"]), len(forecast_df))
+                    actual = test["y"].iloc[:match_len].values
+                    pred = forecast_df["yhat"].iloc[:match_len].values
+                    corr = shape_score(actual, pred)
+                    res["Shape (corr)"] = corr
+                    comparison_data.append({
+                        "Model": model,
+                        "RMSE": res["RMSE"],
+                        "MAPE": res["MAPE"],
+                        "Shape (corr)": res["Shape (corr)"]
+                    })
+                if comparison_data:
                     max_rmse = max(res["RMSE"] for res in st.session_state.model_results.values())
                     for model, res in st.session_state.model_results.items():
                         res["Combined Score"] = combined_score(res["RMSE"], res["Shape (corr)"], max_rmse, 0.5, 1.0)
-                    comparison_data = []
-                    for model, res in st.session_state.model_results.items():
-                        comparison_data.append({
-                            "Model": model,
-                            "RMSE": res["RMSE"],
-                            "MAPE": res["MAPE"],
-                            "Shape (corr)": res["Shape (corr)"],
-                            "Combined Score": res["Combined Score"]
-                        })
+                    for item in comparison_data:
+                        item["Combined Score"] = combined_score(item["RMSE"], item["Shape (corr)"], max_rmse, 0.5, 1.0)
                     comparison_df = pd.DataFrame(comparison_data).sort_values(by="Combined Score")
                     st.dataframe(comparison_df.style.highlight_min(subset=["Combined Score"], color="lightgreen"))
                     best_model = comparison_df.iloc[0]["Model"]
@@ -904,16 +888,15 @@ def main():
                     name="Historical Data",
                     line=dict(color="black", width=2)
                 ))
-                for model_name, res in results.items():
-                    if "Forecast" in res and res["Forecast"] is not None and not res["Forecast"].empty:
-                        forecast_df = res["Forecast"]
-                        fig.add_trace(go.Scatter(
-                            x=forecast_df["ds"],
-                            y=forecast_df["yhat"],
-                            mode="lines",
-                            name=f"{model_name} Forecast",
-                            line=dict(width=2, color=model_colors.get(model_name, "gray"))
-                        ))
+                for model_name, res in st.session_state.model_results.items():
+                    forecast_df = res["Forecast"]
+                    fig.add_trace(go.Scatter(
+                        x=forecast_df["ds"],
+                        y=forecast_df["yhat"],
+                        mode="lines",
+                        name=f"{model_name} Forecast",
+                        line=dict(width=2, color=model_colors.get(model_name, "gray"))
+                    ))
                 fig.update_layout(
                     title="📊 Multi-Model Sales Forecast",
                     xaxis_title="Date",
@@ -927,7 +910,7 @@ def main():
                 step_message.text("All steps completed!")
                 st.markdown("### 📥 Download Forecast Data")
                 try:
-                    csv = results[best_model]["Forecast"].to_csv(index=False)
+                    csv = st.session_state.model_results[best_model]["Forecast"].to_csv(index=False)
                     st.download_button(
                         label="📩 Download Best Model Forecast (CSV)",
                         data=csv,
@@ -936,7 +919,6 @@ def main():
                     )
                 except Exception as e:
                     st.error(f"❌ Error generating download file: {e}")
-
         except Exception as e:
             st.error(f"Error processing file: {e}")
 
