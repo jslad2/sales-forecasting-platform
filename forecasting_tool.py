@@ -149,7 +149,6 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             # Ensure category_columns is a list (even if it's a single column)
             if not isinstance(category_columns, list):
                 category_columns = [category_columns]
-
             # Group by monthly period + category columns
             grouping_cols = ["year_month"] + category_columns
         else:
@@ -159,8 +158,10 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
         # 5. Aggregate (sum) sales at the monthly level
         data = data.groupby(grouping_cols, as_index=False)["y"].sum()
 
-        # 6. Convert 'year_month' back to a proper datetime (start of each month)
-        data["ds"] = data["year_month"].dt.to_timestamp()
+        # 6. Convert 'year_month' back to a proper datetime.
+        # We use the start of the month and reformat to "YYYY-MM" so that the day is not shown.
+        data["ds"] = pd.to_datetime(data["year_month"].dt.to_timestamp(how="start").dt.strftime("%Y-%m"),
+                                    format="%Y-%m")
         data.drop(columns=["year_month"], inplace=True)
 
         # 7. Check for duplicate dates (and categories) after aggregation
@@ -209,13 +210,14 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             ))
             fig.update_layout(
                 title="Original vs Differenced Series (Monthly)",
-                xaxis_title="Date",
+                xaxis_title="Date (YYYY-MM)",
                 yaxis_title="Sales",
-                template="plotly_white"
+                template="plotly_white",
+                xaxis_tickformat="%Y-%m"
             )
             st.plotly_chart(fig, use_container_width=True)
 
-            # Remove NaNs from differencing
+            # Remove NaNs from differencing and clean up the DataFrame
             differenced_data = data.dropna(subset=["y_diff"]).drop(columns=["y"])
             differenced_data = differenced_data.rename(columns={"y_diff": "y"})
             differenced_data = differenced_data.reset_index(drop=True)
@@ -234,10 +236,11 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
                 line=dict(color="blue", width=2)
             ))
             fig.update_layout(
-                title="📊 Original Series (Monthly)",
-                xaxis_title="Date",
+                title="Original Series (Monthly)",
+                xaxis_title="Date (YYYY-MM)",
                 yaxis_title="Sales",
-                template="plotly_white"
+                template="plotly_white",
+                xaxis_tickformat="%Y-%m"
             )
             st.plotly_chart(fig, use_container_width=True)
 
