@@ -1093,7 +1093,8 @@ def main():
                     xaxis_title="Date",
                     yaxis_title="Sales",
                     legend_title="Models",
-                    template="plotly_white"
+                    template="plotly_white",
+                    xaxis_tickformat="%Y-%m"
                 )
                 st.plotly_chart(fig, use_container_width=True)
                 progress_bar.progress(100)
