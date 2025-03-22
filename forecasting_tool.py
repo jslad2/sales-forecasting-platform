@@ -141,9 +141,6 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             data["y_diff"] = data["y"].diff()
             last_historical_value = data["y"].iloc[-1]
 
-            # Debug: show last rows
-            st.write("DEBUG: Last rows of data BEFORE differencing:", data.tail())
-
             # Visualization
             fig = go.Figure()
             fig.add_trace(go.Scatter(
@@ -174,7 +171,6 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             differenced_data = differenced_data.reset_index(drop=True)
             differenced_data.columns = differenced_data.columns.astype(str)
 
-            st.write("DEBUG: Last rows of data AFTER differencing:", differenced_data.tail())
             return differenced_data[["ds", "y"]], last_historical_value, y_original
 
         else:
@@ -291,8 +287,26 @@ def find_best_prophet_params(train):
                 best_params = params
     return best_params, best_rmse
 
-def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock,
-                    category_columns=None, category_adjustments=None, category_date_ranges=None):
+def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
+    """
+    Apply scenario adjustments to the data.
+    
+    Global adjustments (demand shock, seasonality, external shock) are applied first.
+    Then, if provided, category-specific adjustments from the dynamic dictionary 'category_scenarios'
+    are applied. This dictionary is expected to have the following structure:
+    
+    {
+      "column_name1": {
+           "category_value1": {"adjustment": 10, "start_date": <date>, "end_date": <date>},
+           "category_value2": {"adjustment": -20, "start_date": <date>, "end_date": <date>},
+           ...
+      },
+      "column_name2": { ... }
+    }
+    
+    Returns:
+        The modified DataFrame.
+    """
     try:
         if data is None or data.empty:
             st.error("❌ No data provided. Please check your input.")
@@ -302,47 +316,51 @@ def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock,
             st.error("❌ Required columns 'ds' (date) and 'y' (sales) are missing.")
             return data
 
+        # Global demand shock
         if demand_shock != 0:
             data["y"] = data["y"] * (1 + demand_shock / 100)
             st.write(f"✅ Applied global demand shock: {demand_shock}%")
 
+        # Global seasonality adjustment
         if seasonality_adjustment != 0:
             data["month"] = data["ds"].dt.month
             seasonality_multiplier = 1 + seasonality_adjustment / 100
-            data["y"] = data["y"] * (
-                1 + (data["month"] - 1) * (seasonality_multiplier - 1) / 12
-            )
+            data["y"] = data["y"] * (1 + (data["month"] - 1) * (seasonality_multiplier - 1) / 12)
             st.write(f"✅ Applied global seasonality adjustment: {seasonality_adjustment}%")
 
+        # Global external shock
         if external_shock:
-            data["y"] = data["y"] * 0.8
+            data["y"] = data["y"] * 0.8  # 20% reduction in sales
             st.write("✅ Applied global external shock: 20% reduction in sales")
 
-        if category_columns and category_adjustments and category_date_ranges:
+        # Category-specific adjustments using the dynamic dictionary
+        if category_scenarios:
             st.write("🔍 Applying category-specific adjustments...")
-            for category_column, category_adjustment in zip(category_columns, category_adjustments):
-                if category_column in data.columns:
-                    start_date, end_date = category_date_ranges[category_column]
-                    start_date = pd.to_datetime(start_date)
-                    end_date = pd.to_datetime(end_date)
+            for col, cat_dict in category_scenarios.items():
+                if col not in data.columns:
+                    st.warning(f"⚠️ Column '{col}' not found in the dataset. Skipping adjustments for this column.")
+                    continue
 
-                    scenario_data = data[(data["ds"] >= start_date) & (data["ds"] <= end_date)]
-                    for category in scenario_data[category_column].unique():
-                        scenario_data.loc[scenario_data[category_column] == category, "y"] *= (
-                            1 + category_adjustment / 100
-                        )
-                        st.write(
-                            f"✅ Applied {category_adjustment}% adjustment to {category_column}: {category} "
-                            f"(from {start_date.date()} to {end_date.date()})"
-                        )
-                    data.update(scenario_data)
-                else:
-                    st.warning(
-                        f"⚠️ Column '{category_column}' not found in the dataset. "
-                        f"Skipping adjustments for this category."
+                # Process each category value in the current column
+                for cat_val, details in cat_dict.items():
+                    adjustment = details.get("adjustment", 0)
+                    start_date = pd.to_datetime(details.get("start_date"))
+                    end_date = pd.to_datetime(details.get("end_date"))
+
+                    # Filter rows that fall within the specified date range and match the category value
+                    mask = (data["ds"] >= start_date) & (data["ds"] <= end_date) & (data[col] == cat_val)
+                    if mask.sum() == 0:
+                        st.write(f"ℹ️ No rows found for '{cat_val}' in '{col}' between {start_date.date()} and {end_date.date()}.")
+                        continue
+
+                    # Apply adjustment
+                    data.loc[mask, "y"] *= (1 + adjustment / 100)
+                    st.write(
+                        f"✅ Applied {adjustment}% adjustment to '{cat_val}' in '{col}' "
+                        f"(from {start_date.date()} to {end_date.date()})"
                     )
-        elif category_columns:
-            st.warning("⚠️ No time period selected for category-specific adjustments. Skipping.")
+        else:
+            st.warning("⚠️ No category-specific adjustments provided. Skipping this step.")
 
         return data
 
@@ -740,52 +758,65 @@ def main():
                 help="Increase the time budget for larger datasets or more complex models."
             )
 
+            # Define global scenario planning variables
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
                 st.sidebar.markdown("### 🎯 Scenario Planning")
                 demand_shock = st.sidebar.slider(
                     "Simulate Demand Shock (% Change in Sales):",
-                    min_value=-50, max_value=50, value=0, step=5
+                    min_value=-50,
+                    max_value=50,
+                    value=0,
+                    step=5
                 )
                 seasonality_adjustment = st.sidebar.slider(
                     "Adjust Seasonality Strength (% Change):",
-                    min_value=-50, max_value=50, value=0, step=5
+                    min_value=-50,
+                    max_value=50,
+                    value=0,
+                    step=5
                 )
                 external_shock = st.sidebar.checkbox("Simulate External Shock (e.g., Economic Downturn)")
 
+                # Build dynamic category adjustments dictionary
+                category_scenarios = {}
                 if category_columns:
-                    st.sidebar.markdown("### 🎯 Scenario Planning by Category")
-                    category_adjustments = []
-                    category_date_ranges = {}
-                    for i, category_column in enumerate(category_columns):
-                        st.sidebar.markdown(f"#### {category_column} Adjustments")
-                        adjustment = st.sidebar.slider(
-                            f"Adjust Sales for {category_column} (% Change):",
-                            min_value=-50,
-                            max_value=50,
-                            value=10,
-                            step=5,
-                            key=f"category_adjustment_{i}"
-                        )
-                        category_adjustments.append(adjustment)
-                        start_date = st.sidebar.date_input(
-                            f"Start Date for {category_column}",
-                            value=data[date_column].min().to_pydatetime(),
-                            key=f"start_date_{i}"
-                        )
-                        end_date = st.sidebar.date_input(
-                            f"End Date for {category_column}",
-                            value=data[date_column].max().to_pydatetime(),
-                            key=f"end_date_{i}"
-                        )
-                        if end_date < start_date:
-                            st.sidebar.error(f"End date must be after start date for {category_column}.")
-                        category_date_ranges[category_column] = (start_date, end_date)
+                    st.sidebar.markdown("### 🎯 Scenario Planning by Category (Dynamic)")
+                    for col in category_columns:
+                        st.sidebar.markdown(f"#### Adjustments for {col}")
+                        unique_cats = data[col].dropna().unique()
+                        category_scenarios[col] = {}
+                        for cat in unique_cats:
+                            with st.sidebar.expander(f"Adjust '{cat}' in '{col}'"):
+                                cat_adjust = st.slider(
+                                    f"Percentage change for '{cat}'",
+                                    min_value=-50,
+                                    max_value=50,
+                                    value=0,
+                                    step=5,
+                                    help=f"Adjust sales for category '{cat}' within column '{col}'"
+                                )
+                                cat_start = st.date_input(
+                                    f"Start date for '{cat}'",
+                                    value=data[date_column].min().to_pydatetime()
+                                )
+                                cat_end = st.date_input(
+                                    f"End date for '{cat}'",
+                                    value=data[date_column].max().to_pydatetime()
+                                )
+                                category_scenarios[col][cat] = {
+                                    "adjustment": cat_adjust,
+                                    "start_date": cat_start,
+                                    "end_date": cat_end
+                                }
                 else:
                     st.sidebar.markdown("ℹ️ No category columns selected. Category-based scenario planning is disabled.")
-                    category_adjustments = None
-                    category_date_ranges = None
             else:
                 st.sidebar.warning("Please select the Date and Sales columns to enable scenario planning.")
+                # Set default values to prevent undefined errors
+                demand_shock = 0
+                seasonality_adjustment = 0
+                external_shock = False
+                category_scenarios = {}
 
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
                 start_forecast = st.button("✅ Start Forecast", key="start_btn",
@@ -814,13 +845,11 @@ def main():
                 step_message.text(f"Step {step} of {total_steps}: Applying business scenarios...")
                 with st.spinner("🔍 Applying scenarios to training data..."):
                     scenario_data = apply_scenarios(
-                        processed_data.copy(),
-                        demand_shock,
-                        seasonality_adjustment,
-                        external_shock,
-                        category_columns,
-                        category_adjustments,
-                        category_date_ranges
+                        data=processed_data.copy(),
+                        demand_shock=demand_shock,
+                        seasonality_adjustment=seasonality_adjustment,
+                        external_shock=external_shock,
+                        category_scenarios=category_scenarios
                     )
                     time.sleep(1)
                 st.success("✅ Scenarios Applied!")
