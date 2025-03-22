@@ -664,6 +664,11 @@ def main():
                 help="Increase the time budget for larger datasets or more complex models."
             )
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
+                # Determine the maximum date from the raw data
+                last_date_in_data = data[date_column].max()
+                # We'll allow scenario start/end to be at least the day after the last historical date
+                min_future_date = (last_date_in_data + pd.DateOffset(days=1)).date()
+
                 st.sidebar.markdown("### 🎯 Scenario Planning")
                 demand_shock = st.sidebar.slider(
                     "Simulate Demand Shock (% Change in Sales):",
@@ -680,6 +685,7 @@ def main():
                     step=5
                 )
                 external_shock = st.sidebar.checkbox("Simulate External Shock (e.g., Economic Downturn)")
+
                 category_scenarios = {}
                 if category_columns:
                     st.sidebar.markdown("### 🎯 Scenario Planning by Category (Dynamic)")
@@ -702,13 +708,16 @@ def main():
                                     step=5,
                                     help=f"Adjust sales for category '{cat}' within column '{col}'"
                                 )
+                                # Use min_future_date as both the default value and the minimum allowed date
                                 cat_start = st.date_input(
                                     f"Start date for '{cat}'",
-                                    value=data[date_column].min().to_pydatetime()
+                                    value=min_future_date,
+                                    min_value=min_future_date
                                 )
                                 cat_end = st.date_input(
                                     f"End date for '{cat}'",
-                                    value=data[date_column].max().to_pydatetime()
+                                    value=min_future_date,
+                                    min_value=cat_start  # ensure end_date >= start_date
                                 )
                                 category_scenarios[col][cat] = {
                                     "adjustment": cat_adjust,
@@ -723,6 +732,7 @@ def main():
                 seasonality_adjustment = 0
                 external_shock = False
                 category_scenarios = {}
+
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
                 start_forecast = st.button("✅ Start Forecast", key="start_btn",
                                            help="Click to generate your AI-powered forecast")
