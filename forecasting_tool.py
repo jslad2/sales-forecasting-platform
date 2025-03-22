@@ -451,7 +451,7 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         st.warning(f"Prophet Model failed: {e}")
     return ("Prophet", result)
 
-# def train_arima_model(train, test, forecast_period, last_historical_value, y_original):
+def train_arima_model(train, test, forecast_period, last_historical_value, y_original):
     result = {}
     try:
         try:
@@ -925,14 +925,14 @@ def main():
                     time.sleep(1)
                 prophet_status.success("✅ Prophet Model Training Complete!")
 
-                # # 6) Train ARIMA Model
-                # with st.spinner("🚀 Training ARIMA Model..."):
-                #     arima_model_name, arima_res = train_arima_model(
-                #         train, test, forecast_period,
-                #         last_historical_value, y_original
-                #     )
-                #     time.sleep(1)
-                # arima_status.success("✅ ARIMA Model Training Complete!")
+                # 6) Train ARIMA Model
+                with st.spinner("🚀 Training ARIMA Model..."):
+                    arima_model_name, arima_res = train_arima_model(
+                        train, test, forecast_period,
+                        last_historical_value, y_original
+                    )
+                    time.sleep(1)
+                arima_status.success("✅ ARIMA Model Training Complete!")
 
                 # 7) Train XGBoost Model
                 with st.spinner("🚀 Training XGBoost Model..."):
@@ -957,7 +957,7 @@ def main():
                 time.sleep(1)
                 results = {
                     prophet_model_name: prophet_res,
-                    # arima_model_name: arima_res,
+                    arima_model_name: arima_res,
                     xgb_model_name: xgb_res,
                     automl_model_name: automl_res
                 }
@@ -965,69 +965,44 @@ def main():
                 # Store model results in session state
                 st.session_state.model_results = results
 
-                # 10) Display numerical performance comparison and weighted comparison side by side
+                # 10) Display unified model performance comparison table
                 st.subheader("📌 Model Performance Comparison")
 
-                # Create two columns
-                col1, col2 = st.columns(2)
+                if st.session_state.model_results:
+                    # First, compute shape scores using test and forecast data
+                    for model, res in st.session_state.model_results.items():
+                        forecast_df = res["Forecast"]
+                        # Align test data and forecast predictions
+                        match_len = min(len(test["y"]), len(forecast_df))
+                        actual = test["y"].iloc[:match_len].values
+                        pred = forecast_df["yhat"].iloc[:match_len].values
+                        corr = shape_score(actual, pred)
+                        res["Shape (corr)"] = corr
 
-                # Column 1: Numerical Performance Comparison
-                with col1:
-                    st.markdown("#### Numerical Performance")
+                    # Compute the maximum RMSE to use for normalizing
+                    max_rmse = max(res["RMSE"] for res in st.session_state.model_results.values())
+                    # Calculate the combined score for each model using the defined function
+                    for model, res in st.session_state.model_results.items():
+                        res["Combined Score"] = combined_score(res["RMSE"], res["Shape (corr)"], max_rmse, 0.5, 1.0)
+
+                    # Build one combined comparison table with all metrics
                     comparison_data = []
-                    for model, res in results.items():
-                        if isinstance(res, dict) and "RMSE" in res and "MAPE" in res:
-                            comparison_data.append({
-                                "Model": model,
-                                "RMSE": float(res["RMSE"]),
-                                "MAPE": float(res["MAPE"])
-                            })
-                        else:
-                            st.warning(f"Invalid result format for {model}.")
-                    if comparison_data:
-                        comparison_df = pd.DataFrame(comparison_data).sort_values(by="RMSE")
-                        st.dataframe(comparison_df.style.highlight_min(subset=["RMSE", "MAPE"], color="lightgreen"))
-                    else:
-                        st.error("No valid model results available for numerical comparison.")
+                    for model, res in st.session_state.model_results.items():
+                        comparison_data.append({
+                            "Model": model,
+                            "RMSE": res["RMSE"],
+                            "MAPE": res["MAPE"],
+                            "Shape (corr)": res["Shape (corr)"],
+                            "Combined Score": res["Combined Score"]
+                        })
 
-                # Column 2: Weighted Performance Comparison
-                with col2:
-                    st.markdown("#### Weighted Performance")
-                    if st.session_state.model_results:
-                        # Compute shape scores and combined scores using the fixed alpha and beta
-                        for model, res in st.session_state.model_results.items():
-                            forecast_df = res["Forecast"]
-                            # Align test data and forecast predictions
-                            match_len = min(len(test["y"]), len(forecast_df))
-                            actual = test["y"].iloc[:match_len].values
-                            pred = forecast_df["yhat"].iloc[:match_len].values
-                            corr = shape_score(actual, pred)
-                            res["Shape"] = corr
+                    comparison_df = pd.DataFrame(comparison_data).sort_values(by="Combined Score")
+                    st.dataframe(comparison_df.style.highlight_min(subset=["Combined Score"], color="lightgreen"))
 
-                        # Compute combined scores
-                        max_rmse = max(res["RMSE"] for res in st.session_state.model_results.values())
-                        for model, res in st.session_state.model_results.items():
-                            res["Combined"] = combined_score(res["RMSE"], res["Shape"], max_rmse, 0.5, 1.0)
-
-                        # Create a new comparison dataframe including shape and combined scores
-                        combined_data = []
-                        for model, res in st.session_state.model_results.items():
-                            combined_data.append({
-                                "Model": model,
-                                "RMSE": res["RMSE"],
-                                "MAPE": res["MAPE"],
-                                "Shape (corr)": res["Shape"],
-                                "Combined Score": res["Combined"]
-                            })
-                        combined_df = pd.DataFrame(combined_data).sort_values(by="Combined Score")
-
-                        # Display the weighted comparison
-                        st.dataframe(combined_df.style.highlight_min(subset=["Combined Score"], color="lightgreen"))
-
-                        best_model = combined_df.iloc[0]["Model"]
-                        st.success(f"✨ **AI-Selected Best Model (Combined):** {best_model}")
-                    else:
-                        st.warning("No model results found. Please train the models first.")
+                    best_model = comparison_df.iloc[0]["Model"]
+                    st.success(f"✨ **AI-Selected Best Model (Combined):** {best_model}")
+                else:
+                    st.warning("No model results found. Please train the models first.")
 
                 # 12) Plot forecast (e.g., Multi-Model Forecast Visualization)
                 st.markdown("### 🔍 Forecast Comparison Across Models")
