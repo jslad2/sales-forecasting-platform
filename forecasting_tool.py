@@ -502,20 +502,27 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, y_origi
         max_lag = min(12, len(train) - 1)
         rolling_windows = [3, 6] if len(train) > 6 else [3]
         data_xgb = train.copy()
+        
+        # Create lag features for training
         for lag in range(1, max_lag + 1):
             data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
         for window in rolling_windows:
             data_xgb[f"rolling_mean_{window}"] = data_xgb["y"].rolling(window=window).mean()
             data_xgb[f"rolling_std_{window}"] = data_xgb["y"].rolling(window=window).std()
+        
+        # Create time-based features
         data_xgb["month"] = data_xgb["ds"].dt.month
         data_xgb["quarter"] = data_xgb["ds"].dt.quarter
         data_xgb["year"] = data_xgb["ds"].dt.year
         data_xgb["sin_month"] = np.sin(2 * np.pi * data_xgb["month"] / 12)
         data_xgb["cos_month"] = np.cos(2 * np.pi * data_xgb["month"] / 12)
+        
         data_xgb.dropna(inplace=True)
+        
         feature_cols = [col for col in data_xgb.columns if col not in ["y", "ds"]]
         X_train = data_xgb[feature_cols]
         y_train = data_xgb["y"]
+        
         model = XGBRegressor(
             n_estimators=50,
             max_depth=min(5, max(2, len(train) // 10)),
@@ -525,35 +532,49 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, y_origi
             n_jobs=-1
         )
         model.fit(X_train, y_train)
-        future_features = []
+        
+        # Iterative forecasting: update lag features with predicted values
+        future_forecasts = []
+        # Start with the last row from training data (which has all lag and rolling features)
+        last_row = data_xgb.iloc[-1].copy()
+        last_date = train["ds"].iloc[-1]
+        
         for i in range(forecast_period):
+            # Update time features for the forecast period:
+            future_date = last_date + pd.DateOffset(months=i+1)
+            # Create a feature vector for this step based on last_row values
             future_row = {}
-            for lag in range(1, max_lag + 1):
-                if lag == 1:
-                    future_row[f"lag_{lag}"] = data_xgb["y"].iloc[-1]
-                else:
-                    future_row[f"lag_{lag}"] = data_xgb[f"lag_{lag - 1}"].iloc[-1]
-            for window in rolling_windows:
-                future_row[f"rolling_mean_{window}"] = data_xgb[f"rolling_mean_{window}"].iloc[-1]
-                future_row[f"rolling_std_{window}"] = data_xgb[f"rolling_std_{window}"].iloc[-1]
-            future_row["month"] = (data_xgb["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).month
-            future_row["quarter"] = (data_xgb["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).quarter
-            future_row["year"] = (data_xgb["ds"].iloc[-1] + pd.DateOffset(months=i + 1)).year
+            for col in feature_cols:
+                future_row[col] = last_row[col]
+            # Override the time features with new date values
+            future_row["month"] = future_date.month
+            future_row["quarter"] = future_date.quarter
+            future_row["year"] = future_date.year
             future_row["sin_month"] = np.sin(2 * np.pi * future_row["month"] / 12)
             future_row["cos_month"] = np.cos(2 * np.pi * future_row["month"] / 12)
-            future_features.append(future_row)
-        future_df = pd.DataFrame(future_features)
-        future_df.fillna(method="ffill", inplace=True)
-        xgb_forecast = model.predict(future_df)
-        matching_length = min(len(test["y"]), len(xgb_forecast))
-        rmse = mean_squared_error(test["y"].iloc[:matching_length], xgb_forecast[:matching_length]) ** 0.5
-        mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], xgb_forecast[:matching_length])
-        forecast_df = pd.DataFrame({
-            "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
-            "yhat": xgb_forecast
-        })
+            
+            X_future = pd.DataFrame([future_row])
+            pred = model.predict(X_future)[0]
+            future_forecasts.append(pred)
+            
+            # Now update the lag features in last_row for the next forecast:
+            # Shift lags: lag_2 becomes lag_3, ..., lag_max becomes lag_max+1 (dropping the last)
+            for lag in range(max_lag, 1, -1):
+                last_row[f"lag_{lag}"] = last_row[f"lag_{lag-1}"]
+            last_row["lag_1"] = pred
+            # (Optional: update rolling features if you wish; here we keep them constant)
+        
+        # Construct forecast DataFrame
+        forecast_dates = pd.date_range(start=last_date + pd.DateOffset(months=1), periods=forecast_period, freq="M")
+        forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": future_forecasts})
+        
+        # Optionally inverse difference if differencing was applied
         if isinstance(last_historical_value, (int, float)):
             forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
+        
+        matching_length = min(len(test["y"]), len(forecast_df))
+        rmse = mean_squared_error(test["y"].iloc[:matching_length], forecast_df["yhat"].iloc[:matching_length]) ** 0.5
+        mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], forecast_df["yhat"].iloc[:matching_length])
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
     except Exception as e:
         st.warning(f"XGBoost Model failed: {e}")
@@ -749,6 +770,11 @@ def main():
     xgb_status = st.empty()
     automl_status = st.empty()
 
+    # Create a progress bar and step message
+    total_steps = 12  # total number of forecasting steps
+    progress_bar = st.progress(0)
+    step_message = st.empty()
+
     uploaded_file = st.file_uploader("Upload your sales data file", type=["csv"])
     if uploaded_file:
         try:
@@ -856,9 +882,10 @@ def main():
             else:
                 start_forecast = st.button("⏳ Select Columns First", disabled=True, key="start_disabled")
 
-            # ------------------- MAIN FORECAST LOGIC ------------------- #
             if start_forecast:
-                # 1) Preprocessing
+                # STEP 1: Preprocessing
+                step = 1
+                step_message.text(f"Step {step} of {total_steps}: Preprocessing data...")
                 with st.spinner("🔍 Preprocessing data..."):
                     processed_data, last_historical_value, y_original = preprocess_data(
                         data, date_column, sales_column, category_columns
@@ -870,9 +897,12 @@ def main():
                 st.success("✅ Data Preprocessed Successfully!")
                 last_historical_date = y_original["ds"].max()
                 overall_status.info(f"🔍 Last Historical Date: {last_historical_date}")
+                progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(0.5)
 
-                # 2) Apply scenarios
+                # STEP 2: Apply scenarios
+                step += 1
+                step_message.text(f"Step {step} of {total_steps}: Applying business scenarios...")
                 with st.spinner("🔍 Applying scenarios to training data..."):
                     scenario_data = apply_scenarios(
                         processed_data.copy(),
@@ -885,8 +915,12 @@ def main():
                     )
                     time.sleep(1)
                 st.success("✅ Scenarios Applied!")
+                progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(0.5)
 
+                # STEP 3: View Processed Data
+                step += 1
+                step_message.text(f"Step {step} of {total_steps}: Reviewing processed data...")
                 st.markdown(
                     """
                     <div style="text-align: center;">
@@ -898,17 +932,22 @@ def main():
                 with st.expander("📊 View Processed Data"):
                     st.dataframe(scenario_data.style.set_properties(**{"text-align": "center"}),
                                  width=1400, height=450)
+                progress_bar.progress(int((step / total_steps) * 100))
+                time.sleep(0.5)
 
-                # 3) Split data
+                # STEP 4: Split Data
+                step += 1
+                step_message.text(f"Step {step} of {total_steps}: Splitting data into training and test sets...")
                 testing_period = int(len(scenario_data) * 0.2)
                 train = scenario_data.iloc[:-testing_period]
                 test = scenario_data.iloc[-testing_period:]
                 forecast_period = 24
-
-                overall_status.info("🚀 Starting forecasting process...")
+                progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # 4) Find best Prophet hyperparameters
+                # STEP 5: Find Best Prophet Hyperparameters
+                step += 1
+                step_message.text(f"Step {step} of {total_steps}: Tuning Prophet model...")
                 with st.spinner("🚀 Finding the best Prophet hyperparameters..."):
                     best_params, best_rmse = find_best_prophet_params(train)
                     time.sleep(1)
@@ -917,9 +956,12 @@ def main():
                     return
                 st.success(f"✅ Best Prophet Params: {best_params}")
                 overall_status.write(f"📉 Best RMSE (CV): {best_rmse:.2f}")
+                progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # 5) Train Prophet Model
+                # STEP 6: Train Prophet Model
+                step += 1
+                step_message.text(f"Step {step} of {total_steps}: Training Prophet model...")
                 with st.spinner("🚀 Training Prophet Model..."):
                     prophet_model_name, prophet_res = train_prophet_model(
                         train, test, forecast_period, best_params,
@@ -927,8 +969,12 @@ def main():
                     )
                     time.sleep(1)
                 prophet_status.success("✅ Prophet Model Training Complete!")
+                progress_bar.progress(int((step / total_steps) * 100))
+                time.sleep(1)
 
-                # 6) Train ARIMA Model
+                # STEP 7: Train ARIMA Model
+                step += 1
+                step_message.text(f"Step {step} of {total_steps}: Training ARIMA model...")
                 with st.spinner("🚀 Training ARIMA Model..."):
                     arima_model_name, arima_res = train_arima_model(
                         train, test, forecast_period,
@@ -936,8 +982,12 @@ def main():
                     )
                     time.sleep(1)
                 arima_status.success("✅ ARIMA Model Training Complete!")
+                progress_bar.progress(int((step / total_steps) * 100))
+                time.sleep(1)
 
-                # 7) Train XGBoost Model
+                # STEP 8: Train XGBoost Model
+                step += 1
+                step_message.text(f"Step {step} of {total_steps}: Training XGBoost model...")
                 with st.spinner("🚀 Training XGBoost Model..."):
                     xgb_model_name, xgb_res = train_xgb_model(
                         train, test, forecast_period,
@@ -945,8 +995,12 @@ def main():
                     )
                     time.sleep(1)
                 xgb_status.success("✅ XGBoost Model Training Complete!")
+                progress_bar.progress(int((step / total_steps) * 100))
+                time.sleep(1)
 
-                # 8) Train AutoML Model
+                # STEP 9: Train AutoML Model
+                step += 1
+                step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
                 with st.spinner("🚀 Training AutoML Model..."):
                     automl_model_name, automl_res = train_automl_model(
                         train, test, forecast_period,
@@ -954,8 +1008,12 @@ def main():
                     )
                     time.sleep(1)
                 automl_status.success("✅ AutoML Model Training Complete!")
+                progress_bar.progress(int((step / total_steps) * 100))
+                time.sleep(1)
 
-                # 9) Compile results
+                # STEP 10: Compile Results
+                step += 1
+                step_message.text(f"Step {step} of {total_steps}: Compiling forecast results...")
                 st.success("🎉 Forecasting process completed!")
                 time.sleep(1)
                 results = {
@@ -964,31 +1022,26 @@ def main():
                     xgb_model_name: xgb_res,
                     automl_model_name: automl_res
                 }
-
-                # Store model results in session state
                 st.session_state.model_results = results
+                progress_bar.progress(int((step / total_steps) * 100))
+                time.sleep(1)
 
-                # 10) Display unified model performance comparison table
-                st.subheader("📌 Model Performance Comparison")
-
+                # STEP 11: Display Performance Comparison
+                step += 1
+                step_message.text(f"Step {step} of {total_steps}: Displaying model performance comparison...")
                 if st.session_state.model_results:
-                    # First, compute shape scores using test and forecast data
                     for model, res in st.session_state.model_results.items():
                         forecast_df = res["Forecast"]
-                        # Align test data and forecast predictions
                         match_len = min(len(test["y"]), len(forecast_df))
                         actual = test["y"].iloc[:match_len].values
                         pred = forecast_df["yhat"].iloc[:match_len].values
                         corr = shape_score(actual, pred)
                         res["Shape (corr)"] = corr
 
-                    # Compute the maximum RMSE to use for normalizing
                     max_rmse = max(res["RMSE"] for res in st.session_state.model_results.values())
-                    # Calculate the combined score for each model using the defined function
                     for model, res in st.session_state.model_results.items():
                         res["Combined Score"] = combined_score(res["RMSE"], res["Shape (corr)"], max_rmse, 0.5, 1.0)
 
-                    # Build one combined comparison table with all metrics
                     comparison_data = []
                     for model, res in st.session_state.model_results.items():
                         comparison_data.append({
@@ -998,16 +1051,18 @@ def main():
                             "Shape (corr)": res["Shape (corr)"],
                             "Combined Score": res["Combined Score"]
                         })
-
                     comparison_df = pd.DataFrame(comparison_data).sort_values(by="Combined Score")
                     st.dataframe(comparison_df.style.highlight_min(subset=["Combined Score"], color="lightgreen"))
-
                     best_model = comparison_df.iloc[0]["Model"]
                     st.success(f"✨ **AI-Selected Best Model (Combined):** {best_model}")
                 else:
                     st.warning("No model results found. Please train the models first.")
+                progress_bar.progress(int((step / total_steps) * 100))
+                time.sleep(1)
 
-                # 12) Plot forecast (e.g., Multi-Model Forecast Visualization)
+                # STEP 12: Plot Forecast Comparison & Download
+                step += 1
+                step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
                 st.markdown("### 🔍 Forecast Comparison Across Models")
                 model_colors = {
                     "Prophet": "blue",
@@ -1041,8 +1096,9 @@ def main():
                     template="plotly_white"
                 )
                 st.plotly_chart(fig, use_container_width=True)
+                progress_bar.progress(100)
+                step_message.text("All steps completed!")
 
-                # 13) Download forecast data
                 st.markdown("### 📥 Download Forecast Data")
                 try:
                     csv = results[best_model]["Forecast"].to_csv(index=False)
