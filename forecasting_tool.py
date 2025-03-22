@@ -287,11 +287,7 @@ def adjust_forecast_by_category(forecast_df, category_scenarios):
     return forecast_df
 
 def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
-    """
-    Applies global adjustments and then category-specific adjustments to the forecast DataFrame.
-    These adjustments affect only the forecasted (future) values.
-    """
-    # Global adjustments
+    # Apply global adjustments
     if demand_shock != 0:
         forecast_df["yhat"] *= (1 + demand_shock / 100)
         if "yhat_lower" in forecast_df.columns:
@@ -299,7 +295,6 @@ def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_
         if "yhat_upper" in forecast_df.columns:
             forecast_df["yhat_upper"] *= (1 + demand_shock / 100)
     if seasonality_adjustment != 0:
-        # Extract the month from forecast dates
         forecast_df["month"] = forecast_df["ds"].dt.month
         seasonality_multiplier = 1 + seasonality_adjustment / 100
         forecast_df["yhat"] *= (1 + (forecast_df["month"] - 1) * (seasonality_multiplier - 1) / 12)
@@ -313,7 +308,6 @@ def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_
             forecast_df["yhat_lower"] *= 0.8
         if "yhat_upper" in forecast_df.columns:
             forecast_df["yhat_upper"] *= 0.8
-
     # Then apply category-specific adjustments
     if category_scenarios:
         forecast_df = adjust_forecast_by_category(forecast_df, category_scenarios)
@@ -347,7 +341,8 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         st.warning(f"Prophet Model failed: {e}")
     return ("Prophet", result)
 
-def train_arima_model(train, test, forecast_period, last_historical_value, y_original, category_scenarios=None):
+def train_arima_model(train, test, forecast_period, last_historical_value, y_original, 
+                      demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
         try:
@@ -395,7 +390,8 @@ def train_arima_model(train, test, forecast_period, last_historical_value, y_ori
         st.warning(f"ARIMA Model failed: {e}")
     return ("ARIMA", result)
 
-def train_xgb_model(train, test, forecast_period, last_historical_value, y_original):
+def train_xgb_model(train, test, forecast_period, last_historical_value, y_original,
+                    demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
         max_lag = min(12, len(train) - 1)
@@ -450,6 +446,8 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, y_origi
             freq="MS"
         )
         forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": future_forecasts})
+        # Apply forecast adjustments only
+        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
         if isinstance(last_historical_value, (int, float)):
             forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
         matching_length = min(len(test["y"]), len(forecast_df))
@@ -460,7 +458,8 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, y_origi
         st.warning(f"XGBoost Model failed: {e}")
     return ("XGBoost", result)
 
-def train_automl_model(train, test, forecast_period, last_historical_value, y_original, time_budget=None):
+def train_automl_model(train, test, forecast_period, last_historical_value, y_original, time_budget=None,
+                        demand_shock=0, seasonality_adjustment=0, external_shock=False, category_scenarios=None):
     result = {}
     try:
         data_automl = train.copy()
