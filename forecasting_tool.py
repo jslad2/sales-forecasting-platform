@@ -473,7 +473,7 @@ def train_arima_model(train, test, forecast_period, last_historical_value, y_ori
             max_p=3, max_q=3,
             start_P=0, start_Q=0,
             max_P=2, max_Q=2,
-            trace=True,
+            trace=False,
             suppress_warnings=True,
             error_action="ignore",
             stepwise=True
