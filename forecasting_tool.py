@@ -83,8 +83,9 @@ def check_stationarity(series):
 def preprocess_data(data, date_column, sales_column, category_columns=None):
     """
     Preprocess the uploaded data, check stationarity, and apply transformations if needed.
-    Returns a dataframe with columns "ds" and "y" (and optionally categories) for Prophet compatibility.
-    Also returns the last historical value before forecasting if differencing is applied.
+    Returns a dataframe with columns "ds" and "y" (and optionally category columns)
+    for Prophet compatibility. Also returns the last historical value before forecasting
+    if differencing is applied, and a copy of the original data for inspection.
     """
     try:
         # 1. Convert date column to datetime
@@ -97,7 +98,7 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
         # 3. Create a 'monthly' period column
         data["year_month"] = data["ds"].dt.to_period("M")
 
-        # 4. Handle category columns
+        # 4. Handle category columns:
         if category_columns:
             if not isinstance(category_columns, list):
                 category_columns = [category_columns]
@@ -109,18 +110,27 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
         data = data.groupby(grouping_cols, as_index=False)["y"].sum()
 
         # 6. Convert 'year_month' back to a proper datetime (start-of-month)
-        data["ds"] = pd.to_datetime(data["year_month"].dt.to_timestamp(how="start").dt.strftime("%Y-%m"),
-                                    format="%Y-%m")
+        # This creates the 'ds' column (formatted as YYYY-MM) while retaining category columns.
+        data["ds"] = pd.to_datetime(
+            data["year_month"].dt.to_timestamp(how="start").dt.strftime("%Y-%m"),
+            format="%Y-%m"
+        )
         data.drop(columns=["year_month"], inplace=True)
 
-        # 7. Remove duplicates if any
-        subset_cols = ["ds"] + (category_columns if category_columns else [])
+        # 7. Remove duplicates if any (keeping ds, y, and category columns)
+        if category_columns:
+            subset_cols = ["ds", "y"] + category_columns
+        else:
+            subset_cols = ["ds", "y"]
         if data.duplicated(subset=subset_cols).any():
             st.warning("⚠️ Duplicate date/category combinations found. Removing duplicates...")
             data = data.drop_duplicates(subset=subset_cols, keep="last")
 
-        # 8. Original values for inspection
-        y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
+        # 8. Store original values for inspection; include category columns if available.
+        if category_columns:
+            y_original = data.copy()
+        else:
+            y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
 
         # 9. Check stationarity
         stationarity_result = check_stationarity(data["y"])
@@ -137,7 +147,6 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
         # 10. If non-stationary, apply differencing
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
-
             data["y_diff"] = data["y"].diff()
             last_historical_value = data["y"].iloc[-1]
 
@@ -171,10 +180,11 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             differenced_data = differenced_data.reset_index(drop=True)
             differenced_data.columns = differenced_data.columns.astype(str)
 
-            return differenced_data[["ds", "y"]], last_historical_value, y_original
+            # Return the full data (including category columns) for scenario planning
+            return differenced_data, last_historical_value, y_original
 
         else:
-            # Visualization
+            # Visualization for stationary data
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=data["ds"],
@@ -193,7 +203,7 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             st.plotly_chart(fig, use_container_width=True)
 
             data = data.reset_index(drop=True)
-            return data[["ds", "y"]], None, y_original
+            return data, None, y_original
 
     except Exception as e:
         st.error(f"An error occurred during preprocessing: {e}")
@@ -372,7 +382,6 @@ def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock, 
 def train_prophet_model(train, test, forecast_period, best_params, last_historical_value, y_original):
     result = {}
     try:
-        st.write("DEBUG: Prophet - last training date:", train["ds"].iloc[-1])
         model = Prophet(
             seasonality_mode=best_params["seasonality_mode"],
             changepoint_prior_scale=best_params["changepoint_prior_scale"]
@@ -385,12 +394,8 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         
         # Use MS for start-of-month alignment
         future = model.make_future_dataframe(periods=forecast_period, freq="MS", include_history=False)
-        st.write("DEBUG: Prophet - first forecast date (unfiltered):", future["ds"].iloc[0])
         forecast = model.predict(future)
         forecast = forecast[forecast["ds"] > train["ds"].max()]
-        
-        st.write("DEBUG: Prophet - first forecast date (filtered):", forecast["ds"].iloc[0])
-        st.write("DEBUG: Prophet - last forecast date:", forecast["ds"].iloc[-1])
         
         matching_length = min(len(test["y"]), len(forecast))
         rmse = mean_squared_error(test["y"].iloc[:matching_length], forecast["yhat"].iloc[:matching_length]) ** 0.5
@@ -405,7 +410,6 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
 def train_arima_model(train, test, forecast_period, last_historical_value, y_original):
     result = {}
     try:
-        st.write("DEBUG: ARIMA - last training date:", train["ds"].iloc[-1])
         try:
             decomposition = seasonal_decompose(train["y"], model="additive", period=12)
             seasonality_present = np.any(np.abs(decomposition.seasonal) > 0.01)
@@ -440,9 +444,7 @@ def train_arima_model(train, test, forecast_period, last_historical_value, y_ori
             periods=forecast_period,
             freq="MS"
         )
-        st.write("DEBUG: ARIMA - forecast start date:", forecast_dates[0])
-        st.write("DEBUG: ARIMA - forecast end date:", forecast_dates[-1])
-        
+
         forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": arima_forecast[:forecast_period]})
         if isinstance(last_historical_value, (int, float)):
             forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
@@ -456,9 +458,7 @@ def train_arima_model(train, test, forecast_period, last_historical_value, y_ori
 
 def train_xgb_model(train, test, forecast_period, last_historical_value, y_original):
     result = {}
-    try:
-        st.write("DEBUG: XGBoost - last training date:", train["ds"].iloc[-1])
-        
+    try:        
         max_lag = min(12, len(train) - 1)
         rolling_windows = [3, 6] if len(train) > 6 else [3]
         data_xgb = train.copy()
@@ -526,9 +526,6 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, y_origi
             periods=forecast_period,
             freq="MS"
         )
-        st.write("DEBUG: XGBoost - forecast start date:", forecast_dates[0])
-        st.write("DEBUG: XGBoost - forecast end date:", forecast_dates[-1])
-        
         forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": future_forecasts})
         
         if isinstance(last_historical_value, (int, float)):
@@ -546,8 +543,6 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, y_origi
 def train_automl_model(train, test, forecast_period, last_historical_value, y_original, time_budget=None):
     result = {}
     try:
-        st.write("DEBUG: AutoML - last training date:", train["ds"].iloc[-1])
-
         data_automl = train.copy()
         max_lag = min(24, len(train) - 1)
         if len(train) <= 6:
@@ -647,9 +642,6 @@ def train_automl_model(train, test, forecast_period, last_historical_value, y_or
             periods=forecast_period,
             freq="MS"
         )
-        st.write("DEBUG: AutoML - forecast start date:", forecast_dates[0])
-        st.write("DEBUG: AutoML - forecast end date:", forecast_dates[-1])
-
         forecast_df = pd.DataFrame({
             "ds": forecast_dates,
             "yhat": automl_forecast,
@@ -896,10 +888,6 @@ def main():
                 train = scenario_data.iloc[:-testing_period]
                 test = scenario_data.iloc[-testing_period:]
                 forecast_period = 24
-
-                # Debug: show last date of train, first date of test
-                st.write("DEBUG: Train last date:", train["ds"].iloc[-1])
-                st.write("DEBUG: Test first date:", test["ds"].iloc[0])
 
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
