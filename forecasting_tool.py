@@ -83,9 +83,11 @@ def check_stationarity(series):
 def preprocess_data(data, date_column, sales_column, category_columns=None):
     """
     Preprocess the uploaded data, check stationarity, and apply transformations if needed.
-    Returns a dataframe with columns "ds" and "y" (and optionally category columns)
-    for Prophet compatibility. Also returns the last historical value before forecasting
-    if differencing is applied, and a copy of the original data for inspection.
+    Returns a tuple of:
+        1) A DataFrame with columns "ds" and "y" (and optionally category columns) for further processing/scenario planning
+        2) The last historical value before differencing (if applied)
+        3) A copy of the original data for inspection
+    Also, it creates a re_agg_chart DataFrame aggregated by "ds" only for a cleaner single-line chart.
     """
     try:
         # 1. Convert date column to datetime
@@ -98,7 +100,7 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
         # 3. Create a 'monthly' period column
         data["year_month"] = data["ds"].dt.to_period("M")
 
-        # 4. Handle category columns: retain them if provided
+        # 4. Determine grouping columns
         if category_columns:
             if not isinstance(category_columns, list):
                 category_columns = [category_columns]
@@ -106,17 +108,14 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
         else:
             grouping_cols = ["year_month"]
 
-        # 5. Aggregate (sum) sales at the monthly level
+        # 5. Aggregate (sum) sales at the monthly + category level
         data = data.groupby(grouping_cols, as_index=False)["y"].sum()
 
-        # 6. Convert 'year_month' back to datetime (start-of-month), retaining category columns
-        data["ds"] = pd.to_datetime(
-            data["year_month"].dt.to_timestamp(how="start").dt.strftime("%Y-%m"),
-            format="%Y-%m"
-        )
+        # 6. Convert 'year_month' back to datetime (start-of-month)
+        data["ds"] = data["year_month"].dt.to_timestamp(how="start")
         data.drop(columns=["year_month"], inplace=True)
 
-        # 7. Remove duplicates (keeping ds, y, and category columns)
+        # 7. Remove duplicates if any
         if category_columns:
             subset_cols = ["ds", "y"] + category_columns
         else:
@@ -125,14 +124,18 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             st.warning("⚠️ Duplicate date/category combinations found. Removing duplicates...")
             data = data.drop_duplicates(subset=subset_cols, keep="last")
 
-        # 8. Store original values (keep full data if categories exist)
+        # 8. Keep a copy for inspection. If categories exist, keep them all; otherwise, just ds,y.
         if category_columns:
             y_original = data.copy()
         else:
             y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
 
-        # 9. Check stationarity
-        stationarity_result = check_stationarity(data["y"])
+        # 9. For a single-line chart, re-aggregate to monthly totals only (dropping categories).
+        #    This ensures the chart won't look "crazy" when categories are present.
+        re_agg_chart = data.groupby("ds", as_index=False)["y"].sum()
+
+        # 10. Check stationarity on the *aggregated* values
+        stationarity_result = check_stationarity(re_agg_chart["y"])
         st.markdown(
             f"""
             <div style="text-align: center;">
@@ -143,30 +146,32 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             unsafe_allow_html=True,
         )
 
-        # 10. If non-stationary, apply differencing
+        # 11. If non-stationary, apply differencing
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series.")
-            data["y_diff"] = data["y"].diff()
-            last_historical_value = data["y"].iloc[-1]
 
-            # Visualization
+            # Perform differencing on the aggregated chart data
+            re_agg_chart["y_diff"] = re_agg_chart["y"].diff()
+            last_historical_value = re_agg_chart["y"].iloc[-1]
+
+            # Visualization: Original vs Differenced (aggregated)
             fig = go.Figure()
             fig.add_trace(go.Scatter(
-                x=data["ds"],
-                y=data["y"],
+                x=re_agg_chart["ds"],
+                y=re_agg_chart["y"],
                 mode="lines",
                 name="Original Series",
                 line=dict(color="blue", width=2)
             ))
             fig.add_trace(go.Scatter(
-                x=data["ds"].iloc[1:],
-                y=data["y_diff"].dropna(),
+                x=re_agg_chart["ds"].iloc[1:],
+                y=re_agg_chart["y_diff"].dropna(),
                 mode="lines",
                 name="Differenced Series",
                 line=dict(color="orange", width=2, dash="dot")
             ))
             fig.update_layout(
-                title="Original vs Differenced Series (Monthly)",
+                title="Original vs Differenced Series (Monthly, Aggregated)",
                 xaxis_title="Date (YYYY-MM)",
                 yaxis_title="Sales",
                 template="plotly_white",
@@ -174,28 +179,35 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             )
             st.plotly_chart(fig, use_container_width=True)
 
-            differenced_data = data.dropna(subset=["y_diff"]).drop(columns=["y"])
-            differenced_data = differenced_data.rename(columns={"y_diff": "y"})
-            differenced_data = differenced_data.reset_index(drop=True)
-            differenced_data.columns = differenced_data.columns.astype(str)
-            return differenced_data, last_historical_value, y_original
+            # Also differencing the main data (with categories) if needed
+            # For scenario planning, you might want to keep categories undifferenced.
+            # But if you want the entire dataset differenced, do similarly:
+            # data["y_diff"] = data.groupby(category_columns)["y"].transform(lambda x: x.diff())  # If you want to differ by group
+            # ...
+            # For simplicity, let's just differ the aggregated chart. The main data can remain as-is.
+
+            # Return the main data + the last historical value + original
+            return data, last_historical_value, y_original
+
         else:
+            # Visualization for stationary aggregated data
             fig = go.Figure()
             fig.add_trace(go.Scatter(
-                x=data["ds"],
-                y=data["y"],
+                x=re_agg_chart["ds"],
+                y=re_agg_chart["y"],
                 mode="lines",
-                name="Original Series (Monthly)",
+                name="Original Series (Monthly, Aggregated)",
                 line=dict(color="blue", width=2)
             ))
             fig.update_layout(
-                title="Original Series (Monthly)",
+                title="Original Series (Monthly, Aggregated)",
                 xaxis_title="Date (YYYY-MM)",
                 yaxis_title="Sales",
                 template="plotly_white",
                 xaxis_tickformat="%Y-%m"
             )
             st.plotly_chart(fig, use_container_width=True)
+
             data = data.reset_index(drop=True)
             return data, None, y_original
 
