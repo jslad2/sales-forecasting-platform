@@ -323,8 +323,25 @@ def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock, 
         st.error(f"❌ An error occurred while applying scenarios: {e}")
         st.error(f"Debug Info: Columns in data - {data.columns}, Data Shape - {data.shape}")
         return data
+    
+def adjust_forecast_by_category(forecast_df, category_scenarios):
+    # For each scenario in the dynamic dictionary,
+    # if the forecast date falls within the specified date range, adjust yhat.
+    for col, cat_dict in category_scenarios.items():
+        for cat_val, details in cat_dict.items():
+            adjustment = details.get("adjustment", 0)
+            start_date = pd.to_datetime(details.get("start_date"))
+            end_date = pd.to_datetime(details.get("end_date"))
+            mask = (forecast_df["ds"] >= start_date) & (forecast_df["ds"] <= end_date)
+            if mask.any():
+                forecast_df.loc[mask, "yhat"] *= (1 + adjustment / 100)
+                if "yhat_lower" in forecast_df.columns:
+                    forecast_df.loc[mask, "yhat_lower"] *= (1 + adjustment / 100)
+                if "yhat_upper" in forecast_df.columns:
+                    forecast_df.loc[mask, "yhat_upper"] *= (1 + adjustment / 100)
+    return forecast_df    
 
-def train_prophet_model(train, test, forecast_period, best_params, last_historical_value, y_original):
+def train_prophet_model(train, test, forecast_period, best_params, last_historical_value, y_original, category_scenarios=None):
     result = {}
     try:
         model = Prophet(
@@ -339,6 +356,8 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         future = model.make_future_dataframe(periods=forecast_period, freq="MS", include_history=False)
         forecast = model.predict(future)
         forecast = forecast[forecast["ds"] > train["ds"].max()]
+        if category_scenarios:
+            forecast = adjust_forecast_by_category(forecast, category_scenarios)
         matching_length = min(len(test["y"]), len(forecast))
         rmse = mean_squared_error(test["y"].iloc[:matching_length], forecast["yhat"].iloc[:matching_length]) ** 0.5
         mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], forecast["yhat"].iloc[:matching_length])
@@ -349,7 +368,7 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         st.warning(f"Prophet Model failed: {e}")
     return ("Prophet", result)
 
-def train_arima_model(train, test, forecast_period, last_historical_value, y_original):
+def train_arima_model(train, test, forecast_period, last_historical_value, y_original, category_scenarios=None):
     result = {}
     try:
         try:
@@ -385,6 +404,8 @@ def train_arima_model(train, test, forecast_period, last_historical_value, y_ori
             freq="MS"
         )
         forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": arima_forecast[:forecast_period]})
+        if category_scenarios:
+            forecast_df = adjust_forecast_by_category(forecast_df, category_scenarios)
         if isinstance(last_historical_value, (int, float)):
             forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
         matching_length = min(len(test["y"]), len(forecast_df))
@@ -401,7 +422,6 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, y_origi
         max_lag = min(12, len(train) - 1)
         rolling_windows = [3, 6] if len(train) > 6 else [3]
         data_xgb = train.copy()
-        # Create lag features
         for lag in range(1, max_lag + 1):
             data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
         for window in rolling_windows:
@@ -413,7 +433,7 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, y_origi
         data_xgb["sin_month"] = np.sin(2 * np.pi * data_xgb["month"] / 12)
         data_xgb["cos_month"] = np.cos(2 * np.pi * data_xgb["month"] / 12)
         data_xgb.dropna(inplace=True)
-        # Drop non-numeric columns (e.g., CUSTOMERNAME) from features
+        # Filter out non-numeric columns from features
         feature_cols = [col for col in data_xgb.columns if col not in ["y", "ds"] and np.issubdtype(data_xgb[col].dtype, np.number)]
         X_train = data_xgb[feature_cols]
         y_train = data_xgb["y"]
@@ -426,7 +446,6 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, y_origi
             n_jobs=-1
         )
         model.fit(X_train, y_train)
-        # Iterative forecasting
         future_forecasts = []
         last_row = data_xgb.iloc[-1].copy()
         last_date = train["ds"].iloc[-1]
@@ -443,7 +462,6 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, y_origi
             X_future = pd.DataFrame([future_row])
             pred = model.predict(X_future)[0]
             future_forecasts.append(pred)
-            # Shift lag features
             for lag in range(max_lag, 1, -1):
                 last_row[f"lag_{lag}"] = last_row[f"lag_{lag-1}"]
             last_row["lag_1"] = pred
@@ -561,10 +579,8 @@ def train_automl_model(train, test, forecast_period, last_historical_value, y_or
             forecast_df["yhat_lower"] = inverse_difference(forecast_df["yhat_lower"], last_historical_value)
             forecast_df["yhat_upper"] = inverse_difference(forecast_df["yhat_upper"], last_historical_value)
         matching_length = min(len(test["y"]), len(forecast_df))
-        rmse = np.sqrt(mean_squared_error(test["y"].iloc[:matching_length].values,
-                                          forecast_df["yhat"].iloc[:matching_length].values))
-        mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length].values,
-                                               forecast_df["yhat"].iloc[:matching_length].values)
+        rmse = np.sqrt(mean_squared_error(test["y"].values, forecast_df["yhat"][:len(test["y"])]))
+        mape = mean_absolute_percentage_error(test["y"].values, forecast_df["yhat"][:len(test["y"])])
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
     except Exception as e:
         st.error(f"AutoML Model failed: {e}")
@@ -647,7 +663,6 @@ def main():
                 step=60,
                 help="Increase the time budget for larger datasets or more complex models."
             )
-            # Define global scenario planning variables
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
                 st.sidebar.markdown("### 🎯 Scenario Planning")
                 demand_shock = st.sidebar.slider(
@@ -665,7 +680,6 @@ def main():
                     step=5
                 )
                 external_shock = st.sidebar.checkbox("Simulate External Shock (e.g., Economic Downturn)")
-                # Build dynamic category adjustments dictionary with multi-select
                 category_scenarios = {}
                 if category_columns:
                     st.sidebar.markdown("### 🎯 Scenario Planning by Category (Dynamic)")
@@ -741,7 +755,6 @@ def main():
                         category_scenarios=category_scenarios
                     )
                     time.sleep(1)
-                # Only display success message if any adjustment was made
                 adjustments_made = (demand_shock != 0 or seasonality_adjustment != 0 or external_shock)
                 if category_scenarios:
                     for col, cat_dict in category_scenarios.items():
@@ -794,7 +807,7 @@ def main():
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training Prophet model...")
                 with st.spinner("🚀 Training Prophet Model..."):
-                    prophet_model_name, prophet_res = train_prophet_model(train, test, forecast_period, best_params, last_historical_value, y_original)
+                    prophet_model_name, prophet_res = train_prophet_model(train, test, forecast_period, best_params, last_historical_value, y_original, category_scenarios)
                     time.sleep(1)
                 prophet_status.success("✅ Prophet Model Training Complete!")
                 progress_bar.progress(int((step / total_steps) * 100))
@@ -802,7 +815,7 @@ def main():
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training ARIMA model...")
                 with st.spinner("🚀 Training ARIMA Model..."):
-                    arima_model_name, arima_res = train_arima_model(train, test, forecast_period, last_historical_value, y_original)
+                    arima_model_name, arima_res = train_arima_model(train, test, forecast_period, last_historical_value, y_original, category_scenarios)
                     time.sleep(1)
                 arima_status.success("✅ ARIMA Model Training Complete!")
                 progress_bar.progress(int((step / total_steps) * 100))
@@ -833,7 +846,6 @@ def main():
                     xgb_model_name: xgb_res,
                     automl_model_name: automl_res
                 }
-                # Only keep models that successfully produced a forecast
                 valid_results = {model: res for model, res in results.items() if res.get("Forecast") is not None}
                 if not valid_results:
                     st.error("No valid model forecasts produced.")
@@ -888,7 +900,7 @@ def main():
                     name="Historical Data",
                     line=dict(color="black", width=2)
                 ))
-                for model_name, res in st.session_state.model_results.items():
+                for model_name, res in results.items():
                     forecast_df = res["Forecast"]
                     fig.add_trace(go.Scatter(
                         x=forecast_df["ds"],
