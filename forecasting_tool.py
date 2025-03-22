@@ -269,61 +269,6 @@ def find_best_prophet_params(train):
                 best_params = params
     return best_params, best_rmse
 
-def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
-    """
-    Apply global and category-specific scenario adjustments.
-    Global adjustments (demand shock, seasonality, external shock) are applied first.
-    Then, if provided, category-specific adjustments from the dynamic dictionary 'category_scenarios'
-    are applied.
-    """
-    try:
-        if data is None or data.empty:
-            st.error("❌ No data provided. Please check your input.")
-            return data
-        if "ds" not in data.columns or "y" not in data.columns:
-            st.error("❌ Required columns 'ds' (date) and 'y' (sales) are missing.")
-            return data
-
-        # Global adjustments
-        if demand_shock != 0:
-            data["y"] = data["y"] * (1 + demand_shock / 100)
-            st.write(f"✅ Applied global demand shock: {demand_shock}%")
-        if seasonality_adjustment != 0:
-            data["month"] = data["ds"].dt.month
-            seasonality_multiplier = 1 + seasonality_adjustment / 100
-            data["y"] = data["y"] * (1 + (data["month"] - 1) * (seasonality_multiplier - 1) / 12)
-            st.write(f"✅ Applied global seasonality adjustment: {seasonality_adjustment}%")
-        if external_shock:
-            data["y"] = data["y"] * 0.8
-            st.write("✅ Applied global external shock: 20% reduction in sales")
-
-        # Category-specific adjustments
-        if category_scenarios:
-            st.write("🔍 Applying category-specific adjustments...")
-            for col, cat_dict in category_scenarios.items():
-                if col not in data.columns:
-                    st.warning(f"⚠️ Column '{col}' not found in the dataset. Skipping adjustments for this column.")
-                    continue
-                for cat_val, details in cat_dict.items():
-                    adjustment = details.get("adjustment", 0)
-                    start_date = pd.to_datetime(details.get("start_date"))
-                    end_date = pd.to_datetime(details.get("end_date"))
-                    mask = (data["ds"] >= start_date) & (data["ds"] <= end_date) & (data[col] == cat_val)
-                    if mask.sum() == 0:
-                        st.write(f"ℹ️ No rows found for '{cat_val}' in '{col}' between {start_date.date()} and {end_date.date()}.")
-                        continue
-                    data.loc[mask, "y"] *= (1 + adjustment / 100)
-                    st.write(f"✅ Applied {adjustment}% adjustment to '{cat_val}' in '{col}' (from {start_date.date()} to {end_date.date()}).")
-        else:
-            st.warning("⚠️ No category-specific adjustments provided. Skipping this step.")
-
-        return data
-
-    except Exception as e:
-        st.error(f"❌ An error occurred while applying scenarios: {e}")
-        st.error(f"Debug Info: Columns in data - {data.columns}, Data Shape - {data.shape}")
-        return data
-    
 def adjust_forecast_by_category(forecast_df, category_scenarios):
     # For each scenario in the dynamic dictionary,
     # if the forecast date falls within the specified date range, adjust yhat.
@@ -339,9 +284,43 @@ def adjust_forecast_by_category(forecast_df, category_scenarios):
                     forecast_df.loc[mask, "yhat_lower"] *= (1 + adjustment / 100)
                 if "yhat_upper" in forecast_df.columns:
                     forecast_df.loc[mask, "yhat_upper"] *= (1 + adjustment / 100)
-    return forecast_df    
+    return forecast_df
 
-def train_prophet_model(train, test, forecast_period, best_params, last_historical_value, y_original, category_scenarios=None):
+def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
+    """
+    Applies global adjustments and then category-specific adjustments to the forecast DataFrame.
+    These adjustments affect only the forecasted (future) values.
+    """
+    # Global adjustments
+    if demand_shock != 0:
+        forecast_df["yhat"] *= (1 + demand_shock / 100)
+        if "yhat_lower" in forecast_df.columns:
+            forecast_df["yhat_lower"] *= (1 + demand_shock / 100)
+        if "yhat_upper" in forecast_df.columns:
+            forecast_df["yhat_upper"] *= (1 + demand_shock / 100)
+    if seasonality_adjustment != 0:
+        # Extract the month from forecast dates
+        forecast_df["month"] = forecast_df["ds"].dt.month
+        seasonality_multiplier = 1 + seasonality_adjustment / 100
+        forecast_df["yhat"] *= (1 + (forecast_df["month"] - 1) * (seasonality_multiplier - 1) / 12)
+        if "yhat_lower" in forecast_df.columns:
+            forecast_df["yhat_lower"] *= (1 + (forecast_df["month"] - 1) * (seasonality_multiplier - 1) / 12)
+        if "yhat_upper" in forecast_df.columns:
+            forecast_df["yhat_upper"] *= (1 + (forecast_df["month"] - 1) * (seasonality_multiplier - 1) / 12)
+    if external_shock:
+        forecast_df["yhat"] *= 0.8
+        if "yhat_lower" in forecast_df.columns:
+            forecast_df["yhat_lower"] *= 0.8
+        if "yhat_upper" in forecast_df.columns:
+            forecast_df["yhat_upper"] *= 0.8
+
+    # Then apply category-specific adjustments
+    if category_scenarios:
+        forecast_df = adjust_forecast_by_category(forecast_df, category_scenarios)
+    return forecast_df
+
+def train_prophet_model(train, test, forecast_period, best_params, last_historical_value, y_original,
+                        demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
         model = Prophet(
@@ -356,8 +335,8 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         future = model.make_future_dataframe(periods=forecast_period, freq="MS", include_history=False)
         forecast = model.predict(future)
         forecast = forecast[forecast["ds"] > train["ds"].max()]
-        if category_scenarios:
-            forecast = adjust_forecast_by_category(forecast, category_scenarios)
+        # Apply forecast adjustments only
+        forecast = adjust_forecast(forecast, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
         matching_length = min(len(test["y"]), len(forecast))
         rmse = mean_squared_error(test["y"].iloc[:matching_length], forecast["yhat"].iloc[:matching_length]) ** 0.5
         mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], forecast["yhat"].iloc[:matching_length])
@@ -404,8 +383,8 @@ def train_arima_model(train, test, forecast_period, last_historical_value, y_ori
             freq="MS"
         )
         forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": arima_forecast[:forecast_period]})
-        if category_scenarios:
-            forecast_df = adjust_forecast_by_category(forecast_df, category_scenarios)
+        # Apply forecast adjustments only
+        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
         if isinstance(last_historical_value, (int, float)):
             forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
         matching_length = min(len(test["y"]), len(forecast_df))
@@ -433,7 +412,7 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, y_origi
         data_xgb["sin_month"] = np.sin(2 * np.pi * data_xgb["month"] / 12)
         data_xgb["cos_month"] = np.cos(2 * np.pi * data_xgb["month"] / 12)
         data_xgb.dropna(inplace=True)
-        # Filter out non-numeric columns from features
+        # Filter out non-numeric columns
         feature_cols = [col for col in data_xgb.columns if col not in ["y", "ds"] and np.issubdtype(data_xgb[col].dtype, np.number)]
         X_train = data_xgb[feature_cols]
         y_train = data_xgb["y"]
@@ -604,31 +583,35 @@ def main():
     if subscription_level != "premium":
         st.warning("Upgrade to Premium to unlock advanced features!")
         st.stop()
+
     if st.button("🔄 Reset App"):
         st.session_state.clear()
         st.experimental_rerun()
+
     overall_status = st.empty()
     prophet_status = st.empty()
     arima_status = st.empty()
     xgb_status = st.empty()
     automl_status = st.empty()
+
     total_steps = 12
     progress_bar = st.progress(0)
     step_message = st.empty()
+
     uploaded_file = st.file_uploader("Upload your sales data file", type=["csv"])
     if uploaded_file:
         try:
             data = pd.read_csv(uploaded_file)
             st.write("Uploaded Data:")
             st.dataframe(data)
+
             st.markdown(
                 """
                 <div style="text-align: center;">
                     <h2 style="color: #2B3A42;">🛠️ Map Your Columns</h2>
                 </div>
-                """,
-                unsafe_allow_html=True,
-            )
+                """, unsafe_allow_html=True)
+
             col1, col2, col3 = st.columns([1, 1, 1])
             with col1:
                 date_column = st.selectbox(
@@ -652,40 +635,34 @@ def main():
                         options=[col for col in data.columns if col not in [date_column, sales_column]],
                         key="category_cols"
                     )
+
             if date_column != "-- Select Column --":
                 data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
+
             st.markdown("### ⏱️ AutoML Time Budget")
             time_budget = st.slider(
                 "Set the time budget for AutoML training (in seconds):",
-                min_value=60,
-                max_value=1200,
-                value=300,
-                step=60,
+                min_value=60, max_value=1200, value=300, step=60,
                 help="Increase the time budget for larger datasets or more complex models."
             )
+
+            # Determine the last historical date and set a minimum future date
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
-                # Determine the maximum date from the raw data
                 last_date_in_data = data[date_column].max()
-                # We'll allow scenario start/end to be at least the day after the last historical date
                 min_future_date = (last_date_in_data + pd.DateOffset(days=1)).date()
 
                 st.sidebar.markdown("### 🎯 Scenario Planning")
                 demand_shock = st.sidebar.slider(
                     "Simulate Demand Shock (% Change in Sales):",
-                    min_value=-50,
-                    max_value=50,
-                    value=0,
-                    step=5
+                    min_value=-50, max_value=50, value=0, step=5
                 )
                 seasonality_adjustment = st.sidebar.slider(
                     "Adjust Seasonality Strength (% Change):",
-                    min_value=-50,
-                    max_value=50,
-                    value=0,
-                    step=5
+                    min_value=-50, max_value=50, value=0, step=5
                 )
                 external_shock = st.sidebar.checkbox("Simulate External Shock (e.g., Economic Downturn)")
 
+                # Build dynamic category adjustments dictionary for future forecast adjustments only.
                 category_scenarios = {}
                 if category_columns:
                     st.sidebar.markdown("### 🎯 Scenario Planning by Category (Dynamic)")
@@ -702,22 +679,20 @@ def main():
                             with st.sidebar.expander(f"Adjust '{cat}' in '{col}'"):
                                 cat_adjust = st.slider(
                                     f"Percentage change for '{cat}'",
-                                    min_value=-50,
-                                    max_value=50,
-                                    value=0,
-                                    step=5,
+                                    min_value=-50, max_value=50, value=0, step=5,
                                     help=f"Adjust sales for category '{cat}' within column '{col}'"
                                 )
-                                # Use min_future_date as both the default value and the minimum allowed date
+                                # Set default and minimum future dates so users cannot choose historical dates.
                                 cat_start = st.date_input(
                                     f"Start date for '{cat}'",
                                     value=min_future_date,
                                     min_value=min_future_date
                                 )
+                                default_end = (last_date_in_data + pd.DateOffset(months=1)).date()
                                 cat_end = st.date_input(
                                     f"End date for '{cat}'",
-                                    value=min_future_date,
-                                    min_value=cat_start  # ensure end_date >= start_date
+                                    value=default_end if default_end > min_future_date else min_future_date,
+                                    min_value=cat_start
                                 )
                                 category_scenarios[col][cat] = {
                                     "adjustment": cat_adjust,
@@ -738,7 +713,9 @@ def main():
                                            help="Click to generate your AI-powered forecast")
             else:
                 start_forecast = st.button("⏳ Select Columns First", disabled=True, key="start_disabled")
+
             if start_forecast:
+                # STEP 1: Preprocess data (historical data remains unchanged)
                 step = 1
                 step_message.text(f"Step {step} of {total_steps}: Preprocessing data...")
                 with st.spinner("🔍 Preprocessing data..."):
@@ -754,32 +731,15 @@ def main():
                 overall_status.info(f"🔍 Last Historical Date: {last_historical_date}")
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(0.5)
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Applying business scenarios...")
-                with st.spinner("🔍 Applying scenarios to training data..."):
-                    scenario_data = apply_scenarios(
-                        data=processed_data.copy(),
-                        demand_shock=demand_shock,
-                        seasonality_adjustment=seasonality_adjustment,
-                        external_shock=external_shock,
-                        category_scenarios=category_scenarios
-                    )
-                    time.sleep(1)
-                adjustments_made = (demand_shock != 0 or seasonality_adjustment != 0 or external_shock)
-                if category_scenarios:
-                    for col, cat_dict in category_scenarios.items():
-                        for cat_val, details in cat_dict.items():
-                            if details.get("adjustment", 0) != 0:
-                                adjustments_made = True
-                                break
-                        if adjustments_made:
-                            break
-                if adjustments_made:
-                    st.success("✅ Scenarios Applied!")
-                else:
-                    st.info("No scenario adjustments were made.")
+
+                # IMPORTANT: Do NOT apply any adjustments to historical data.
+                # Use processed_data directly for training.
+                scenario_data = processed_data.copy()
+                st.info("Historical data remains unchanged. All scenario adjustments will only affect future forecasts.")
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(0.5)
+
+                # STEP 2: Review Processed Data
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Reviewing processed data...")
                 st.markdown(
@@ -787,13 +747,13 @@ def main():
                     <div style="text-align: center;">
                         <h2 style="color: #2B3A42;">📅 Preprocessed Monthly Data</h2>
                     </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                    """, unsafe_allow_html=True)
                 with st.expander("📊 View Processed Data"):
                     st.dataframe(scenario_data.style.set_properties(**{"text-align": "center"}), width=1400, height=450)
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(0.5)
+
+                # STEP 3: Split Data into Training and Test Sets
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Splitting data into training and test sets...")
                 testing_period = int(len(scenario_data) * 0.2)
@@ -802,6 +762,8 @@ def main():
                 forecast_period = 24
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
+
+                # STEP 4: Tune Prophet Model
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Tuning Prophet model...")
                 with st.spinner("🚀 Finding the best Prophet hyperparameters..."):
@@ -814,38 +776,57 @@ def main():
                 overall_status.write(f"📉 Best RMSE (CV): {best_rmse:.2f}")
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
+
+                # STEP 5: Train Prophet Model (forecast adjustments applied here)
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training Prophet model...")
                 with st.spinner("🚀 Training Prophet Model..."):
-                    prophet_model_name, prophet_res = train_prophet_model(train, test, forecast_period, best_params, last_historical_value, y_original, category_scenarios)
+                    prophet_model_name, prophet_res = train_prophet_model(
+                        train, test, forecast_period, best_params, last_historical_value, y_original,
+                        demand_shock, seasonality_adjustment, external_shock, category_scenarios
+                    )
                     time.sleep(1)
                 prophet_status.success("✅ Prophet Model Training Complete!")
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
+
+                # STEP 6: Train ARIMA Model (forecast adjustments applied here)
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training ARIMA model...")
                 with st.spinner("🚀 Training ARIMA Model..."):
-                    arima_model_name, arima_res = train_arima_model(train, test, forecast_period, last_historical_value, y_original, category_scenarios)
+                    arima_model_name, arima_res = train_arima_model(
+                        train, test, forecast_period, last_historical_value, y_original, category_scenarios
+                    )
                     time.sleep(1)
                 arima_status.success("✅ ARIMA Model Training Complete!")
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
+
+                # STEP 7: Train XGBoost Model (forecast adjustments will be applied in its function if needed)
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training XGBoost model...")
                 with st.spinner("🚀 Training XGBoost Model..."):
-                    xgb_model_name, xgb_res = train_xgb_model(train, test, forecast_period, last_historical_value, y_original)
+                    xgb_model_name, xgb_res = train_xgb_model(
+                        train, test, forecast_period, last_historical_value, y_original
+                    )
                     time.sleep(1)
                 xgb_status.success("✅ XGBoost Model Training Complete!")
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
+
+                # STEP 8: Train AutoML Model (forecast adjustments applied inside its function)
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
                 with st.spinner("🚀 Training AutoML Model..."):
-                    automl_model_name, automl_res = train_automl_model(train, test, forecast_period, last_historical_value, y_original, time_budget)
+                    automl_model_name, automl_res = train_automl_model(
+                        train, test, forecast_period, last_historical_value, y_original, time_budget
+                    )
                     time.sleep(1)
                 automl_status.success("✅ AutoML Model Training Complete!")
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
+
+                # STEP 9: Compile Forecast Results
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Compiling forecast results...")
                 st.success("🎉 Forecasting process completed!")
@@ -863,6 +844,8 @@ def main():
                 st.session_state.model_results = valid_results
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
+
+                # STEP 10: Display Model Performance Comparison
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Displaying model performance comparison...")
                 comparison_data = []
@@ -893,6 +876,8 @@ def main():
                     st.warning("No model results found. Please train the models first.")
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
+
+                # STEP 11: Finalize Forecast Visualization
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
                 st.markdown("### 🔍 Forecast Comparison Across Models")
@@ -941,6 +926,7 @@ def main():
                     )
                 except Exception as e:
                     st.error(f"❌ Error generating download file: {e}")
+
         except Exception as e:
             st.error(f"Error processing file: {e}")
 
