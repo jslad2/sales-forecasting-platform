@@ -779,13 +779,28 @@ def main():
 
                 # Build dynamic category adjustments dictionary
                 category_scenarios = {}
+
                 if category_columns:
                     st.sidebar.markdown("### 🎯 Scenario Planning by Category (Dynamic)")
+                    
                     for col in category_columns:
-                        st.sidebar.markdown(f"#### Adjustments for {col}")
-                        unique_cats = data[col].dropna().unique()
+                        st.sidebar.markdown(f"#### Adjustments for '{col}'")
+                        
+                        # 1) Get all unique categories in the current column
+                        unique_cats = sorted(data[col].dropna().unique())
+
+                        # 2) Let the user pick which categories they want to adjust
+                        selected_cats = st.sidebar.multiselect(
+                            f"Pick categories in '{col}' to adjust:",
+                            options=unique_cats,
+                            help=f"Select one or more categories from '{col}' that you want to apply adjustments to."
+                        )
+
+                        # Initialize a dictionary for this column
                         category_scenarios[col] = {}
-                        for cat in unique_cats:
+
+                        # 3) Only create sliders/date inputs for the selected categories
+                        for cat in selected_cats:
                             with st.sidebar.expander(f"Adjust '{cat}' in '{col}'"):
                                 cat_adjust = st.slider(
                                     f"Percentage change for '{cat}'",
@@ -803,6 +818,8 @@ def main():
                                     f"End date for '{cat}'",
                                     value=data[date_column].max().to_pydatetime()
                                 )
+
+                                # Store the user's inputs in the dictionary
                                 category_scenarios[col][cat] = {
                                     "adjustment": cat_adjust,
                                     "start_date": cat_start,
@@ -810,6 +827,7 @@ def main():
                                 }
                 else:
                     st.sidebar.markdown("ℹ️ No category columns selected. Category-based scenario planning is disabled.")
+
             else:
                 st.sidebar.warning("Please select the Date and Sales columns to enable scenario planning.")
                 # Set default values to prevent undefined errors
