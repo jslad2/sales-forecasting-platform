@@ -68,53 +68,6 @@ else:
         unsafe_allow_html=True,
     )
 
-# Load environment variables from .env
-# load_dotenv()
-
-# Initialize Supabase Client
-# supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
-
-def is_feature_available(subscription_level, feature):
-    subscription_levels = {
-        "Free": {
-            "Basic Forecasting": True,
-            "Best Model Selection": False,
-            "AutoML Hyperparameter Tuning": False,
-            "Custom Forecast Intervals": False,
-            "Scenario Planning & Demand Shocks": False,
-            "Business Impact Insights": False,
-            "Anomaly Detection": False,
-            "Alerts & Monitoring": False,
-            "Google Sheets & Excel Exports": False,
-            "Multi-User Access & API Integration": False
-        },
-        "basic": {
-            "Basic Forecasting": True,
-            "Best Model Selection": True,
-            "AutoML Hyperparameter Tuning": False,
-            "Custom Forecast Intervals": True,
-            "Scenario Planning & Demand Shocks": False,
-            "Business Impact Insights": True,
-            "Anomaly Detection": False,
-            "Alerts & Monitoring": False,
-            "Google Sheets & Excel Exports": True,
-            "Multi-User Access & API Integration": False
-        },
-        "premium": {
-            "Basic Forecasting": True,
-            "Best Model Selection": True,
-            "AutoML Hyperparameter Tuning": True,
-            "Custom Forecast Intervals": True,
-            "Scenario Planning & Demand Shocks": True,
-            "Business Impact Insights": True,
-            "Anomaly Detection": True,
-            "Alerts & Monitoring": True,
-            "Google Sheets & Excel Exports": True,
-            "Multi-User Access & API Integration": True
-        }
-    }
-    return subscription_levels.get(subscription_level, {}).get(feature, False)
-
 def check_stationarity(series):
     adf_result = adfuller(series, autolag="AIC")
     adf_p_value = adf_result[1]
@@ -146,34 +99,30 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
 
         # 4. Handle category columns
         if category_columns:
-            # Ensure category_columns is a list (even if it's a single column)
             if not isinstance(category_columns, list):
                 category_columns = [category_columns]
-            # Group by monthly period + category columns
             grouping_cols = ["year_month"] + category_columns
         else:
-            # Group by monthly period only
             grouping_cols = ["year_month"]
 
         # 5. Aggregate (sum) sales at the monthly level
         data = data.groupby(grouping_cols, as_index=False)["y"].sum()
 
-        # 6. Convert 'year_month' back to a proper datetime.
-        # We use the start of the month and reformat to "YYYY-MM" so that the day is not shown.
+        # 6. Convert 'year_month' back to a proper datetime (start-of-month)
         data["ds"] = pd.to_datetime(data["year_month"].dt.to_timestamp(how="start").dt.strftime("%Y-%m"),
                                     format="%Y-%m")
         data.drop(columns=["year_month"], inplace=True)
 
-        # 7. Check for duplicate dates (and categories) after aggregation
+        # 7. Remove duplicates if any
         subset_cols = ["ds"] + (category_columns if category_columns else [])
         if data.duplicated(subset=subset_cols).any():
             st.warning("⚠️ Duplicate date/category combinations found. Removing duplicates...")
             data = data.drop_duplicates(subset=subset_cols, keep="last")
 
-        # 8. Store original values (for plotting/inspection later)
+        # 8. Original values for inspection
         y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
 
-        # 9. Check stationarity of the aggregated series
+        # 9. Check stationarity
         stationarity_result = check_stationarity(data["y"])
         st.markdown(
             f"""
@@ -192,7 +141,10 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             data["y_diff"] = data["y"].diff()
             last_historical_value = data["y"].iloc[-1]
 
-            # Visualization: Original vs. Differenced
+            # Debug: show last rows
+            st.write("DEBUG: Last rows of data BEFORE differencing:", data.tail())
+
+            # Visualization
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=data["ds"],
@@ -217,16 +169,16 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             )
             st.plotly_chart(fig, use_container_width=True)
 
-            # Remove NaNs from differencing and clean up the DataFrame
             differenced_data = data.dropna(subset=["y_diff"]).drop(columns=["y"])
             differenced_data = differenced_data.rename(columns={"y_diff": "y"})
             differenced_data = differenced_data.reset_index(drop=True)
             differenced_data.columns = differenced_data.columns.astype(str)
 
+            st.write("DEBUG: Last rows of data AFTER differencing:", differenced_data.tail())
             return differenced_data[["ds", "y"]], last_historical_value, y_original
 
         else:
-            # If already stationary, just visualize the original monthly series
+            # Visualization
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=data["ds"],
@@ -244,7 +196,6 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             )
             st.plotly_chart(fig, use_container_width=True)
 
-            # Return the monthly-aggregated data without differencing
             data = data.reset_index(drop=True)
             return data[["ds", "y"]], None, y_original
 
@@ -254,39 +205,21 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
         return None, None, None
 
 def inverse_difference(forecast_data, first_value):
-    """
-    Reverse differencing to restore original scale.
-    
-    :param forecast_data: DataFrame or Series containing the forecasted values.
-    :param first_value: The last historical value before differencing.
-    :return: DataFrame or Series with restored values.
-    """
     if first_value is not None:
-        # Ensure first_value is numeric
         if not isinstance(first_value, (int, float)):
-            raise ValueError("first_value must be a numeric value (int or float).")
-
-        # Convert Series to DataFrame if necessary
+            raise ValueError("first_value must be numeric.")
         if isinstance(forecast_data, pd.Series):
             forecast_data = forecast_data.to_frame(name="yhat")
 
-        # Restore original values using cumulative sums
         if "yhat" in forecast_data.columns:
             forecast_data["yhat"] = first_value + forecast_data["yhat"].cumsum()
         
-        # Restore upper and lower bounds if they exist
         if "yhat_upper" in forecast_data.columns:
             forecast_data["yhat_upper"] = first_value + forecast_data["yhat_upper"].cumsum()
         
         if "yhat_lower" in forecast_data.columns:
             forecast_data["yhat_lower"] = first_value + forecast_data["yhat_lower"].cumsum()
-    
     return forecast_data
-
-    # if last_historical_value is not None:
-    #     prophet_forecast["yhat"] = last_historical_value + prophet_forecast["yhat"].cumsum() - prophet_forecast["yhat"].iloc[0]
-    #     prophet_forecast["yhat_upper"] = last_historical_value + prophet_forecast["yhat_upper"].cumsum() - prophet_forecast["yhat_upper"].iloc[0]
-    #     prophet_forecast["yhat_lower"] = last_historical_value + prophet_forecast["yhat_lower"].cumsum() - prophet_forecast["yhat_lower"].iloc[0]
 
 def detect_and_add_seasonalities(model, data):
     data_frequency = pd.infer_freq(data["ds"])
@@ -345,10 +278,12 @@ def find_best_prophet_params(train):
     best_params = None
     best_rmse = float("inf")
     
-    # Use a ThreadPoolExecutor to evaluate parameter combinations concurrently
     grid = list(ParameterGrid(param_grid))
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = {executor.submit(evaluate_prophet_params, params, train, initial, horizon, period): params for params in grid}
+        futures = {
+            executor.submit(evaluate_prophet_params, params, train, initial, horizon, period): params
+            for params in grid
+        }
         for future in concurrent.futures.as_completed(futures):
             params, rmse = future.result()
             if rmse < best_rmse:
@@ -356,82 +291,70 @@ def find_best_prophet_params(train):
                 best_params = params
     return best_params, best_rmse
 
-def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock, category_columns=None, category_adjustments=None, category_date_ranges=None):
-    """
-    Apply scenario adjustments to the training data.
-    Supports global adjustments (demand shock, seasonality, external shock) and category-specific adjustments.
-    """
+def apply_scenarios(data, demand_shock, seasonality_adjustment, external_shock,
+                    category_columns=None, category_adjustments=None, category_date_ranges=None):
     try:
-        # Validate input data
         if data is None or data.empty:
             st.error("❌ No data provided. Please check your input.")
             return data
 
-        # Ensure required columns are present
         if "ds" not in data.columns or "y" not in data.columns:
             st.error("❌ Required columns 'ds' (date) and 'y' (sales) are missing.")
             return data
 
-        # Apply global demand shock
         if demand_shock != 0:
             data["y"] = data["y"] * (1 + demand_shock / 100)
             st.write(f"✅ Applied global demand shock: {demand_shock}%")
 
-        # Apply global seasonality adjustment
         if seasonality_adjustment != 0:
             data["month"] = data["ds"].dt.month
             seasonality_multiplier = 1 + seasonality_adjustment / 100
-            data["y"] = data["y"] * (1 + (data["month"] - 1) * (seasonality_multiplier - 1) / 12)
+            data["y"] = data["y"] * (
+                1 + (data["month"] - 1) * (seasonality_multiplier - 1) / 12
+            )
             st.write(f"✅ Applied global seasonality adjustment: {seasonality_adjustment}%")
 
-        # Apply global external shock
         if external_shock:
-            data["y"] = data["y"] * 0.8  # Simulate a 20% reduction in sales
+            data["y"] = data["y"] * 0.8
             st.write("✅ Applied global external shock: 20% reduction in sales")
 
-        # Apply category-specific adjustments if categories are selected
         if category_columns and category_adjustments and category_date_ranges:
             st.write("🔍 Applying category-specific adjustments...")
-            
             for category_column, category_adjustment in zip(category_columns, category_adjustments):
                 if category_column in data.columns:
-                    # Get the date range for the current category
                     start_date, end_date = category_date_ranges[category_column]
-
-                    # Convert start_date and end_date to datetime
                     start_date = pd.to_datetime(start_date)
                     end_date = pd.to_datetime(end_date)
 
-                    # Filter data for the selected time period
-                    scenario_data = data[
-                        (data["ds"] >= start_date) & 
-                        (data["ds"] <= end_date)
-                    ]
-                    
-                    # Apply adjustments to all categories in the column
+                    scenario_data = data[(data["ds"] >= start_date) & (data["ds"] <= end_date)]
                     for category in scenario_data[category_column].unique():
-                        # Increase or decrease sales for the selected category
-                        scenario_data.loc[scenario_data[category_column] == category, "y"] *= (1 + category_adjustment / 100)
-                        st.write(f"✅ Applied {category_adjustment}% adjustment to {category_column}: {category} (from {start_date.date()} to {end_date.date()})")
-
-                    # Update the main data with the adjusted values
+                        scenario_data.loc[scenario_data[category_column] == category, "y"] *= (
+                            1 + category_adjustment / 100
+                        )
+                        st.write(
+                            f"✅ Applied {category_adjustment}% adjustment to {category_column}: {category} "
+                            f"(from {start_date.date()} to {end_date.date()})"
+                        )
                     data.update(scenario_data)
                 else:
-                    st.warning(f"⚠️ Column '{category_column}' not found in the dataset. Skipping adjustments for this category.")
+                    st.warning(
+                        f"⚠️ Column '{category_column}' not found in the dataset. "
+                        f"Skipping adjustments for this category."
+                    )
         elif category_columns:
             st.warning("⚠️ No time period selected for category-specific adjustments. Skipping.")
 
-        # Return the modified data
         return data
 
     except Exception as e:
         st.error(f"❌ An error occurred while applying scenarios: {e}")
         st.error(f"Debug Info: Columns in data - {data.columns}, Data Shape - {data.shape}")
-        return data  # Return the original data in case of an error
+        return data
 
 def train_prophet_model(train, test, forecast_period, best_params, last_historical_value, y_original):
     result = {}
     try:
+        st.write("DEBUG: Prophet - last training date:", train["ds"].iloc[-1])
         model = Prophet(
             seasonality_mode=best_params["seasonality_mode"],
             changepoint_prior_scale=best_params["changepoint_prior_scale"]
@@ -441,9 +364,16 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         except Exception as e:
             st.warning(f"Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
         model.fit(train)
-        future = model.make_future_dataframe(periods=forecast_period, freq="M", include_history=False)
+        
+        # Use MS for start-of-month alignment
+        future = model.make_future_dataframe(periods=forecast_period, freq="MS", include_history=False)
+        st.write("DEBUG: Prophet - first forecast date (unfiltered):", future["ds"].iloc[0])
         forecast = model.predict(future)
         forecast = forecast[forecast["ds"] > train["ds"].max()]
+        
+        st.write("DEBUG: Prophet - first forecast date (filtered):", forecast["ds"].iloc[0])
+        st.write("DEBUG: Prophet - last forecast date:", forecast["ds"].iloc[-1])
+        
         matching_length = min(len(test["y"]), len(forecast))
         rmse = mean_squared_error(test["y"].iloc[:matching_length], forecast["yhat"].iloc[:matching_length]) ** 0.5
         mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], forecast["yhat"].iloc[:matching_length])
@@ -457,6 +387,7 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
 def train_arima_model(train, test, forecast_period, last_historical_value, y_original):
     result = {}
     try:
+        st.write("DEBUG: ARIMA - last training date:", train["ds"].iloc[-1])
         try:
             decomposition = seasonal_decompose(train["y"], model="additive", period=12)
             seasonality_present = np.any(np.abs(decomposition.seasonal) > 0.01)
@@ -484,7 +415,16 @@ def train_arima_model(train, test, forecast_period, last_historical_value, y_ori
         arima_forecast = model.predict(n_periods=forecast_period)
         if len(arima_forecast) < forecast_period:
             forecast_period = len(arima_forecast)
-        forecast_dates = pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M")
+        
+        # Use MS for start-of-month alignment
+        forecast_dates = pd.date_range(
+            start=train["ds"].iloc[-1] + pd.DateOffset(months=1),
+            periods=forecast_period,
+            freq="MS"
+        )
+        st.write("DEBUG: ARIMA - forecast start date:", forecast_dates[0])
+        st.write("DEBUG: ARIMA - forecast end date:", forecast_dates[-1])
+        
         forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": arima_forecast[:forecast_period]})
         if isinstance(last_historical_value, (int, float)):
             forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
@@ -499,18 +439,19 @@ def train_arima_model(train, test, forecast_period, last_historical_value, y_ori
 def train_xgb_model(train, test, forecast_period, last_historical_value, y_original):
     result = {}
     try:
+        st.write("DEBUG: XGBoost - last training date:", train["ds"].iloc[-1])
+        
         max_lag = min(12, len(train) - 1)
         rolling_windows = [3, 6] if len(train) > 6 else [3]
         data_xgb = train.copy()
         
-        # Create lag features for training
+        # Create lag features
         for lag in range(1, max_lag + 1):
             data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
         for window in rolling_windows:
             data_xgb[f"rolling_mean_{window}"] = data_xgb["y"].rolling(window=window).mean()
             data_xgb[f"rolling_std_{window}"] = data_xgb["y"].rolling(window=window).std()
         
-        # Create time-based features
         data_xgb["month"] = data_xgb["ds"].dt.month
         data_xgb["quarter"] = data_xgb["ds"].dt.quarter
         data_xgb["year"] = data_xgb["ds"].dt.year
@@ -533,20 +474,18 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, y_origi
         )
         model.fit(X_train, y_train)
         
-        # Iterative forecasting: update lag features with predicted values
+        # Iterative forecasting
         future_forecasts = []
-        # Start with the last row from training data (which has all lag and rolling features)
         last_row = data_xgb.iloc[-1].copy()
         last_date = train["ds"].iloc[-1]
         
         for i in range(forecast_period):
-            # Update time features for the forecast period:
             future_date = last_date + pd.DateOffset(months=i+1)
-            # Create a feature vector for this step based on last_row values
             future_row = {}
             for col in feature_cols:
                 future_row[col] = last_row[col]
-            # Override the time features with new date values
+            
+            # Update time-based features for the new future_date
             future_row["month"] = future_date.month
             future_row["quarter"] = future_date.quarter
             future_row["year"] = future_date.year
@@ -557,51 +496,42 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, y_origi
             pred = model.predict(X_future)[0]
             future_forecasts.append(pred)
             
-            # Now update the lag features in last_row for the next forecast:
-            # Shift lags: lag_2 becomes lag_3, ..., lag_max becomes lag_max+1 (dropping the last)
+            # Shift lag features
             for lag in range(max_lag, 1, -1):
                 last_row[f"lag_{lag}"] = last_row[f"lag_{lag-1}"]
             last_row["lag_1"] = pred
-            # (Optional: update rolling features if you wish; here we keep them constant)
+            # Rolling features remain unchanged for simplicity
         
-        # Construct forecast DataFrame
-        forecast_dates = pd.date_range(start=last_date + pd.DateOffset(months=1), periods=forecast_period, freq="M")
+        # Construct forecast DataFrame with freq="MS"
+        forecast_dates = pd.date_range(
+            start=last_date + pd.DateOffset(months=1),
+            periods=forecast_period,
+            freq="MS"
+        )
+        st.write("DEBUG: XGBoost - forecast start date:", forecast_dates[0])
+        st.write("DEBUG: XGBoost - forecast end date:", forecast_dates[-1])
+        
         forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": future_forecasts})
         
-        # Optionally inverse difference if differencing was applied
         if isinstance(last_historical_value, (int, float)):
             forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
         
         matching_length = min(len(test["y"]), len(forecast_df))
         rmse = mean_squared_error(test["y"].iloc[:matching_length], forecast_df["yhat"].iloc[:matching_length]) ** 0.5
         mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], forecast_df["yhat"].iloc[:matching_length])
+        
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
     except Exception as e:
         st.warning(f"XGBoost Model failed: {e}")
     return ("XGBoost", result)
 
 def train_automl_model(train, test, forecast_period, last_historical_value, y_original, time_budget=None):
-    """
-    Train an AutoML model using FLAML for time series forecasting.
-
-    Args:
-        train (pd.DataFrame): Training data with columns "ds" (date) and "y" (target).
-        test (pd.DataFrame): Test data for evaluation.
-        forecast_period (int): Number of periods to forecast.
-        last_historical_value (float): Last observed value before differencing (if applied).
-        y_original (pd.DataFrame): Original target values for comparison.
-        time_budget (int or None): Time budget in seconds for AutoML training. If None, it is dynamically calculated.
-
-    Returns:
-        tuple: Model name ("AutoML") and a dictionary containing RMSE, MAPE, and forecast DataFrame.
-    """
     result = {}
     try:
-        # Feature Engineering
-        data_automl = train.copy()
+        st.write("DEBUG: AutoML - last training date:", train["ds"].iloc[-1])
 
-        # Determine maximum lag based on dataset size
-        max_lag = min(24, len(train) - 1)  # Cap at 24 lags
+        data_automl = train.copy()
+        max_lag = min(24, len(train) - 1)
         if len(train) <= 6:
             max_lag = min(3, len(train) - 1)
         elif len(train) <= 12:
@@ -609,54 +539,39 @@ def train_automl_model(train, test, forecast_period, last_historical_value, y_or
         elif len(train) <= 24:
             max_lag = min(12, len(train) - 1)
 
-        # Add lag features
         for lag in range(1, max_lag + 1):
             data_automl[f"lag_{lag}"] = data_automl["y"].shift(lag)
 
-        # Add rolling statistics
         for window in [3, 6, 12]:
             data_automl[f"rolling_mean_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).mean()
             data_automl[f"rolling_std_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).std()
 
-        # Add year-over-year growth (if sufficient data)
         if len(train) > 12:
             data_automl["yoy_growth"] = (data_automl["y"] / data_automl["y"].shift(12)) - 1
         else:
             data_automl["yoy_growth"] = 0
 
-        # Add differenced values
         data_automl["y_diff"] = data_automl["y"].diff().fillna(0)
-
-        # Add rolling mean growth
         data_automl["rolling_mean_growth"] = data_automl["y"].rolling(window=3).mean().diff().fillna(0)
-
-        # Add trigonometric features for seasonality
         data_automl["sin_month"] = np.sin(2 * np.pi * data_automl["ds"].dt.month / 12)
         data_automl["cos_month"] = np.cos(2 * np.pi * data_automl["ds"].dt.month / 12)
 
-        # Log-transform if the target variable has a large range
-        if data_automl["y"].max() / data_automl["y"].min() > 5:
+        if data_automl["y"].min() > 0 and (data_automl["y"].max() / data_automl["y"].min() > 5):
             data_automl["y_log"] = np.log1p(data_automl["y"])
             apply_log = True
         else:
             data_automl["y_log"] = data_automl["y"]
             apply_log = False
 
-        # Drop rows with missing values
         data_automl.dropna(inplace=True)
-
-        # Prepare features and target
         feature_cols = [col for col in data_automl.columns if col not in ["y", "ds", "y_log"]]
         y_train = data_automl["y_log"] if apply_log else data_automl["y"]
         X_train = data_automl[feature_cols]
 
-        # Dynamic time budget calculation (if not provided)
         if time_budget is None:
-            # Base time budget on dataset size and number of features
-            time_budget = min(600, max(60, len(train) * 0.1 + len(feature_cols) * 2))  # 60s to 600s
-            st.info(f"Dynamic time budget set to {time_budget} seconds based on dataset size and complexity.")
+            time_budget = min(600, max(60, len(train) * 0.1 + len(feature_cols) * 2))
+            st.info(f"Dynamic time budget set to {time_budget} seconds.")
 
-        # Train AutoML model
         automl_model = AutoML()
         automl_model.fit(
             X_train=X_train,
@@ -666,11 +581,10 @@ def train_automl_model(train, test, forecast_period, last_historical_value, y_or
             eval_method="cv",
             estimator_list=["xgboost", "lgbm", "rf", "catboost"],
             metric="r2",
-            early_stop=True,  # Enable early stopping
-            verbose=1  # Show progress
+            early_stop=True,
+            verbose=1
         )
 
-        # Generate future features for forecasting
         future_features = []
         last_row = data_automl.iloc[-1].copy()
         for i in range(forecast_period):
@@ -682,9 +596,13 @@ def train_automl_model(train, test, forecast_period, last_historical_value, y_or
                     future_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
             for window in [3, 6, 12]:
                 if apply_log:
-                    future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y_log"] - last_row[f"lag_{window}"]) / window
+                    future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (
+                        last_row["y_log"] - last_row[f"lag_{window}"]
+                    ) / window
                 else:
-                    future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y"] - last_row[f"lag_{window}"]) / window
+                    future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (
+                        last_row["y"] - last_row[f"lag_{window}"]
+                    ) / window
                 future_row[f"rolling_std_{window}"] = last_row[f"rolling_std_{window}"]
             future_row["yoy_growth"] = last_row["yoy_growth"]
             future_row["y_diff"] = last_row["y_diff"]
@@ -692,40 +610,44 @@ def train_automl_model(train, test, forecast_period, last_historical_value, y_or
             future_row["sin_month"] = np.sin(2 * np.pi * (last_row["ds"].month + i) / 12)
             future_row["cos_month"] = np.cos(2 * np.pi * (last_row["ds"].month + i) / 12)
             future_features.append(future_row)
-            last_row = last_row.copy()
             for key, value in future_row.items():
                 last_row[key] = value
 
-        # Create future DataFrame
         future_df = pd.DataFrame(future_features)
         for col in X_train.columns:
             if col not in future_df.columns:
                 future_df[col] = 0
         future_df = future_df[X_train.columns]
 
-        # Generate forecasts
         automl_forecast = automl_model.predict(future_df)
         if apply_log:
             automl_forecast = np.expm1(automl_forecast)
 
-        # Create forecast DataFrame
+        # Use MS for start-of-month alignment
+        forecast_dates = pd.date_range(
+            start=train["ds"].iloc[-1] + pd.DateOffset(months=1),
+            periods=forecast_period,
+            freq="MS"
+        )
+        st.write("DEBUG: AutoML - forecast start date:", forecast_dates[0])
+        st.write("DEBUG: AutoML - forecast end date:", forecast_dates[-1])
+
         forecast_df = pd.DataFrame({
-            "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M"),
+            "ds": forecast_dates,
             "yhat": automl_forecast,
             "yhat_lower": automl_forecast * 0.9,
             "yhat_upper": automl_forecast * 1.1
         })
 
-        # Inverse differencing if applicable
         if isinstance(last_historical_value, (int, float)):
             forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
             forecast_df["yhat_lower"] = inverse_difference(forecast_df["yhat_lower"], last_historical_value)
             forecast_df["yhat_upper"] = inverse_difference(forecast_df["yhat_upper"], last_historical_value)
 
-        # Evaluate model performance
         matching_length = min(len(test["y"]), len(forecast_df))
         rmse = np.sqrt(mean_squared_error(test["y"].values, forecast_df["yhat"][:len(test["y"])]))
         mape = mean_absolute_percentage_error(test["y"].values, forecast_df["yhat"][:len(test["y"])])
+
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
 
     except Exception as e:
@@ -733,9 +655,6 @@ def train_automl_model(train, test, forecast_period, last_historical_value, y_or
     return ("AutoML", result)
 
 def shape_score(actual, forecast):
-    """
-    Compute the Pearson correlation coefficient between actual and forecast arrays.
-    """
     if len(actual) != len(forecast):
         min_len = min(len(actual), len(forecast))
         actual = actual[:min_len]
@@ -744,10 +663,6 @@ def shape_score(actual, forecast):
     return corr
 
 def combined_score(rmse, corr, max_rmse, alpha, beta):
-    """
-    Compute a combined score that weighs normalized RMSE and (1 - correlation).
-    Lower combined scores are better.
-    """
     norm_rmse = rmse / max_rmse
     return alpha * norm_rmse + beta * (1 - corr)
 
@@ -758,20 +673,17 @@ def main():
         st.warning("Upgrade to Premium to unlock advanced features!")
         st.stop()
 
-    # Reset button
     if st.button("🔄 Reset App"):
         st.session_state.clear()
         st.experimental_rerun()
 
-    # Placeholders for status messages
     overall_status = st.empty()
     prophet_status = st.empty()
     arima_status = st.empty()
     xgb_status = st.empty()
     automl_status = st.empty()
 
-    # Create a progress bar and step message
-    total_steps = 12  # total number of forecasting steps
+    total_steps = 12
     progress_bar = st.progress(0)
     step_message = st.empty()
 
@@ -818,7 +730,6 @@ def main():
             if date_column != "-- Select Column --":
                 data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
 
-            # Add Time Budget Slider
             st.markdown("### ⏱️ AutoML Time Budget")
             time_budget = st.slider(
                 "Set the time budget for AutoML training (in seconds):",
@@ -829,7 +740,6 @@ def main():
                 help="Increase the time budget for larger datasets or more complex models."
             )
 
-            # Scenario Planning on Sidebar
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
                 st.sidebar.markdown("### 🎯 Scenario Planning")
                 demand_shock = st.sidebar.slider(
@@ -878,12 +788,12 @@ def main():
                 st.sidebar.warning("Please select the Date and Sales columns to enable scenario planning.")
 
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
-                start_forecast = st.button("✅ Start Forecast", key="start_btn", help="Click to generate your AI-powered forecast")
+                start_forecast = st.button("✅ Start Forecast", key="start_btn",
+                                           help="Click to generate your AI-powered forecast")
             else:
                 start_forecast = st.button("⏳ Select Columns First", disabled=True, key="start_disabled")
 
             if start_forecast:
-                # STEP 1: Preprocessing
                 step = 1
                 step_message.text(f"Step {step} of {total_steps}: Preprocessing data...")
                 with st.spinner("🔍 Preprocessing data..."):
@@ -900,7 +810,6 @@ def main():
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(0.5)
 
-                # STEP 2: Apply scenarios
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Applying business scenarios...")
                 with st.spinner("🔍 Applying scenarios to training data..."):
@@ -918,7 +827,6 @@ def main():
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(0.5)
 
-                # STEP 3: View Processed Data
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Reviewing processed data...")
                 st.markdown(
@@ -935,17 +843,20 @@ def main():
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(0.5)
 
-                # STEP 4: Split Data
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Splitting data into training and test sets...")
                 testing_period = int(len(scenario_data) * 0.2)
                 train = scenario_data.iloc[:-testing_period]
                 test = scenario_data.iloc[-testing_period:]
                 forecast_period = 24
+
+                # Debug: show last date of train, first date of test
+                st.write("DEBUG: Train last date:", train["ds"].iloc[-1])
+                st.write("DEBUG: Test first date:", test["ds"].iloc[0])
+
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 5: Find Best Prophet Hyperparameters
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Tuning Prophet model...")
                 with st.spinner("🚀 Finding the best Prophet hyperparameters..."):
@@ -959,7 +870,6 @@ def main():
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 6: Train Prophet Model
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training Prophet model...")
                 with st.spinner("🚀 Training Prophet Model..."):
@@ -972,7 +882,6 @@ def main():
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 7: Train ARIMA Model
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training ARIMA model...")
                 with st.spinner("🚀 Training ARIMA Model..."):
@@ -985,7 +894,6 @@ def main():
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 8: Train XGBoost Model
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training XGBoost model...")
                 with st.spinner("🚀 Training XGBoost Model..."):
@@ -998,7 +906,6 @@ def main():
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 9: Train AutoML Model
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
                 with st.spinner("🚀 Training AutoML Model..."):
@@ -1011,7 +918,6 @@ def main():
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 10: Compile Results
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Compiling forecast results...")
                 st.success("🎉 Forecasting process completed!")
@@ -1026,7 +932,6 @@ def main():
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 11: Display Performance Comparison
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Displaying model performance comparison...")
                 if st.session_state.model_results:
@@ -1060,7 +965,6 @@ def main():
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 12: Plot Forecast Comparison & Download
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
                 st.markdown("### 🔍 Forecast Comparison Across Models")
