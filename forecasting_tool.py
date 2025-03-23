@@ -396,12 +396,10 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
 
     return "XGBoost", result
 
-def train_automl_model(train, test, forecast_period, last_historical_value, is_diff,
-                       time_budget=None, demand_shock=0, seasonality_adjustment=0,
-                       external_shock=False, category_scenarios=None):
+def train_automl_model(train, test, forecast_period, last_historical_value, is_diff, time_budget=None):
     result = {}
     try:
-        # Build lag & rolling features
+        # Feature engineering
         data_auto = train.copy()
         max_lag = min(24, len(train) - 1)
         if len(train) <= 6:
@@ -409,14 +407,14 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         elif len(train) <= 12:
             max_lag = min(6, len(train) - 1)
 
-        for lag in range(1, max_lag + 1):
+        for lag in range(1, max_lag+1):
             data_auto[f"lag_{lag}"] = data_auto["y"].shift(lag)
         for window in [3, 6, 12]:
             data_auto[f"rolling_mean_{window}"] = data_auto["y"].rolling(window, min_periods=1).mean()
             data_auto[f"rolling_std_{window}"] = data_auto["y"].rolling(window, min_periods=1).std()
 
         data_auto.dropna(inplace=True)
-        X_train = data_auto.drop(columns=["ds", "y"])
+        X_train = data_auto.drop(columns=["ds","y"])
         y_train = data_auto["y"]
 
         if time_budget is None:
@@ -425,28 +423,17 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
 
         automl = AutoML()
         if len(train) < 5:
-            automl.fit(
-                X_train=X_train,
-                y_train=y_train,
-                task="regression",
-                time_budget=time_budget,
-                eval_method="holdout",
-                split_ratio=0.8,
-                estimator_list=["xgboost", "lgbm", "rf", "catboost"],
-                metric="r2"
-            )
+            automl.fit(X_train=X_train, y_train=y_train,
+                       task="regression", time_budget=time_budget,
+                       eval_method="holdout", split_ratio=0.8,
+                       estimator_list=["xgboost","lgbm","rf","catboost"], metric="r2")
         else:
-            automl.fit(
-                X_train=X_train,
-                y_train=y_train,
-                task="regression",
-                time_budget=time_budget,
-                eval_method="cv",
-                estimator_list=["xgboost", "lgbm", "rf", "catboost"],
-                metric="r2"
-            )
+            automl.fit(X_train=X_train, y_train=y_train,
+                       task="regression", time_budget=time_budget,
+                       eval_method="cv",
+                       estimator_list=["xgboost","lgbm","rf","catboost"], metric="r2")
 
-        # Forecast future
+        # Forecast generation
         last_row = data_auto.iloc[-1].copy()
         preds, last_date = [], train["ds"].iloc[-1]
         for i in range(forecast_period):
@@ -462,12 +449,11 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             "ds": pd.date_range(start=last_date + pd.DateOffset(months=1), periods=forecast_period, freq="MS"),
             "yhat": preds
         })
-        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
+        # Evaluate performance
         match_len = min(len(test), len(forecast_df))
         rmse = np.sqrt(mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len]))
         mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
-
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
 
     except Exception as e:
