@@ -408,6 +408,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             max_lag = min(3, len(train) - 1)
         elif len(train) <= 12:
             max_lag = min(6, len(train) - 1)
+
         for lag in range(1, max_lag + 1):
             data_auto[f"lag_{lag}"] = data_auto["y"].shift(lag)
         for window in [3, 6, 12]:
@@ -423,21 +424,28 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             st.info(f"Dynamic time budget set to {time_budget} seconds.")
 
         automl = AutoML()
-        automl.fit(X_train=X_train, y_train=y_train, task="regression", time_budget=time_budget)
+        eval_method = "holdout" if len(train) < 5 else "cv"
+        automl.fit(
+            X_train=X_train,
+            y_train=y_train,
+            task="regression",
+            time_budget=time_budget,
+            eval_method=eval_method,
+            estimator_list=["xgboost", "lgbm", "rf", "catboost"],
+            metric="r2"
+        )
 
         # Forecast future
         last_row = data_auto.iloc[-1].copy()
-        preds = []
-        last_date = train["ds"].iloc[-1]
+        preds, last_date = [], train["ds"].iloc[-1]
         for i in range(forecast_period):
             future_date = last_date + pd.DateOffset(months=i+1)
-            future = {col: last_row[col] for col in X_train.columns}
-            Xf = pd.DataFrame([future])
-            preds.append(automl.predict(Xf)[0])
-            # shift lags
+            row = {col: last_row[col] for col in X_train.columns}
+            pred = automl.predict(pd.DataFrame([row]))[0]
+            preds.append(pred)
             for lag in range(max_lag, 1, -1):
                 last_row[f"lag_{lag}"] = last_row[f"lag_{lag-1}"]
-            last_row["lag_1"] = preds[-1]
+            last_row["lag_1"] = pred
 
         forecast_df = pd.DataFrame({
             "ds": pd.date_range(start=last_date + pd.DateOffset(months=1), periods=forecast_period, freq="MS"),
@@ -479,15 +487,15 @@ def main():
         st.session_state.clear()
         st.experimental_rerun()
 
-    overall_status = st.empty()
-    prophet_status = st.empty()
-    arima_status = st.empty()
-    xgb_status = st.empty()
-    automl_status = st.empty()
+    # overall_status = st.empty()
+    # prophet_status = st.empty()
+    # arima_status = st.empty()
+    # xgb_status = st.empty()
+    # automl_status = st.empty()
 
-    total_steps = 12
-    progress_bar = st.progress(0)
-    step_message = st.empty()
+    # total_steps = 12
+    # progress_bar = st.progress(0)
+    # step_message = st.empty()
 
     uploaded_file = st.file_uploader("Upload your sales data file", type=["csv"])
     if uploaded_file:
@@ -604,6 +612,16 @@ def main():
                                            help="Click to generate your AI-powered forecast")
             else:
                 start_forecast = st.button("⏳ Select Columns First", disabled=True, key="start_disabled")
+
+            overall_status = st.empty()
+            prophet_status = st.empty()
+            arima_status = st.empty()
+            xgb_status = st.empty()
+            automl_status = st.empty()
+
+            total_steps = 12
+            progress_bar = st.progress(0)
+            step_message = st.empty()
 
             if start_forecast:
                 # STEP 1: Preprocess data (historical data remains unchanged)
