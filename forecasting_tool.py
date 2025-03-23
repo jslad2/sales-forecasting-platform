@@ -244,7 +244,8 @@ def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_
         forecast_df = adjust_forecast_by_category(forecast_df, category_scenarios)
     return forecast_df
 
-def train_prophet_model(train, test, forecast_period, best_params, last_historical_value, y_original):
+def train_prophet_model(train, test, forecast_period, best_params, last_historical_value,
+                        is_diff, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
         model = Prophet(
