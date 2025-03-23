@@ -78,129 +78,54 @@ def check_stationarity(series):
 
 def preprocess_data(data, date_column, sales_column, category_columns=None):
     """
-    Preprocess the uploaded data, check stationarity, and apply transformations if needed.
-    Returns a dataframe with columns "ds" and "y" (and optionally categories) for Prophet compatibility.
-    Also returns the last historical value before forecasting if differencing is applied.
+    Preprocess the uploaded data for Prophet compatibility.
+    Returns:
+      - df_for_model: DataFrame with columns ds, y (differenced if non‑stationary)
+      - last_historical_value: Last original y value (needed to invert differencing) or None
+      - y_original: DataFrame of historical ds + original y values
+      - is_diff: Boolean indicating whether differencing was applied
     """
     try:
-        # 1. Convert date column to datetime
         data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
         data.dropna(subset=[date_column, sales_column], inplace=True)
-
-        # 2. Rename columns for Prophet compatibility
         data = data.rename(columns={date_column: "ds", sales_column: "y"})
-
-        # 3. Create a 'monthly' period column
         data["year_month"] = data["ds"].dt.to_period("M")
 
-        # 4. Handle category columns
-        if category_columns:
-            # Ensure category_columns is a list (even if it's a single column)
-            if not isinstance(category_columns, list):
-                category_columns = [category_columns]
-            # Group by monthly period + category columns
-            grouping_cols = ["year_month"] + category_columns
-        else:
-            # Group by monthly period only
-            grouping_cols = ["year_month"]
+        grouping = ["year_month"] + (category_columns if isinstance(category_columns, list) else ([category_columns] if category_columns else []))
+        data = data.groupby(grouping, as_index=False)["y"].sum()
 
-        # 5. Aggregate (sum) sales at the monthly level
-        data = data.groupby(grouping_cols, as_index=False)["y"].sum()
-
-        # 6. Convert 'year_month' back to a proper datetime.
-        # We use the start of the month and reformat to "YYYY-MM" so that the day is not shown.
-        data["ds"] = pd.to_datetime(data["year_month"].dt.to_timestamp(how="start").dt.strftime("%Y-%m"),
-                                    format="%Y-%m")
+        data["ds"] = pd.to_datetime(data["year_month"].dt.to_timestamp(how="start"))
         data.drop(columns=["year_month"], inplace=True)
 
-        # 7. Check for duplicate dates (and categories) after aggregation
-        subset_cols = ["ds"] + (category_columns if category_columns else [])
-        if data.duplicated(subset=subset_cols).any():
+        subset = ["ds"] + (category_columns or [])
+        if data.duplicated(subset=subset).any():
             st.warning("⚠️ Duplicate date/category combinations found. Removing duplicates...")
-            data = data.drop_duplicates(subset=subset_cols, keep="last")
+            data = data.drop_duplicates(subset=subset, keep="last")
 
-        # 8. Store original values (for plotting/inspection later)
-        y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
+        y_original = data[["ds","y"]].rename(columns={"y":"y_original"}).copy()
 
-        # 9. Check stationarity of the aggregated series
-        stationarity_result = check_stationarity(data["y"])
-        st.markdown(
-            f"""
-            <div style="text-align: center;">
-                <h2 style="color: #2B3A42;">📊 Stationarity Test</h2>
-                <p style="font-size: 1.2rem;">Conclusion: The series is <strong>{stationarity_result}</strong>.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        stationarity = check_stationarity(data["y"])
+        is_diff = (stationarity == "Non-Stationary")
+        st.markdown(f"""
+            <div style="text-align:center;">
+                <h2 style="color:#2B3A42;">📊 Stationarity Test</h2>
+                <p>The series is <strong>{stationarity}</strong>.</p>
+            </div>""", unsafe_allow_html=True)
 
-        # 10. If non-stationary, apply differencing
-        if stationarity_result == "Non-Stationary":
+        if is_diff:
             st.warning("Applying differencing to stabilize the series.")
-
-            data["y_diff"] = data["y"].diff()
             last_historical_value = data["y"].iloc[-1]
-
-            # Visualization: Original vs. Differenced
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=data["ds"],
-                y=data["y"],
-                mode="lines",
-                name="Original Series",
-                line=dict(color="blue", width=2)
-            ))
-            fig.add_trace(go.Scatter(
-                x=data["ds"].iloc[1:],
-                y=data["y_diff"].dropna(),
-                mode="lines",
-                name="Differenced Series",
-                line=dict(color="orange", width=2, dash="dot")
-            ))
-            fig.update_layout(
-                title="Original vs Differenced Series (Monthly)",
-                xaxis_title="Date (YYYY-MM)",
-                yaxis_title="Sales",
-                template="plotly_white",
-                xaxis_tickformat="%Y-%m"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-            # Remove NaNs from differencing and clean up the DataFrame
-            differenced_data = data.dropna(subset=["y_diff"]).drop(columns=["y"])
-            differenced_data = differenced_data.rename(columns={"y_diff": "y"})
-            differenced_data = differenced_data.reset_index(drop=True)
-            differenced_data.columns = differenced_data.columns.astype(str)
-
-            return differenced_data[["ds", "y"]], last_historical_value, y_original
-
+            data["y"] = data["y"].diff().dropna()
+            df_for_model = data.dropna(subset=["y"])[["ds","y"]].reset_index(drop=True)
         else:
-            # If already stationary, just visualize the original monthly series
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=data["ds"],
-                y=data["y"],
-                mode="lines",
-                name="Original Series (Monthly)",
-                line=dict(color="blue", width=2)
-            ))
-            fig.update_layout(
-                title="Original Series (Monthly)",
-                xaxis_title="Date (YYYY-MM)",
-                yaxis_title="Sales",
-                template="plotly_white",
-                xaxis_tickformat="%Y-%m"
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            last_historical_value = None
+            df_for_model = data[["ds","y"]].reset_index(drop=True)
 
-            # Return the monthly-aggregated data without differencing
-            data = data.reset_index(drop=True)
-            return data[["ds", "y"]], None, y_original
+        return df_for_model, last_historical_value, y_original, is_diff
 
     except Exception as e:
-        st.error(f"An error occurred during preprocessing: {e}")
-        st.error(f"Debug Info: Columns in data - {data.columns}, Data Shape - {data.shape}")
-        return None, None, None
+        st.error(f"Preprocessing error: {e}")
+        return None, None, None, False
 
 def inverse_difference(forecast_data, first_value):
     if first_value is not None:
@@ -319,8 +244,8 @@ def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_
         forecast_df = adjust_forecast_by_category(forecast_df, category_scenarios)
     return forecast_df
 
-def train_prophet_model(train, test, forecast_period, best_params, last_historical_value, y_original,
-                        demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
+def train_prophet_model(train, test, forecast_period, best_params, last_historical_value,
+                        is_diff, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
         model = Prophet(
@@ -331,21 +256,25 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
             model = detect_and_add_seasonalities(model, train)
         except Exception as e:
             st.warning(f"Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
+
         model.fit(train)
         future = model.make_future_dataframe(periods=forecast_period, freq="MS", include_history=False)
         forecast = model.predict(future)
         forecast = forecast[forecast["ds"] > train["ds"].max()]
-        # Apply forecast adjustments only
+
+        # Apply only future adjustments
         forecast = adjust_forecast(forecast, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
-        matching_length = min(len(test["y"]), len(forecast))
-        rmse = mean_squared_error(test["y"].iloc[:matching_length], forecast["yhat"].iloc[:matching_length]) ** 0.5
-        mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], forecast["yhat"].iloc[:matching_length])
-        if isinstance(last_historical_value, (int, float)):
-            forecast = inverse_difference(forecast, last_historical_value)
+
+        match_len = min(len(test["y"]), len(forecast))
+        rmse = mean_squared_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len], squared=False)
+        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len])
+
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast}
+
     except Exception as e:
         st.warning(f"Prophet Model failed: {e}")
-    return ("Prophet", result)
+
+    return "Prophet", result
 
 def train_arima_model(train, test, forecast_period, last_historical_value, y_original, 
                       demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
@@ -724,13 +653,14 @@ def main():
                 step = 1
                 step_message.text(f"Step {step} of {total_steps}: Preprocessing data...")
                 with st.spinner("🔍 Preprocessing data..."):
-                    processed_data, last_historical_value, y_original = preprocess_data(
+                    processed_data, last_historical_value, y_original, is_diff = preprocess_data(
                         data, date_column, sales_column, category_columns
                     )
                     time.sleep(1)
                 if processed_data is None:
                     st.error("Preprocessing failed. Please check your data.")
                     return
+
                 st.success("✅ Data Preprocessed Successfully!")
                 last_historical_date = y_original["ds"].max()
                 overall_status.info(f"🔍 Last Historical Date: {last_historical_date}")
@@ -782,15 +712,21 @@ def main():
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 5: Train Prophet Model (forecast adjustments applied here)
+                # STEP 5: Train Prophet Model
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training Prophet model...")
                 with st.spinner("🚀 Training Prophet Model..."):
                     prophet_model_name, prophet_res = train_prophet_model(
-                        train, test, forecast_period, best_params, last_historical_value, y_original,
+                        train, test, forecast_period, best_params,
+                        last_historical_value, is_diff,
                         demand_shock, seasonality_adjustment, external_shock, category_scenarios
                     )
                     time.sleep(1)
+
+                # Invert differencing exactly once (if applied)
+                if is_diff and prophet_res.get("Forecast") is not None:
+                    prophet_res["Forecast"] = inverse_difference(prophet_res["Forecast"], last_historical_value)
+
                 prophet_status.success("✅ Prophet Model Training Complete!")
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
