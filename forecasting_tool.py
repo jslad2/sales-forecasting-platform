@@ -244,8 +244,7 @@ def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_
         forecast_df = adjust_forecast_by_category(forecast_df, category_scenarios)
     return forecast_df
 
-def train_prophet_model(train, test, forecast_period, best_params, last_historical_value,
-                        is_diff, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
+def train_prophet_model(train, test, forecast_period, best_params, last_historical_value, y_original):
     result = {}
     try:
         model = Prophet(
@@ -256,25 +255,19 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
             model = detect_and_add_seasonalities(model, train)
         except Exception as e:
             st.warning(f"Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
-
         model.fit(train)
-        future = model.make_future_dataframe(periods=forecast_period, freq="MS", include_history=False)
+        future = model.make_future_dataframe(periods=forecast_period, freq="M", include_history=False)
         forecast = model.predict(future)
         forecast = forecast[forecast["ds"] > train["ds"].max()]
-
-        # Apply only future adjustments
-        forecast = adjust_forecast(forecast, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
-
-        match_len = min(len(test["y"]), len(forecast))
-        rmse = mean_squared_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len], squared=False)
-        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len])
-
+        matching_length = min(len(test["y"]), len(forecast))
+        rmse = mean_squared_error(test["y"].iloc[:matching_length], forecast["yhat"].iloc[:matching_length]) ** 0.5
+        mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], forecast["yhat"].iloc[:matching_length])
+        if isinstance(last_historical_value, (int, float)):
+            forecast = inverse_difference(forecast, last_historical_value)
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast}
-
     except Exception as e:
         st.warning(f"Prophet Model failed: {e}")
-
-    return "Prophet", result
+    return ("Prophet", result)
 
 def train_arima_model(train, test, forecast_period, last_historical_value, is_diff,
                       demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
