@@ -276,10 +276,11 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
 
     return "Prophet", result
 
-def train_arima_model(train, test, forecast_period, last_historical_value, y_original, 
+def train_arima_model(train, test, forecast_period, last_historical_value, is_diff,
                       demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
+        # Detect seasonality
         try:
             decomposition = seasonal_decompose(train["y"], model="additive", period=12)
             seasonality_present = np.any(np.abs(decomposition.seasonal) > 0.01)
@@ -289,6 +290,7 @@ def train_arima_model(train, test, forecast_period, last_historical_value, y_ori
         except Exception as e:
             st.warning(f"Error in seasonality analysis: {e}")
             seasonal = False
+
         model = auto_arima(
             train["y"],
             seasonal=seasonal,
@@ -299,205 +301,160 @@ def train_arima_model(train, test, forecast_period, last_historical_value, y_ori
             max_p=3, max_q=3,
             start_P=0, start_Q=0,
             max_P=2, max_Q=2,
-            trace=False,
             suppress_warnings=True,
             error_action="ignore",
             stepwise=True
         )
-        arima_forecast = model.predict(n_periods=forecast_period)
-        if len(arima_forecast) < forecast_period:
-            forecast_period = len(arima_forecast)
+
+        preds = model.predict(n_periods=forecast_period)
         forecast_dates = pd.date_range(
             start=train["ds"].iloc[-1] + pd.DateOffset(months=1),
-            periods=forecast_period,
+            periods=len(preds),
             freq="MS"
         )
-        forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": arima_forecast[:forecast_period]})
-        # Apply forecast adjustments only
+        forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": preds})
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
-        if isinstance(last_historical_value, (int, float)):
-            forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
-        matching_length = min(len(test["y"]), len(forecast_df))
-        rmse = mean_squared_error(test["y"].iloc[:matching_length], forecast_df["yhat"].iloc[:matching_length]) ** 0.5
-        mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], forecast_df["yhat"].iloc[:matching_length])
+
+        match_len = min(len(test), len(forecast_df))
+        rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
+        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
+
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
+
     except Exception as e:
         st.warning(f"ARIMA Model failed: {e}")
-    return ("ARIMA", result)
 
-def train_xgb_model(train, test, forecast_period, last_historical_value, y_original,
+    return "ARIMA", result
+
+def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff,
                     demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
         max_lag = min(12, len(train) - 1)
         rolling_windows = [3, 6] if len(train) > 6 else [3]
         data_xgb = train.copy()
+
         for lag in range(1, max_lag + 1):
             data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
         for window in rolling_windows:
             data_xgb[f"rolling_mean_{window}"] = data_xgb["y"].rolling(window=window).mean()
             data_xgb[f"rolling_std_{window}"] = data_xgb["y"].rolling(window=window).std()
+
         data_xgb["month"] = data_xgb["ds"].dt.month
         data_xgb["quarter"] = data_xgb["ds"].dt.quarter
         data_xgb["year"] = data_xgb["ds"].dt.year
         data_xgb["sin_month"] = np.sin(2 * np.pi * data_xgb["month"] / 12)
         data_xgb["cos_month"] = np.cos(2 * np.pi * data_xgb["month"] / 12)
+
         data_xgb.dropna(inplace=True)
-        # Filter out non-numeric columns
-        feature_cols = [col for col in data_xgb.columns if col not in ["y", "ds"] and np.issubdtype(data_xgb[col].dtype, np.number)]
-        X_train = data_xgb[feature_cols]
-        y_train = data_xgb["y"]
+        feature_cols = [c for c in data_xgb.columns if c not in ["y","ds"] and np.issubdtype(data_xgb[c].dtype, np.number)]
+
         model = XGBRegressor(
             n_estimators=50,
-            max_depth=min(5, max(2, len(train) // 10)),
-            learning_rate=0.1 if len(train) > 50 else 0.2,
+            max_depth=min(5, max(2, len(train)//10)),
+            learning_rate=0.1 if len(train)>50 else 0.2,
             objective="reg:squarederror",
             random_state=42,
             n_jobs=-1
         )
-        model.fit(X_train, y_train)
-        future_forecasts = []
+        model.fit(data_xgb[feature_cols], data_xgb["y"])
+
+        # Generate future forecasts
         last_row = data_xgb.iloc[-1].copy()
         last_date = train["ds"].iloc[-1]
+        preds = []
         for i in range(forecast_period):
             future_date = last_date + pd.DateOffset(months=i+1)
-            future_row = {}
-            for col in feature_cols:
-                future_row[col] = last_row[col]
-            future_row["month"] = future_date.month
-            future_row["quarter"] = future_date.quarter
-            future_row["year"] = future_date.year
-            future_row["sin_month"] = np.sin(2 * np.pi * future_row["month"] / 12)
-            future_row["cos_month"] = np.cos(2 * np.pi * future_row["month"] / 12)
-            X_future = pd.DataFrame([future_row])
-            pred = model.predict(X_future)[0]
-            future_forecasts.append(pred)
-            for lag in range(max_lag, 1, -1):
+            future = {col: last_row[col] for col in feature_cols}
+            future.update({
+                "month": future_date.month,
+                "quarter": future_date.quarter,
+                "year": future_date.year,
+                "sin_month": np.sin(2*np.pi*future_date.month/12),
+                "cos_month": np.cos(2*np.pi*future_date.month/12)
+            })
+            pred = model.predict(pd.DataFrame([future]))[0]
+            preds.append(pred)
+            for lag in range(max_lag,1,-1):
                 last_row[f"lag_{lag}"] = last_row[f"lag_{lag-1}"]
             last_row["lag_1"] = pred
-        forecast_dates = pd.date_range(
-            start=last_date + pd.DateOffset(months=1),
-            periods=forecast_period,
-            freq="MS"
-        )
-        forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": future_forecasts})
-        # Apply forecast adjustments only
+
+        forecast_df = pd.DataFrame({
+            "ds": pd.date_range(start=last_date + pd.DateOffset(months=1), periods=forecast_period, freq="MS"),
+            "yhat": preds
+        })
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
-        if isinstance(last_historical_value, (int, float)):
-            forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
-        matching_length = min(len(test["y"]), len(forecast_df))
-        rmse = mean_squared_error(test["y"].iloc[:matching_length], forecast_df["yhat"].iloc[:matching_length]) ** 0.5
-        mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], forecast_df["yhat"].iloc[:matching_length])
+
+        match_len = min(len(test), len(forecast_df))
+        rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
+        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
+
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
+
     except Exception as e:
         st.warning(f"XGBoost Model failed: {e}")
-    return ("XGBoost", result)
 
-def train_automl_model(train, test, forecast_period, last_historical_value, y_original, time_budget=None,
-                        demand_shock=0, seasonality_adjustment=0, external_shock=False, category_scenarios=None):
+    return "XGBoost", result
+
+def train_automl_model(train, test, forecast_period, last_historical_value, is_diff,
+                       time_budget=None, demand_shock=0, seasonality_adjustment=0,
+                       external_shock=False, category_scenarios=None):
     result = {}
     try:
-        data_automl = train.copy()
+        # Build lag & rolling features
+        data_auto = train.copy()
         max_lag = min(24, len(train) - 1)
         if len(train) <= 6:
             max_lag = min(3, len(train) - 1)
         elif len(train) <= 12:
             max_lag = min(6, len(train) - 1)
-        elif len(train) <= 24:
-            max_lag = min(12, len(train) - 1)
         for lag in range(1, max_lag + 1):
-            data_automl[f"lag_{lag}"] = data_automl["y"].shift(lag)
+            data_auto[f"lag_{lag}"] = data_auto["y"].shift(lag)
         for window in [3, 6, 12]:
-            data_automl[f"rolling_mean_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).mean()
-            data_automl[f"rolling_std_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).std()
-        if len(train) > 12:
-            data_automl["yoy_growth"] = (data_automl["y"] / data_automl["y"].shift(12)) - 1
-        else:
-            data_automl["yoy_growth"] = 0
-        data_automl["y_diff"] = data_automl["y"].diff().fillna(0)
-        data_automl["rolling_mean_growth"] = data_automl["y"].rolling(window=3).mean().diff().fillna(0)
-        data_automl["sin_month"] = np.sin(2 * np.pi * data_automl["ds"].dt.month / 12)
-        data_automl["cos_month"] = np.cos(2 * np.pi * data_automl["ds"].dt.month / 12)
-        if data_automl["y"].min() > 0 and (data_automl["y"].max() / data_automl["y"].min() > 5):
-            data_automl["y_log"] = np.log1p(data_automl["y"])
-            apply_log = True
-        else:
-            data_automl["y_log"] = data_automl["y"]
-            apply_log = False
-        data_automl.dropna(inplace=True)
-        feature_cols = [col for col in data_automl.columns if col not in ["y", "ds", "y_log"]]
-        y_train = data_automl["y_log"] if apply_log else data_automl["y"]
-        X_train = data_automl[feature_cols]
+            data_auto[f"rolling_mean_{window}"] = data_auto["y"].rolling(window, min_periods=1).mean()
+            data_auto[f"rolling_std_{window}"] = data_auto["y"].rolling(window, min_periods=1).std()
+
+        data_auto.dropna(inplace=True)
+        X_train = data_auto.drop(columns=["ds", "y"])
+        y_train = data_auto["y"]
+
         if time_budget is None:
-            time_budget = min(600, max(60, len(train) * 0.1 + len(feature_cols) * 2))
+            time_budget = min(600, max(60, len(train)*0.1 + X_train.shape[1]*2))
             st.info(f"Dynamic time budget set to {time_budget} seconds.")
-        automl_model = AutoML()
-        automl_model.fit(
-            X_train=X_train,
-            y_train=y_train,
-            task="regression",
-            time_budget=time_budget,
-            eval_method="cv",
-            estimator_list=["xgboost", "lgbm", "rf", "catboost"],
-            metric="r2",
-            early_stop=True,
-            verbose=1
-        )
-        future_features = []
-        last_row = data_automl.iloc[-1].copy()
+
+        automl = AutoML()
+        automl.fit(X_train=X_train, y_train=y_train, task="regression", time_budget=time_budget)
+
+        # Forecast future
+        last_row = data_auto.iloc[-1].copy()
+        preds = []
+        last_date = train["ds"].iloc[-1]
         for i in range(forecast_period):
-            future_row = {}
-            for lag in range(1, max_lag + 1):
-                if lag == 1:
-                    future_row[f"lag_{lag}"] = last_row["y_log"] if apply_log else last_row["y"]
-                else:
-                    future_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
-            for window in [3, 6, 12]:
-                if apply_log:
-                    future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y_log"] - last_row[f"lag_{window}"]) / window
-                else:
-                    future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y"] - last_row[f"lag_{window}"]) / window
-                future_row[f"rolling_std_{window}"] = last_row[f"rolling_std_{window}"]
-            future_row["yoy_growth"] = last_row["yoy_growth"]
-            future_row["y_diff"] = last_row["y_diff"]
-            future_row["rolling_mean_growth"] = last_row["rolling_mean_growth"]
-            future_row["sin_month"] = np.sin(2 * np.pi * (last_row["ds"].month + i) / 12)
-            future_row["cos_month"] = np.cos(2 * np.pi * (last_row["ds"].month + i) / 12)
-            future_features.append(future_row)
-            for key, value in future_row.items():
-                last_row[key] = value
-        future_df = pd.DataFrame(future_features)
-        for col in X_train.columns:
-            if col not in future_df.columns:
-                future_df[col] = 0
-        future_df = future_df[X_train.columns]
-        automl_forecast = automl_model.predict(future_df)
-        if apply_log:
-            automl_forecast = np.expm1(automl_forecast)
-        forecast_dates = pd.date_range(
-            start=train["ds"].iloc[-1] + pd.DateOffset(months=1),
-            periods=forecast_period,
-            freq="MS"
-        )
+            future_date = last_date + pd.DateOffset(months=i+1)
+            future = {col: last_row[col] for col in X_train.columns}
+            Xf = pd.DataFrame([future])
+            preds.append(automl.predict(Xf)[0])
+            # shift lags
+            for lag in range(max_lag, 1, -1):
+                last_row[f"lag_{lag}"] = last_row[f"lag_{lag-1}"]
+            last_row["lag_1"] = preds[-1]
+
         forecast_df = pd.DataFrame({
-            "ds": forecast_dates,
-            "yhat": automl_forecast,
-            "yhat_lower": automl_forecast * 0.9,
-            "yhat_upper": automl_forecast * 1.1
+            "ds": pd.date_range(start=last_date + pd.DateOffset(months=1), periods=forecast_period, freq="MS"),
+            "yhat": preds
         })
-        # Apply forecast adjustments only (global and category-specific)
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
-        if isinstance(last_historical_value, (int, float)):
-            forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
-            forecast_df["yhat_lower"] = inverse_difference(forecast_df["yhat_lower"], last_historical_value)
-            forecast_df["yhat_upper"] = inverse_difference(forecast_df["yhat_upper"], last_historical_value)
-        matching_length = min(len(test["y"]), len(forecast_df))
-        rmse = np.sqrt(mean_squared_error(test["y"].values, forecast_df["yhat"][:len(test["y"])]))
-        mape = mean_absolute_percentage_error(test["y"].values, forecast_df["yhat"][:len(test["y"])])
+
+        match_len = min(len(test), len(forecast_df))
+        rmse = np.sqrt(mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len]))
+        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
+
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
+
     except Exception as e:
         st.error(f"AutoML Model failed: {e}")
-    return ("AutoML", result)
+
+    return "AutoML", result
 
 def shape_score(actual, forecast):
     if len(actual) != len(forecast):
@@ -731,41 +688,50 @@ def main():
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 6: Train ARIMA Model (forecast adjustments applied here)
+                # STEP 6: Train ARIMA Model
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training ARIMA model...")
                 with st.spinner("🚀 Training ARIMA Model..."):
                     arima_model_name, arima_res = train_arima_model(
-                        train, test, forecast_period, last_historical_value, y_original, 
+                        train, test, forecast_period,
+                        last_historical_value, is_diff,
                         demand_shock, seasonality_adjustment, external_shock, category_scenarios
                     )
                     time.sleep(1)
+                if is_diff and arima_res.get("Forecast") is not None:
+                    arima_res["Forecast"] = inverse_difference(arima_res["Forecast"], last_historical_value)
                 arima_status.success("✅ ARIMA Model Training Complete!")
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 7: Train XGBoost Model (forecast adjustments will be applied in its function if needed)
+                # STEP 7: Train XGBoost Model
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training XGBoost model...")
                 with st.spinner("🚀 Training XGBoost Model..."):
                     xgb_model_name, xgb_res = train_xgb_model(
-                        train, test, forecast_period, last_historical_value, y_original,
+                        train, test, forecast_period,
+                        last_historical_value, is_diff,
                         demand_shock, seasonality_adjustment, external_shock, category_scenarios
                     )
                     time.sleep(1)
+                if is_diff and xgb_res.get("Forecast") is not None:
+                    xgb_res["Forecast"] = inverse_difference(xgb_res["Forecast"], last_historical_value)
                 xgb_status.success("✅ XGBoost Model Training Complete!")
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 8: Train AutoML Model (forecast adjustments applied inside its function)
+                # STEP 8: Train AutoML Model
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
                 with st.spinner("🚀 Training AutoML Model..."):
                     automl_model_name, automl_res = train_automl_model(
-                        train, test, forecast_period, last_historical_value, y_original, time_budget,
-                        demand_shock, seasonality_adjustment, external_shock, category_scenarios
+                        train, test, forecast_period,
+                        last_historical_value, is_diff,
+                        time_budget, demand_shock, seasonality_adjustment, external_shock, category_scenarios
                     )
                     time.sleep(1)
+                if is_diff and automl_res.get("Forecast") is not None:
+                    automl_res["Forecast"] = inverse_difference(automl_res["Forecast"], last_historical_value)
                 automl_status.success("✅ AutoML Model Training Complete!")
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
