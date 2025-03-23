@@ -424,16 +424,27 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             st.info(f"Dynamic time budget set to {time_budget} seconds.")
 
         automl = AutoML()
-        eval_method = "holdout" if len(train) < 5 else "cv"
-        automl.fit(
-            X_train=X_train,
-            y_train=y_train,
-            task="regression",
-            time_budget=time_budget,
-            eval_method=eval_method,
-            estimator_list=["xgboost", "lgbm", "rf", "catboost"],
-            metric="r2"
-        )
+        if len(train) < 5:
+            automl.fit(
+                X_train=X_train,
+                y_train=y_train,
+                task="regression",
+                time_budget=time_budget,
+                eval_method="holdout",
+                split_ratio=0.8,
+                estimator_list=["xgboost", "lgbm", "rf", "catboost"],
+                metric="r2"
+            )
+        else:
+            automl.fit(
+                X_train=X_train,
+                y_train=y_train,
+                task="regression",
+                time_budget=time_budget,
+                eval_method="cv",
+                estimator_list=["xgboost", "lgbm", "rf", "catboost"],
+                metric="r2"
+            )
 
         # Forecast future
         last_row = data_auto.iloc[-1].copy()
