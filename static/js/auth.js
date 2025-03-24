@@ -76,7 +76,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // ✅ Auto-check authentication on protected pages
-    if (window.location.pathname === "/dashboard_new") {
+    if (window.location.pathname === "/dashboard") {
         checkAuth();
     }
 });
@@ -91,7 +91,7 @@ async function checkAuth() {
         console.warn("❌ No JWT token found.");
         
         // 🔹 Only redirect on protected pages
-        const protectedPages = ["/dashboard_new", "/profile", "/account-settings"];
+        const protectedPages = ["/dashboard", "/profile", "/account-settings"];
         if (protectedPages.includes(window.location.pathname)) {
             alert("⚠️ Session expired. Please log in again.");
             window.location.href = "/login";
@@ -196,7 +196,7 @@ function updateNavbar() {
     if (token) {
         console.log("✅ User is logged in.");
         authButtons.innerHTML = `
-            <a href="/dashboard_new" class="dashboard-btn">Dashboard</a>
+            <a href="/dashboard" class="dashboard-btn">Dashboard</a>
             <a href="#" class="logout-btn" onclick="logout()">Logout</a>
         `;
     } else {
