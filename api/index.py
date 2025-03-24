@@ -290,7 +290,7 @@ def token_required(f):
     
     return decorated_function
 
-@app.route('/dashboard', methods=['GET'])
+@app.route('/dashboard_new', methods=['GET'])
 @token_required
 def dashboard():
     try:
@@ -299,7 +299,7 @@ def dashboard():
 
         logger.debug(f"✅ User {user_info['email']} accessed dashboard. Subscription: {user_plan}")
 
-        return render_template('dashboard.html', user_info=user_info, user_plan=user_plan)
+        return render_template('dashboard_new.html', user_info=user_info, user_plan=user_plan)
 
     except Exception as e:
         logger.exception("🔥 Error loading dashboard")
@@ -507,7 +507,7 @@ def login():
 
         return jsonify({
             "status": "success",
-            "redirect": "/dashboard",
+            "redirect": "/dashboard_new",
             "access_token": jwt_token,
             "tier": user_tier
         })
