@@ -127,7 +127,7 @@
             const token = localStorage.getItem("access_token");
 
             if (token) {
-                authContainer.innerHTML = `<a href="/dashboard" class="auth-link">Dashboard</a>
+                authContainer.innerHTML = `<a href="/dashboard_new" class="auth-link">Dashboard</a>
                                            <a href="#" onclick="logout()" class="auth-link">Logout</a>`;
             } else {
                 authContainer.innerHTML = `<a href="/login" class="auth-link">Login</a>`;
