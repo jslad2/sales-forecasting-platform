@@ -193,7 +193,7 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
     except Exception as e:
         st.error(f"An error occurred during preprocessing: {e}")
         st.error(f"Debug Info: Columns in data - {data.columns}, Data Shape - {data.shape}")
-        return None, None, None
+        return None, None, None, False
 
 def inverse_difference(forecast_data, first_value):
     if first_value is not None:
