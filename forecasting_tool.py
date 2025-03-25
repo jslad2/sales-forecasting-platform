@@ -757,6 +757,14 @@ def main():
             else:
                 total_steps = 6
 
+            overall_status = st.empty()
+            prophet_status = st.empty()
+            arima_status = st.empty()
+            xgb_status = st.empty()
+            automl_status = st.empty()
+            progress_bar = st.progress(0)
+            step_message = st.empty()
+
             if start_forecast:
                 # STEP 1: Preprocess Data
                 step = 1
@@ -770,14 +778,6 @@ def main():
                     st.error("Preprocessing failed. Please check your data.")
                     return
                 st.success("✅ Data Preprocessed Successfully!")
-
-                overall_status = st.empty()
-                prophet_status = st.empty()
-                arima_status = st.empty()
-                xgb_status = st.empty()
-                automl_status = st.empty()
-                progress_bar = st.progress(0)
-                step_message = st.empty()
 
                 last_historical_date = y_original["ds"].max()
                 overall_status.info(f"🔍 Last Historical Date: {last_historical_date}")
