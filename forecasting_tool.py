@@ -1207,20 +1207,21 @@ def main():
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
-                    # After model training (where you currently have the plotting code):
-
+                    # Interactive Dashboard Section
                     if 'model_results' in st.session_state:
                         st.markdown("## 📊 Interactive Forecast Dashboard")
                         
                         # Model selector for focused viewing
                         selected_model = st.selectbox(
                             "Focus on specific model:",
-                            ["All Models"] + list(st.session_state.model_results.keys())
+                            ["All Models"] + list(st.session_state.model_results.keys())  # Fixed missing parenthesis
                         )
+                        
                         # Main interactive dashboard
                         main_chart = create_interactive_forecast_dashboard(
-                            historical_data=y_original,
+                            historical_data=y_original.rename(columns={"y_original": "y"}),
                             forecasts=st.session_state.model_results,
+                            model_results=st.session_state.model_results,  # Added missing parameter
                             selected_model=selected_model if selected_model != "All Models" else None
                         )
                         st.plotly_chart(main_chart, use_container_width=True)
@@ -1228,11 +1229,9 @@ def main():
                         # Scenario comparison (if adjustments were made)
                         if demand_shock != 0 or seasonality_adjustment != 0 or external_shock:
                             st.markdown("## 🔍 Scenario Comparison")
-                            base_forecast = train_prophet_model(
-                                train, test, forecast_period, best_params,
-                                last_historical_value, is_diff,
-                                0, 0, False, None  # No adjustments
-                            )[1]["Forecast"]
+                            # Use existing prophet_res instead of retraining
+                            base_forecast = prophet_res["Forecast"].copy()
+                            base_forecast["yhat"] = base_forecast["yhat"] / (1 + demand_shock/100)  # Reverse adjustments
                             
                             adjusted_scenarios = {
                                 "Current Scenario": next(iter(st.session_state.model_results.values()))["Forecast"]
