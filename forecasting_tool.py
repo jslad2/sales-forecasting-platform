@@ -565,7 +565,7 @@ def combined_score(rmse, corr, max_rmse, alpha, beta):
 def main():
     # Set subscription level: "free" for basic features, "premium" for full access
     user_id = "user123"
-    subscription_level = "free"  # Change to "premium" to enable advanced features
+    subscription_level = "premium"  # Change to "premium" to enable advanced features
 
     if subscription_level != "premium":
         st.info("You are using the Free version. Advanced features such as category adjustments, extended forecast horizons, hyperparameter tuning, and forecast downloads are disabled.")
