@@ -76,11 +76,12 @@ def get_oauth_token():
         logger.error(f"❌ ERROR: Failed to get OAuth2 token: {e}")
         return None
 
-    
 # ✅ Initialize Flask App
-app = Flask(__name__, 
-            template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")), 
-            static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../static")))
+app = Flask(
+    __name__,
+    template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")),
+    static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../static"))
+)
 
 # ✅ Configure logging properly
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -114,7 +115,7 @@ def verify_jwt():
         return jsonify({"error": "JWT token expired"}), 401
     except pyjwt.InvalidTokenError:
         return jsonify({"error": "Invalid JWT token"}), 401
-    
+
 # ✅ Home Page
 @app.route('/')
 def home():
@@ -187,7 +188,9 @@ def contact():
         logger.info(f"🔍 DEBUG: Using OAuth2 Token (first 20 chars): {OAUTH_ACCESS_TOKEN[:20]}...")
 
         try:
-            recaptcha_result = requests.post(recaptcha_url, json=recaptcha_payload, headers=recaptcha_headers, timeout=5).json()
+            recaptcha_result = requests.post(
+                recaptcha_url, json=recaptcha_payload, headers=recaptcha_headers, timeout=5
+            ).json()
             logger.info(f"🔍 DEBUG: reCAPTCHA API Response: {recaptcha_result}")
 
             # ✅ Check if reCAPTCHA validation was successful
@@ -294,17 +297,23 @@ def token_required(f):
 @token_required
 def dashboard():
     try:
-        user_info = request.user  # Get user info from JWT
+        user_info = request.user  # Decoded JWT payload
         user_plan = user_info.get("tier", "free")  # Default to "free" if missing
+        
+        # ✅ If you only have an email, just display it as the name
+        user_name = user_info.get("email", "User")
 
-        logger.debug(f"✅ User {user_info['email']} accessed dashboard. Subscription: {user_plan}")
+        logger.debug(f"✅ User {user_name} accessed dashboard. Subscription: {user_plan}")
 
-        return render_template('dashboard.html', user_info=user_info, user_plan=user_plan)
-
+        # Pass user_name to the template so {{ user_name }} is not empty
+        return render_template('dashboard.html',
+                               user_info=user_info,
+                               user_plan=user_plan,
+                               user_name=user_name)
     except Exception as e:
         logger.exception("🔥 Error loading dashboard")
         return render_template('500.html'), 500
-    
+
 # ✅ Register Route (Uses Supabase Auth)
 @app.route('/register', methods=['GET', 'POST'])
 def register():
