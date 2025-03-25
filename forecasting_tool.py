@@ -26,6 +26,9 @@ import catboost
 from tqdm import tqdm
 import concurrent.futures
 from scipy.stats import pearsonr
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from plotly.colors import hex_to_rgb
 
 # Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
 st.set_page_config(layout="wide", page_title="Time Series Forecasting", page_icon="📈")
@@ -641,6 +644,245 @@ def combined_score(rmse, corr, max_rmse, alpha, beta):
     norm_rmse = rmse / max_rmse
     return alpha * norm_rmse + beta * (1 - corr)
 
+def create_interactive_forecast_dashboard(historical_data, forecasts, model_results, selected_model=None):
+    """Create an interactive dashboard with drill-down capabilities and scenario comparison"""
+    
+    # Create main figure
+    fig = make_subplots(
+        rows=2, cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.1,
+        row_heights=[0.7, 0.3],
+        specs=[[{"type": "scatter"}], [{"type": "table"}]]
+    )
+    
+    # Add historical data
+    fig.add_trace(
+        go.Scatter(
+            x=historical_data["ds"],
+            y=historical_data["y"],
+            mode="lines+markers",
+            name="Historical Data",
+            line=dict(color="black", width=2),
+            hovertemplate="<b>Date</b>: %{x|%Y-%m-%d}<br><b>Sales</b>: %{y:,.0f}<extra></extra>"
+        ),
+        row=1, col=1
+    )
+    
+    # Model colors and line styles
+    model_styles = {
+        "Prophet": dict(color="#636EFA", dash="solid"),
+        "ARIMA": dict(color="#EF553B", dash="dash"),
+        "XGBoost": dict(color="#00CC96", dash="dot"),
+        "AutoML": dict(color="#AB63FA", dash="longdash")
+    }
+    
+    # Add forecast traces
+    for model_name, res in model_results.items():
+        forecast = res["Forecast"]
+        fig.add_trace(
+            go.Scatter(
+                x=forecast["ds"],
+                y=forecast["yhat"],
+                mode="lines",
+                name=f"{model_name} Forecast",
+                line=model_styles.get(model_name, {}),
+                hovertemplate="<b>Date</b>: %{x|%Y-%m-%d}<br><b>Forecast</b>: %{y:,.0f}<extra></extra>",
+                visible="legendonly" if selected_model and model_name != selected_model else True
+            ),
+            row=1, col=1
+        )
+        
+        # Add confidence interval if available
+        if "yhat_lower" in forecast.columns and "yhat_upper" in forecast.columns:
+            fig.add_trace(
+                go.Scatter(
+                    x=forecast["ds"].tolist() + forecast["ds"].tolist()[::-1],
+                    y=forecast["yhat_upper"].tolist() + forecast["yhat_lower"].tolist()[::-1],
+                    fill="toself",
+                    fillcolor=f"rgba{(*hex_to_rgb(model_styles.get(model_name, {}).get('color', '#000000')), 0.2)}",
+                    line=dict(color="rgba(255,255,255,0)"),
+                    hoverinfo="skip",
+                    name=f"{model_name} Uncertainty",
+                    showlegend=False,
+                    visible="legendonly" if selected_model and model_name != selected_model else True
+                ),
+                row=1, col=1
+            )
+    
+    # Add metrics table
+    metrics_df = pd.DataFrame([
+        {
+            "Model": model,
+            "RMSE": f"{res['RMSE']:,.1f}",
+            "MAPE": f"{res['MAPE']:.1%}",
+            "Correlation": f"{res.get('Shape (corr)', 0):.2f}"
+        }
+        for model, res in model_results.items()
+    ])
+    
+    fig.add_trace(
+        go.Table(
+            header=dict(
+                values=list(metrics_df.columns),
+                font=dict(size=12, color="white"),
+                fill_color="#2B3A42",
+                align="center"
+            ),
+            cells=dict(
+                values=[metrics_df[col] for col in metrics_df.columns],
+                font=dict(size=11),
+                align="center"
+            ),
+            columnwidth=[1, 0.7, 0.7, 0.7]
+        ),
+        row=2, col=1
+    )
+    
+    # Update layout
+    fig.update_layout(
+        title="<b>Interactive Forecast Dashboard</b>",
+        hovermode="x unified",
+        template="plotly_white",
+        height=800,
+        margin=dict(t=80, b=20, l=40, r=40),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        xaxis=dict(
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1, label="1m", step="month", stepmode="backward"),
+                    dict(count=3, label="3m", step="month", stepmode="backward"),
+                    dict(count=6, label="6m", step="month", stepmode="backward"),
+                    dict(count=1, label="YTD", step="year", stepmode="todate"),
+                    dict(count=1, label="1y", step="year", stepmode="backward"),
+                    dict(step="all")
+                ])
+            ),
+            rangeslider=dict(visible=True),
+            type="date"
+        ),
+        yaxis_title="Sales Volume",
+        xaxis2_visible=False
+    )
+    
+    return fig
+
+def create_scenario_comparison_chart(base_forecast, adjusted_forecasts):
+    """Create a side-by-side comparison of forecast scenarios"""
+    fig = go.Figure()
+    
+    # Add baseline forecast
+    fig.add_trace(
+        go.Scatter(
+            x=base_forecast["ds"],
+            y=base_forecast["yhat"],
+            mode="lines",
+            name="Baseline Forecast",
+            line=dict(color="grey", width=2, dash="dot")
+        )
+    )
+    
+    # Add each scenario
+    colors = px.colors.qualitative.Plotly[1:]  # Skip grey
+    for i, (scenario_name, forecast) in enumerate(adjusted_forecasts.items()):
+        fig.add_trace(
+            go.Scatter(
+                x=forecast["ds"],
+                y=forecast["yhat"],
+                mode="lines",
+                name=scenario_name,
+                line=dict(color=colors[i % len(colors)], width=3),
+                hovertemplate="<b>%{fullData.name}</b><br>Date: %{x|%Y-%m-%d}<br>Sales: %{y:,.0f}<extra></extra>"
+            )
+        )
+    
+    # Add difference area
+    if len(adjusted_forecasts) == 1:
+        scenario_name, adjusted = next(iter(adjusted_forecasts.items()))
+        fig.add_trace(
+            go.Scatter(
+                x=adjusted["ds"],
+                y=adjusted["yhat"],
+                fill="tonexty",
+                fillcolor="rgba(255,165,0,0.2)",
+                mode="none",
+                name="Difference vs Baseline",
+                showlegend=False
+            )
+        )
+    
+    fig.update_layout(
+        title="<b>Scenario Comparison</b>",
+        xaxis_title="Date",
+        yaxis_title="Sales Volume",
+        hovermode="x unified",
+        template="plotly_white",
+        height=500
+    )
+    
+    return fig
+
+def add_drill_down_interactivity(selected_data, historical_data, category_columns=None):
+    """Create drill-down view when user clicks on a data point"""
+    if not selected_data or "points" not in selected_data:
+        return None
+    
+    point = selected_data["points"][0]
+    date = pd.to_datetime(point["x"])
+    
+    # Get daily data for the selected month
+    daily_view = historical_data[
+        (historical_data["ds"].dt.year == date.year) & 
+        (historical_data["ds"].dt.month == date.month)
+    ].copy()
+    
+    if len(daily_view) == 0:
+        return None
+    
+    # Create sub-chart
+    sub_fig = make_subplots(
+        rows=2 if category_columns else 1, cols=1,
+        subplot_titles=["Daily Breakdown"] + (["By Category"] if category_columns else [])
+    )
+    
+    # Daily trend
+    sub_fig.add_trace(
+        go.Bar(
+            x=daily_view["ds"],
+            y=daily_view["y"],
+            name="Daily Sales",
+            marker_color="#636EFA"
+        ),
+        row=1, col=1
+    )
+    
+    # Category breakdown if available
+    if category_columns:
+        category_data = daily_view.groupby(category_columns)["y"].sum().reset_index()
+        sub_fig.add_trace(
+            go.Pie(
+                labels=category_data[category_columns[0]],
+                values=category_data["y"],
+                name="By Category",
+                hole=0.4
+            ),
+            row=2, col=1
+        )
+    
+    sub_fig.update_layout(
+        title=f"<b>Drill-down: {date.strftime('%B %Y')}</b>",
+        showlegend=False,
+        height=600 if category_columns else 300
+    )
+    
+    return sub_fig
+
 def main():
     # Set subscription level: "free" for basic features, "premium" for full access
     user_id = "user123"
@@ -964,6 +1206,60 @@ def main():
                         st.warning("No model results found. Please train the models first.")
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
+
+                    # After model training (where you currently have the plotting code):
+
+                    if 'model_results' in st.session_state:
+                        st.markdown("## 📊 Interactive Forecast Dashboard")
+                        
+                        # Model selector for focused viewing
+                        selected_model = st.selectbox(
+                            "Focus on specific model:",
+                            ["All Models"] + list(st.session_state.model_results.keys())
+                        )
+                        # Main interactive dashboard
+                        main_chart = create_interactive_forecast_dashboard(
+                            historical_data=y_original,
+                            forecasts=st.session_state.model_results,
+                            selected_model=selected_model if selected_model != "All Models" else None
+                        )
+                        st.plotly_chart(main_chart, use_container_width=True)
+                        
+                        # Scenario comparison (if adjustments were made)
+                        if demand_shock != 0 or seasonality_adjustment != 0 or external_shock:
+                            st.markdown("## 🔍 Scenario Comparison")
+                            base_forecast = train_prophet_model(
+                                train, test, forecast_period, best_params,
+                                last_historical_value, is_diff,
+                                0, 0, False, None  # No adjustments
+                            )[1]["Forecast"]
+                            
+                            adjusted_scenarios = {
+                                "Current Scenario": next(iter(st.session_state.model_results.values()))["Forecast"]
+                            }
+                            scenario_chart = create_scenario_comparison_chart(base_forecast, adjusted_scenarios)
+                            st.plotly_chart(scenario_chart, use_container_width=True)
+                        
+                        # Drill-down interactivity
+                        st.markdown("## 🔎 Drill-Down Analysis")
+                        st.info("Click on any point in the main chart to see daily details below")
+                        selected_data = st.session_state.get("selected_data")
+                        drill_down = add_drill_down_interactivity(
+                            selected_data,
+                            data.rename(columns={date_column: "ds", sales_column: "y"}),
+                            category_columns
+                        )
+                        if drill_down:
+                            st.plotly_chart(drill_down, use_container_width=True)
+                        
+                        # Add click event handler
+                        st.write("""
+                        <script>
+                        document.querySelector(".plotly-graph-div").on('plotly_click', function(data){
+                            Streamlit.setComponentValue(data);
+                        });
+                        </script>
+                        """, unsafe_allow_html=True)
 
                     # STEP 11: Finalize Forecast Visualization (Premium)
                     step += 1
