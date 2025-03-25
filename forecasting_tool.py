@@ -561,25 +561,16 @@ def combined_score(rmse, corr, max_rmse, alpha, beta):
     return alpha * norm_rmse + beta * (1 - corr)
 
 def main():
+    # Set subscription level: "free" for basic features, "premium" for full access
     user_id = "user123"
-    subscription_level = "premium"
+    subscription_level = "free"  # Change to "premium" to enable advanced features
+
     if subscription_level != "premium":
-        st.warning("Upgrade to Premium to unlock advanced features!")
-        st.stop()
+        st.info("You are using the Free version. Advanced features such as category adjustments, extended forecast horizons, hyperparameter tuning, and forecast downloads are disabled.")
 
     if st.button("🔄 Reset App"):
         st.session_state.clear()
         st.experimental_rerun()
-
-    # overall_status = st.empty()
-    # prophet_status = st.empty()
-    # arima_status = st.empty()
-    # xgb_status = st.empty()
-    # automl_status = st.empty()
-
-    # total_steps = 12
-    # progress_bar = st.progress(0)
-    # step_message = st.empty()
 
     uploaded_file = st.file_uploader("Upload your sales data file", type=["csv"])
     if uploaded_file:
@@ -613,83 +604,93 @@ def main():
                     st.warning("Please select the Date and Sales columns first.")
                     category_columns = None
                 else:
-                    category_columns = st.multiselect(
-                        "🏷️ Select Category Columns (Optional):",
-                        options=[col for col in data.columns if col not in [date_column, sales_column]],
-                        key="category_cols"
-                    )
+                    if subscription_level != "premium":
+                        st.info("Category adjustments are available only for premium users.")
+                        category_columns = None
+                    else:
+                        category_columns = st.multiselect(
+                            "🏷️ Select Category Columns (Optional):",
+                            options=[col for col in data.columns if col not in [date_column, sales_column]],
+                            key="category_cols"
+                        )
 
             if date_column != "-- Select Column --":
                 data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
 
-            st.markdown("### ⏱️ AutoML Time Budget")
-            time_budget = st.slider(
-                "Set the time budget for AutoML training (in seconds):",
-                min_value=60, max_value=1200, value=300, step=60,
-                help="Increase the time budget for larger datasets or more complex models."
-            )
+            if subscription_level != "premium":
+                time_budget = 60
+                forecast_period = 3
+            else:
+                st.markdown("### ⏱️ AutoML Time Budget")
+                time_budget = st.slider(
+                    "Set the time budget for AutoML training (in seconds):",
+                    min_value=60, max_value=1200, value=300, step=60,
+                    help="Increase the time budget for larger datasets or more complex models."
+                )
+                forecast_period = 24
 
-            # Determine the last historical date and set a minimum future date
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
                 last_date_in_data = data[date_column].max()
                 min_future_date = (last_date_in_data + pd.DateOffset(days=1)).date()
 
-                st.sidebar.markdown("### 🎯 Scenario Planning")
-                demand_shock = st.sidebar.slider(
-                    "Simulate Demand Shock (% Change in Sales):",
-                    min_value=-50, max_value=50, value=0, step=5
-                )
-                seasonality_adjustment = st.sidebar.slider(
-                    "Adjust Seasonality Strength (% Change):",
-                    min_value=-50, max_value=50, value=0, step=5
-                )
-                external_shock = st.sidebar.checkbox("Simulate External Shock (e.g., Economic Downturn)")
-
-                # Build dynamic category adjustments dictionary for future forecast adjustments only.
-                category_scenarios = {}
-                if category_columns:
-                    st.sidebar.markdown("### 🎯 Scenario Planning by Category (Dynamic)")
-                    for col in category_columns:
-                        st.sidebar.markdown(f"#### Adjustments for '{col}'")
-                        unique_cats = sorted(data[col].dropna().unique())
-                        selected_cats = st.sidebar.multiselect(
-                            f"Pick categories in '{col}' to adjust:",
-                            options=unique_cats,
-                            help=f"Select one or more categories from '{col}' that you want to adjust."
-                        )
-                        category_scenarios[col] = {}
-                        for cat in selected_cats:
-                            with st.sidebar.expander(f"Adjust '{cat}' in '{col}'"):
-                                cat_adjust = st.slider(
-                                    f"Percentage change for '{cat}'",
-                                    min_value=-50, max_value=50, value=0, step=5,
-                                    help=f"Adjust sales for category '{cat}' within column '{col}'"
-                                )
-                                # Set default and minimum future dates so users cannot choose historical dates.
-                                cat_start = st.date_input(
-                                    f"Start date for '{cat}'",
-                                    value=min_future_date,
-                                    min_value=min_future_date
-                                )
-                                default_end = (last_date_in_data + pd.DateOffset(months=1)).date()
-                                cat_end = st.date_input(
-                                    f"End date for '{cat}'",
-                                    value=default_end if default_end > min_future_date else min_future_date,
-                                    min_value=cat_start
-                                )
-                                category_scenarios[col][cat] = {
-                                    "adjustment": cat_adjust,
-                                    "start_date": cat_start,
-                                    "end_date": cat_end
-                                }
+                if subscription_level != "premium":
+                    st.sidebar.info("Scenario planning is available only for premium users.")
+                    demand_shock = 0
+                    seasonality_adjustment = 0
+                    external_shock = False
+                    category_scenarios = {}
                 else:
-                    st.sidebar.markdown("ℹ️ No category columns selected. Category-based scenario planning is disabled.")
-            else:
-                st.sidebar.warning("Please select the Date and Sales columns to enable scenario planning.")
-                demand_shock = 0
-                seasonality_adjustment = 0
-                external_shock = False
-                category_scenarios = {}
+                    st.sidebar.markdown("### 🎯 Scenario Planning")
+                    demand_shock = st.sidebar.slider(
+                        "Simulate Demand Shock (% Change in Sales):",
+                        min_value=-50, max_value=50, value=0, step=5
+                    )
+                    seasonality_adjustment = st.sidebar.slider(
+                        "Adjust Seasonality Strength (% Change):",
+                        min_value=-50, max_value=50, value=0, step=5
+                    )
+                    external_shock = st.sidebar.checkbox("Simulate External Shock (e.g., Economic Downturn)")
+                    category_scenarios = {}
+                    if category_columns:
+                        st.sidebar.markdown("### 🎯 Scenario Planning by Category (Dynamic)")
+                        for col in category_columns:
+                            st.sidebar.markdown(f"#### Adjustments for '{col}'")
+                            unique_cats = sorted(data[col].dropna().unique())
+                            selected_cats = st.sidebar.multiselect(
+                                f"Pick categories in '{col}' to adjust:",
+                                options=unique_cats,
+                                help=f"Select one or more categories from '{col}' that you want to adjust."
+                            )
+                            category_scenarios[col] = {}
+                            for cat in selected_cats:
+                                with st.sidebar.expander(f"Adjust '{cat}' in '{col}'"):
+                                    cat_adjust = st.slider(
+                                        f"Percentage change for '{cat}'",
+                                        min_value=-50, max_value=50, value=0, step=5,
+                                        help=f"Adjust sales for category '{cat}' within column '{col}'"
+                                    )
+                                    cat_start = st.date_input(
+                                        f"Start date for '{cat}'",
+                                        value=min_future_date,
+                                        min_value=min_future_date
+                                    )
+                                    default_end = (last_date_in_data + pd.DateOffset(months=1)).date()
+                                    cat_end = st.date_input(
+                                        f"End date for '{cat}'",
+                                        value=default_end if default_end > min_future_date else min_future_date,
+                                        min_value=cat_start
+                                    )
+                                    category_scenarios[col][cat] = {
+                                        "adjustment": cat_adjust,
+                                        "start_date": cat_start,
+                                        "end_date": cat_end
+                                    }
+                    else:
+                        st.sidebar.warning("Please select the Date and Sales columns to enable scenario planning.")
+                        demand_shock = 0
+                        seasonality_adjustment = 0
+                        external_shock = False
+                        category_scenarios = {}
 
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
                 start_forecast = st.button("✅ Start Forecast", key="start_btn",
@@ -702,13 +703,16 @@ def main():
             arima_status = st.empty()
             xgb_status = st.empty()
             automl_status = st.empty()
-
-            total_steps = 12
             progress_bar = st.progress(0)
             step_message = st.empty()
 
+            if subscription_level == "premium":
+                total_steps = 12
+            else:
+                total_steps = 6
+
             if start_forecast:
-                # STEP 1: Preprocess data (historical data remains unchanged)
+                # STEP 1: Preprocess Data
                 step = 1
                 step_message.text(f"Step {step} of {total_steps}: Preprocessing data...")
                 with st.spinner("🔍 Preprocessing data..."):
@@ -719,17 +723,9 @@ def main():
                 if processed_data is None:
                     st.error("Preprocessing failed. Please check your data.")
                     return
-
                 st.success("✅ Data Preprocessed Successfully!")
                 last_historical_date = y_original["ds"].max()
                 overall_status.info(f"🔍 Last Historical Date: {last_historical_date}")
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(0.5)
-
-                # IMPORTANT: Do NOT apply any adjustments to historical data.
-                # Use processed_data directly for training.
-                scenario_data = processed_data.copy()
-                st.info("Historical data remains unchanged. All scenario adjustments will only affect future forecasts.")
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(0.5)
 
@@ -743,201 +739,260 @@ def main():
                     </div>
                     """, unsafe_allow_html=True)
                 with st.expander("📊 View Processed Data"):
-                    st.dataframe(scenario_data.style.set_properties(**{"text-align": "center"}), width=1400, height=450)
+                    st.dataframe(processed_data.style.set_properties(**{"text-align": "center"}), width=1400, height=450)
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(0.5)
 
                 # STEP 3: Split Data into Training and Test Sets
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Splitting data into training and test sets...")
-                testing_period = int(len(scenario_data) * 0.2)
-                train = scenario_data.iloc[:-testing_period]
-                test = scenario_data.iloc[-testing_period:]
-                forecast_period = 24
+                testing_period = int(len(processed_data) * 0.2)
+                train = processed_data.iloc[:-testing_period]
+                test = processed_data.iloc[-testing_period:]
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 4: Tune Prophet Model
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Tuning Prophet model...")
-                with st.spinner("🚀 Finding the best Prophet hyperparameters..."):
-                    best_params, best_rmse = find_best_prophet_params(train)
-                    time.sleep(1)
-                if best_params is None:
-                    st.error("No valid Prophet parameters were found.")
-                    return
-                st.success(f"✅ Best Prophet Params: {best_params}")
-                overall_status.write(f"📉 Best RMSE (CV): {best_rmse:.2f}")
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(1)
-
-                # STEP 5: Train Prophet Model
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Training Prophet model...")
-                with st.spinner("🚀 Training Prophet Model..."):
-                    prophet_model_name, prophet_res = train_prophet_model(
-                        train, test, forecast_period, best_params,
-                        last_historical_value, is_diff,
-                        demand_shock, seasonality_adjustment, external_shock, category_scenarios
-                    )
+                if subscription_level == "premium":
+                    # PREMIUM PIPELINE
+                    # STEP 4: Tune Prophet Model
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Tuning Prophet model...")
+                    with st.spinner("🚀 Tuning Prophet model..."):
+                        best_params, best_rmse = find_best_prophet_params(train)
+                        time.sleep(1)
+                    if best_params is None:
+                        st.error("No valid Prophet parameters were found.")
+                        return
+                    st.success(f"✅ Best Prophet Params: {best_params}")
+                    overall_status.write(f"📉 Best RMSE (CV): {best_rmse:.2f}")
+                    progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
-                # Invert differencing exactly once (if applied)
-                if is_diff and prophet_res.get("Forecast") is not None:
-                    prophet_res["Forecast"] = inverse_difference(prophet_res["Forecast"], last_historical_value)
-
-                prophet_status.success("✅ Prophet Model Training Complete!")
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(1)
-
-                # STEP 6: Train ARIMA Model
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Training ARIMA model...")
-                with st.spinner("🚀 Training ARIMA Model..."):
-                    arima_model_name, arima_res = train_arima_model(
-                        train, test, forecast_period,
-                        last_historical_value, is_diff,
-                        demand_shock, seasonality_adjustment, external_shock, category_scenarios
-                    )
+                    # STEP 5: Train Prophet Model
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Training Prophet model...")
+                    with st.spinner("🚀 Training Prophet model..."):
+                        prophet_model_name, prophet_res = train_prophet_model(
+                            train, test, forecast_period, best_params,
+                            last_historical_value, is_diff,
+                            demand_shock, seasonality_adjustment, external_shock, category_scenarios
+                        )
+                        time.sleep(1)
+                    if is_diff and prophet_res.get("Forecast") is not None:
+                        prophet_res["Forecast"] = inverse_difference(prophet_res["Forecast"], last_historical_value)
+                    st.success("✅ Prophet Model Training Complete!")
+                    progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
-                if is_diff and arima_res.get("Forecast") is not None:
-                    arima_res["Forecast"] = inverse_difference(arima_res["Forecast"], last_historical_value)
-                arima_status.success("✅ ARIMA Model Training Complete!")
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(1)
 
-                # STEP 7: Train XGBoost Model
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Training XGBoost model...")
-                with st.spinner("🚀 Training XGBoost Model..."):
-                    xgb_model_name, xgb_res = train_xgb_model(
-                        train, test, forecast_period,
-                        last_historical_value, is_diff,
-                        demand_shock, seasonality_adjustment, external_shock, category_scenarios
-                    )
+                    # STEP 6: Train ARIMA Model
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Training ARIMA model...")
+                    with st.spinner("🚀 Training ARIMA model..."):
+                        arima_model_name, arima_res = train_arima_model(
+                            train, test, forecast_period,
+                            last_historical_value, is_diff,
+                            demand_shock, seasonality_adjustment, external_shock, category_scenarios
+                        )
+                        time.sleep(1)
+                    if is_diff and arima_res.get("Forecast") is not None:
+                        arima_res["Forecast"] = inverse_difference(arima_res["Forecast"], last_historical_value)
+                    st.success("✅ ARIMA Model Training Complete!")
+                    progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
-                if is_diff and xgb_res.get("Forecast") is not None:
-                    xgb_res["Forecast"] = inverse_difference(xgb_res["Forecast"], last_historical_value)
-                xgb_status.success("✅ XGBoost Model Training Complete!")
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(1)
 
-                # STEP 8: Train AutoML Model
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
-                with st.spinner("🚀 Training AutoML Model..."):
-                    automl_model_name, automl_res = train_automl_model(
-                        train, test, forecast_period,
-                        last_historical_value, is_diff,
-                        time_budget, demand_shock, seasonality_adjustment, external_shock, category_scenarios
-                    )
+                    # STEP 7: Train XGBoost Model
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Training XGBoost model...")
+                    with st.spinner("🚀 Training XGBoost model..."):
+                        xgb_model_name, xgb_res = train_xgb_model(
+                            train, test, forecast_period,
+                            last_historical_value, is_diff,
+                            demand_shock, seasonality_adjustment, external_shock, category_scenarios
+                        )
+                        time.sleep(1)
+                    if is_diff and xgb_res.get("Forecast") is not None:
+                        xgb_res["Forecast"] = inverse_difference(xgb_res["Forecast"], last_historical_value)
+                    st.success("✅ XGBoost Model Training Complete!")
+                    progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
-                if is_diff and automl_res.get("Forecast") is not None:
-                    automl_res["Forecast"] = inverse_difference(automl_res["Forecast"], last_historical_value)
-                automl_status.success("✅ AutoML Model Training Complete!")
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(1)
 
-                # STEP 9: Compile Forecast Results
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Compiling forecast results...")
-                st.success("🎉 Forecasting process completed!")
-                time.sleep(1)
-                results = {
-                    prophet_model_name: prophet_res,
-                    arima_model_name: arima_res,
-                    xgb_model_name: xgb_res,
-                    automl_model_name: automl_res
-                }
-                valid_results = {model: res for model, res in results.items() if res.get("Forecast") is not None}
-                if not valid_results:
-                    st.error("No valid model forecasts produced.")
-                    return
-                st.session_state.model_results = valid_results
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(1)
+                    # STEP 8: Train AutoML Model (Premium)
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
+                    with st.spinner("🚀 Training AutoML model..."):
+                        automl_model_name, automl_res = train_automl_model(
+                            train, test, forecast_period,
+                            last_historical_value, is_diff,
+                            time_budget, demand_shock, seasonality_adjustment, external_shock, category_scenarios
+                        )
+                        time.sleep(1)
+                    if is_diff and automl_res.get("Forecast") is not None:
+                        automl_res["Forecast"] = inverse_difference(automl_res["Forecast"], last_historical_value)
+                    st.success("✅ AutoML Model Training Complete!")
+                    progress_bar.progress(int((step / total_steps) * 100))
+                    time.sleep(1)
 
-                # STEP 10: Display Model Performance Comparison
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Displaying model performance comparison...")
-                comparison_data = []
-                for model, res in st.session_state.model_results.items():
-                    forecast_df = res["Forecast"]
-                    match_len = min(len(test["y"]), len(forecast_df))
-                    actual = test["y"].iloc[:match_len].values
-                    pred = forecast_df["yhat"].iloc[:match_len].values
-                    corr = shape_score(actual, pred)
-                    res["Shape (corr)"] = corr
-                    comparison_data.append({
-                        "Model": model,
-                        "RMSE": res["RMSE"],
-                        "MAPE": res["MAPE"],
-                        "Shape (corr)": res["Shape (corr)"]
-                    })
-                if comparison_data:
-                    max_rmse = max(res["RMSE"] for res in st.session_state.model_results.values())
+                    # STEP 9: Compile Forecast Results (Premium)
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Compiling forecast results...")
+                    st.success("🎉 Forecasting process completed!")
+                    time.sleep(1)
+                    results = {
+                        prophet_model_name: prophet_res,
+                        arima_model_name: arima_res,
+                        xgb_model_name: xgb_res,
+                        automl_model_name: automl_res
+                    }
+                    valid_results = {model: res for model, res in results.items() if res.get("Forecast") is not None}
+                    if not valid_results:
+                        st.error("No valid model forecasts produced.")
+                        return
+                    st.session_state.model_results = valid_results
+                    progress_bar.progress(int((step / total_steps) * 100))
+                    time.sleep(1)
+
+                    # STEP 10: Display Model Performance Comparison (Premium)
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Displaying model performance comparison...")
+                    comparison_data = []
                     for model, res in st.session_state.model_results.items():
-                        res["Combined Score"] = combined_score(res["RMSE"], res["Shape (corr)"], max_rmse, 0.5, 1.0)
-                    for item in comparison_data:
-                        item["Combined Score"] = combined_score(item["RMSE"], item["Shape (corr)"], max_rmse, 0.5, 1.0)
-                    comparison_df = pd.DataFrame(comparison_data).sort_values(by="Combined Score")
-                    st.dataframe(comparison_df.style.highlight_min(subset=["Combined Score"], color="lightgreen"))
-                    best_model = comparison_df.iloc[0]["Model"]
-                    st.success(f"✨ **AI-Selected Best Model (Combined):** {best_model}")
-                else:
-                    st.warning("No model results found. Please train the models first.")
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(1)
+                        forecast_df = res["Forecast"]
+                        match_len = min(len(test["y"]), len(forecast_df))
+                        actual = test["y"].iloc[:match_len].values
+                        pred = forecast_df["yhat"].iloc[:match_len].values
+                        corr = shape_score(actual, pred)
+                        res["Shape (corr)"] = corr
+                        comparison_data.append({
+                            "Model": model,
+                            "RMSE": res["RMSE"],
+                            "MAPE": res["MAPE"],
+                            "Shape (corr)": res["Shape (corr)"]
+                        })
+                    if comparison_data:
+                        max_rmse = max(res["RMSE"] for res in st.session_state.model_results.values())
+                        for model, res in st.session_state.model_results.items():
+                            res["Combined Score"] = combined_score(res["RMSE"], res["Shape (corr)"], max_rmse, 0.5, 1.0)
+                        for item in comparison_data:
+                            item["Combined Score"] = combined_score(item["RMSE"], item["Shape (corr)"], max_rmse, 0.5, 1.0)
+                        comparison_df = pd.DataFrame(comparison_data).sort_values(by="Combined Score")
+                        st.dataframe(comparison_df.style.highlight_min(subset=["Combined Score"], color="lightgreen"))
+                        best_model = comparison_df.iloc[0]["Model"]
+                        st.success(f"✨ **AI-Selected Best Model (Combined):** {best_model}")
+                    else:
+                        st.warning("No model results found. Please train the models first.")
+                    progress_bar.progress(int((step / total_steps) * 100))
+                    time.sleep(1)
 
-                # STEP 11: Finalize Forecast Visualization
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
-                st.markdown("### 🔍 Forecast Comparison Across Models")
-                model_colors = {
-                    "Prophet": "blue",
-                    "ARIMA": "green",
-                    "XGBoost": "red",
-                    "AutoML": "purple"
-                }
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=y_original["ds"],
-                    y=y_original["y_original"],
-                    mode="lines",
-                    name="Historical Data",
-                    line=dict(color="black", width=2)
-                ))
-                for model_name, res in results.items():
-                    forecast_df = res["Forecast"]
+                    # STEP 11: Finalize Forecast Visualization (Premium)
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
+                    st.markdown("### 🔍 Forecast Comparison Across Models")
+                    model_colors = {
+                        "Prophet": "blue",
+                        "ARIMA": "green",
+                        "XGBoost": "red",
+                        "AutoML": "purple"
+                    }
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=y_original["ds"],
+                        y=y_original["y_original"],
+                        mode="lines",
+                        name="Historical Data",
+                        line=dict(color="black", width=2)
+                    ))
+                    for model_name, res in results.items():
+                        forecast_df = res["Forecast"]
+                        fig.add_trace(go.Scatter(
+                            x=forecast_df["ds"],
+                            y=forecast_df["yhat"],
+                            mode="lines",
+                            name=f"{model_name} Forecast",
+                            line=dict(width=2, color=model_colors.get(model_name, "gray"))
+                        ))
+                    fig.update_layout(
+                        title="📊 Multi-Model Sales Forecast",
+                        xaxis_title="Date",
+                        yaxis_title="Sales",
+                        legend_title="Models",
+                        template="plotly_white",
+                        xaxis_tickformat="%Y-%m"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    progress_bar.progress(100)
+                    step_message.text("All steps completed!")
+                    
+                    st.markdown("### 📥 Download Forecast Data")
+                    try:
+                        csv = st.session_state.model_results[best_model]["Forecast"].to_csv(index=False)
+                        st.download_button(
+                            label="📩 Download Best Model Forecast (CSV)",
+                            data=csv,
+                            file_name="forecast.csv",
+                            mime="text/csv"
+                        )
+                    except Exception as e:
+                        st.error(f"❌ Error generating download file: {e}")
+                else:
+                    # FREE USERS PIPELINE (only AutoML)
+                    # STEP 4 (Free): Train AutoML Model
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Training AutoML model (Limited)...")
+                    with st.spinner("🚀 Training AutoML Model..."):
+                        automl_model_name, automl_res = train_automl_model(
+                            train, test, forecast_period,
+                            last_historical_value, is_diff,
+                            time_budget, demand_shock, seasonality_adjustment, external_shock, category_scenarios
+                        )
+                        time.sleep(1)
+                    if is_diff and automl_res.get("Forecast") is not None:
+                        automl_res["Forecast"] = inverse_difference(automl_res["Forecast"], last_historical_value)
+                    automl_status.success("✅ AutoML Model Training Complete!")
+                    progress_bar.progress(int((step / total_steps) * 100))
+                    time.sleep(1)
+                    
+                    # STEP 5 (Free): Compile Forecast Results
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Compiling forecast results...")
+                    st.success("🎉 Forecasting process completed!")
+                    time.sleep(1)
+                    results = {"AutoML": automl_res}
+                    st.session_state.model_results = results
+                    progress_bar.progress(int((step / total_steps) * 100))
+                    time.sleep(1)
+                    
+                    # STEP 6 (Free): Finalize Forecast Visualization
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
+                    st.markdown("### 🔍 Forecast Visualization")
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=y_original["ds"],
+                        y=y_original["y_original"],
+                        mode="lines",
+                        name="Historical Data",
+                        line=dict(color="black", width=2)
+                    ))
+                    forecast_df = automl_res["Forecast"]
                     fig.add_trace(go.Scatter(
                         x=forecast_df["ds"],
                         y=forecast_df["yhat"],
                         mode="lines",
-                        name=f"{model_name} Forecast",
-                        line=dict(width=2, color=model_colors.get(model_name, "gray"))
+                        name="AutoML Forecast",
+                        line=dict(width=2, color="purple")
                     ))
-                fig.update_layout(
-                    title="📊 Multi-Model Sales Forecast",
-                    xaxis_title="Date",
-                    yaxis_title="Sales",
-                    legend_title="Models",
-                    template="plotly_white",
-                    xaxis_tickformat="%Y-%m"
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                progress_bar.progress(100)
-                step_message.text("All steps completed!")
-                st.markdown("### 📥 Download Forecast Data")
-                try:
-                    csv = st.session_state.model_results[best_model]["Forecast"].to_csv(index=False)
-                    st.download_button(
-                        label="📩 Download Best Model Forecast (CSV)",
-                        data=csv,
-                        file_name="forecast.csv",
-                        mime="text/csv"
+                    fig.update_layout(
+                        title="📊 Sales Forecast",
+                        xaxis_title="Date",
+                        yaxis_title="Sales",
+                        template="plotly_white",
+                        xaxis_tickformat="%Y-%m"
                     )
-                except Exception as e:
-                    st.error(f"❌ Error generating download file: {e}")
+                    st.plotly_chart(fig, use_container_width=True)
+                    progress_bar.progress(100)
+                    step_message.text("All steps completed!")
+                    
+                    st.info("Upgrade to Premium to unlock advanced features like multi-model comparison and forecast download.")
 
         except Exception as e:
             st.error(f"Error processing file: {e}")
