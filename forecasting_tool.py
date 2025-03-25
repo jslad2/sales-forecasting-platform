@@ -81,8 +81,9 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
     Preprocess the uploaded data for Prophet.
     Returns:
       - data: Processed DataFrame with columns ds, y, and category columns (if provided)
-      - last_historical_value: The last y value (if differencing was applied)
+      - last_historical_value: The last y value (if differencing was applied), otherwise None
       - y_original: A copy of the processed data for inspection
+      - is_diff: Boolean indicating whether differencing was applied
       Also creates a re-aggregated DataFrame for a clean monthly chart.
     """
     try:
@@ -107,8 +108,10 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
         data = data.groupby(grouping_cols, as_index=False)["y"].sum()
 
         # 5. Convert year_month back to datetime (start-of-month)
-        data["ds"] = pd.to_datetime(data["year_month"].dt.to_timestamp(how="start").dt.strftime("%Y-%m"),
-                                    format="%Y-%m")
+        data["ds"] = pd.to_datetime(
+            data["year_month"].dt.to_timestamp(how="start").dt.strftime("%Y-%m"),
+            format="%Y-%m"
+        )
         data.drop(columns=["year_month"], inplace=True)
 
         # 6. Remove duplicates
@@ -141,11 +144,12 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             unsafe_allow_html=True,
         )
 
-        # 10. If non-stationary, apply differencing to stabilize the series and plot both series
+        # 10. If non-stationary, apply differencing to the aggregated series (for chart)
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the aggregated series.")
             re_agg_chart["y_diff"] = re_agg_chart["y"].diff()
             last_historical_value = re_agg_chart["y"].iloc[-1]
+            is_diff = True
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=re_agg_chart["ds"],
@@ -169,8 +173,10 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
                 xaxis_tickformat="%Y-%m"
             )
             st.plotly_chart(fig, use_container_width=True)
-            return data, last_historical_value, y_original
+            # Always return 4 values
+            return data, last_historical_value, y_original, is_diff
         else:
+            is_diff = False
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=re_agg_chart["ds"],
@@ -188,12 +194,13 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             )
             st.plotly_chart(fig, use_container_width=True)
             data = data.reset_index(drop=True)
-            return data, None, y_original
+            # Return four values
+            return data, None, y_original, is_diff
 
     except Exception as e:
         st.error(f"An error occurred during preprocessing: {e}")
         st.error(f"Debug Info: Columns in data - {data.columns}, Data Shape - {data.shape}")
-        return None, None, None, False
+        return None, None, None, None
 
 def inverse_difference(forecast_data, first_value):
     if first_value is not None:
