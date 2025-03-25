@@ -716,7 +716,8 @@ def create_interactive_forecast_dashboard(historical_data, forecasts, model_resu
             "Model": model,
             "RMSE": f"{res['RMSE']:,.1f}",
             "MAPE": f"{res['MAPE']:.1%}",
-            "Correlation": f"{res.get('Shape (corr)', 0):.2f}"
+            "Correlation": f"{res.get('Shape (corr)', 0):.2f}",
+            "Combined Score": f"{res.get('Combined Score', 0):.2f}"
         }
         for model, res in model_results.items()
     ])
@@ -734,7 +735,7 @@ def create_interactive_forecast_dashboard(historical_data, forecasts, model_resu
                 font=dict(size=11),
                 align="center"
             ),
-            columnwidth=[1, 0.7, 0.7, 0.7]
+            columnwidth=[1, 0.7, 0.7, 0.7, 0.7]
         ),
         row=2, col=1
     )
@@ -767,9 +768,12 @@ def create_interactive_forecast_dashboard(historical_data, forecasts, model_resu
             rangeslider=dict(visible=True),
             type="date"
         ),
-        yaxis_title="Sales Volume",
-        xaxis2_visible=False
+        yaxis_title="Sales Volume"
     )
+    
+    # Hide axes for table subplot
+    fig.update_xaxes(showgrid=False, showticklabels=False, row=2, col=1)
+    fig.update_yaxes(showgrid=False, showticklabels=False, row=2, col=1)
     
     return fig
 
