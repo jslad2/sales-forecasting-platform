@@ -461,7 +461,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             data_automl["y_log"] = data_automl["y"]
             apply_log = False
 
-        # Drop rows with missing values and reset the index to align samples
+        # Drop rows with missing values and reset the index for alignment
         data_automl = data_automl.dropna().reset_index(drop=True)
 
         # Prepare features and target
@@ -469,20 +469,19 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         y_train = data_automl["y_log"] if apply_log else data_automl["y"]
         X_train = data_automl[feature_cols]
 
-        # Choose evaluation method based on training sample size
-        eval_method = "cv"
-        if X_train.shape[0] < 5:
-            eval_method = "holdout"
-            st.info("Dataset is small; using holdout evaluation instead of cross-validation.")
+        # Check if we have enough samples for training
+        if X_train.shape[0] < 10:
+            st.error("Not enough data samples to train the AutoML model. Please provide more data.")
+            return ("AutoML", {})
 
-        # Train AutoML model
+        # Train AutoML model using provided time_budget
         automl_model = AutoML()
         automl_model.fit(
             X_train=X_train,
             y_train=y_train,
             task="regression",
             time_budget=time_budget,
-            eval_method=eval_method,
+            eval_method="cv",  # You could adjust this if needed
             estimator_list=["xgboost", "lgbm", "rf", "catboost"],
             metric="r2",
             early_stop=True,
@@ -549,6 +548,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
     except Exception as e:
         st.error(f"AutoML Model failed: {e}")
     return ("AutoML", result)
+
 
 def shape_score(actual, forecast):
     if len(actual) != len(forecast):
