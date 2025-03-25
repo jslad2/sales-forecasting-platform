@@ -78,123 +78,54 @@ def check_stationarity(series):
 
 def preprocess_data(data, date_column, sales_column, category_columns=None):
     """
-    Preprocess the uploaded data for Prophet.
+    Preprocess the uploaded data for Prophet compatibility.
     Returns:
-      - data: DataFrame with columns ds, y, and category columns (if provided)
-      - last_historical_value: The last y value (if differencing applied)
-      - y_original: A copy of the processed data for inspection
-      Also, creates a re-aggregated DataFrame for a clean monthly chart.
+      - df_for_model: DataFrame with columns ds, y (differenced if non‑stationary)
+      - last_historical_value: Last original y value (needed to invert differencing) or None
+      - y_original: DataFrame of historical ds + original y values
+      - is_diff: Boolean indicating whether differencing was applied
     """
     try:
-        # 1. Convert date column to datetime and drop missing rows
         data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
         data.dropna(subset=[date_column, sales_column], inplace=True)
-
-        # 2. Rename columns for Prophet
         data = data.rename(columns={date_column: "ds", sales_column: "y"})
-
-        # 3. Create monthly period column
         data["year_month"] = data["ds"].dt.to_period("M")
 
-        # 4. Group by year_month and category columns (if provided)
-        if category_columns:
-            if not isinstance(category_columns, list):
-                category_columns = [category_columns]
-            grouping_cols = ["year_month"] + category_columns
-        else:
-            grouping_cols = ["year_month"]
+        grouping = ["year_month"] + (category_columns if isinstance(category_columns, list) else ([category_columns] if category_columns else []))
+        data = data.groupby(grouping, as_index=False)["y"].sum()
 
-        data = data.groupby(grouping_cols, as_index=False)["y"].sum()
-
-        # 5. Convert year_month back to datetime (start-of-month)
-        data["ds"] = pd.to_datetime(data["year_month"].dt.to_timestamp(how="start").dt.strftime("%Y-%m"),
-                                    format="%Y-%m")
+        data["ds"] = pd.to_datetime(data["year_month"].dt.to_timestamp(how="start"))
         data.drop(columns=["year_month"], inplace=True)
 
-        # 6. Remove duplicates
-        if category_columns:
-            subset_cols = ["ds", "y"] + category_columns
-        else:
-            subset_cols = ["ds", "y"]
-        if data.duplicated(subset=subset_cols).any():
+        subset = ["ds"] + (category_columns or [])
+        if data.duplicated(subset=subset).any():
             st.warning("⚠️ Duplicate date/category combinations found. Removing duplicates...")
-            data = data.drop_duplicates(subset=subset_cols, keep="last")
+            data = data.drop_duplicates(subset=subset, keep="last")
 
-        # 7. Save original processed data for inspection (keep category columns if exist)
-        if category_columns:
-            y_original = data.copy()
+        y_original = data[["ds","y"]].rename(columns={"y":"y_original"}).copy()
+
+        stationarity = check_stationarity(data["y"])
+        is_diff = (stationarity == "Non-Stationary")
+        st.markdown(f"""
+            <div style="text-align:center;">
+                <h2 style="color:#2B3A42;">📊 Stationarity Test</h2>
+                <p>The series is <strong>{stationarity}</strong>.</p>
+            </div>""", unsafe_allow_html=True)
+
+        if is_diff:
+            st.warning("Applying differencing to stabilize the series.")
+            last_historical_value = data["y"].iloc[-1]
+            data["y"] = data["y"].diff().dropna()
+            df_for_model = data.dropna(subset=["y"])[["ds","y"]].reset_index(drop=True)
         else:
-            y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
+            last_historical_value = None
+            df_for_model = data[["ds","y"]].reset_index(drop=True)
 
-        # 8. Re-aggregate data by ds for charting (to get a single line per month)
-        re_agg_chart = data.groupby("ds", as_index=False)["y"].sum()
-
-        # 9. Check stationarity on the aggregated series
-        stationarity_result = check_stationarity(re_agg_chart["y"])
-        st.markdown(
-            f"""
-            <div style="text-align: center;">
-                <h2 style="color: #2B3A42;">📊 Stationarity Test</h2>
-                <p style="font-size: 1.2rem;">Conclusion: The series is <strong>{stationarity_result}</strong>.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        # 10. If non-stationary, apply differencing to the aggregated series (for chart)
-        if stationarity_result == "Non-Stationary":
-            st.warning("Applying differencing to stabilize the aggregated series.")
-            re_agg_chart["y_diff"] = re_agg_chart["y"].diff()
-            last_historical_value = re_agg_chart["y"].iloc[-1]
-
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=re_agg_chart["ds"],
-                y=re_agg_chart["y"],
-                mode="lines",
-                name="Original Series",
-                line=dict(color="blue", width=2)
-            ))
-            fig.add_trace(go.Scatter(
-                x=re_agg_chart["ds"].iloc[1:],
-                y=re_agg_chart["y_diff"].dropna(),
-                mode="lines",
-                name="Differenced Series",
-                line=dict(color="orange", width=2, dash="dot")
-            ))
-            fig.update_layout(
-                title="Original vs Differenced Series (Monthly, Aggregated)",
-                xaxis_title="Date (YYYY-MM)",
-                yaxis_title="Sales",
-                template="plotly_white",
-                xaxis_tickformat="%Y-%m"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            return data, last_historical_value, y_original
-        else:
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=re_agg_chart["ds"],
-                y=re_agg_chart["y"],
-                mode="lines",
-                name="Original Series (Monthly, Aggregated)",
-                line=dict(color="blue", width=2)
-            ))
-            fig.update_layout(
-                title="Original Series (Monthly, Aggregated)",
-                xaxis_title="Date (YYYY-MM)",
-                yaxis_title="Sales",
-                template="plotly_white",
-                xaxis_tickformat="%Y-%m"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            data = data.reset_index(drop=True)
-            return data, None, y_original
+        return df_for_model, last_historical_value, y_original, is_diff
 
     except Exception as e:
-        st.error(f"An error occurred during preprocessing: {e}")
-        st.error(f"Debug Info: Columns in data - {data.columns}, Data Shape - {data.shape}")
-        return None, None, None
+        st.error(f"Preprocessing error: {e}")
+        return None, None, None, False
 
 def inverse_difference(forecast_data, first_value):
     if first_value is not None:
