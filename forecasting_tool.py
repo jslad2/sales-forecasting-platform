@@ -461,7 +461,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             data_automl["y_log"] = data_automl["y"]
             apply_log = False
 
-        # Drop rows with any NaN values and reset index for alignment
+        # Drop rows with missing values and reset the index to align samples
         data_automl = data_automl.dropna().reset_index(drop=True)
 
         # Prepare features and target
@@ -469,14 +469,20 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         y_train = data_automl["y_log"] if apply_log else data_automl["y"]
         X_train = data_automl[feature_cols]
 
-        # Train AutoML model using provided time_budget
+        # Choose evaluation method based on training sample size
+        eval_method = "cv"
+        if X_train.shape[0] < 5:
+            eval_method = "holdout"
+            st.info("Dataset is small; using holdout evaluation instead of cross-validation.")
+
+        # Train AutoML model
         automl_model = AutoML()
         automl_model.fit(
             X_train=X_train,
             y_train=y_train,
             task="regression",
             time_budget=time_budget,
-            eval_method="cv",
+            eval_method=eval_method,
             estimator_list=["xgboost", "lgbm", "rf", "catboost"],
             metric="r2",
             early_stop=True,
@@ -516,7 +522,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
                 future_df[col] = 0
         future_df = future_df[X_train.columns]
 
-        # Generate forecasts using AutoML model
+        # Generate forecasts
         automl_forecast = automl_model.predict(future_df)
         if apply_log:
             automl_forecast = np.expm1(automl_forecast)
