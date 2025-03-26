@@ -483,7 +483,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
     Train an AutoML model using FLAML for time series forecasting.
 
     Args:
-        train (pd.DataFrame): Training data with columns "ds" (date) and "y" (target).
+        train (pd.DataFrame): Training data with columns "ds" (date) and "y" (target, already differenced if non-stationary).
         test (pd.DataFrame): Test data for evaluation.
         forecast_period (int): Number of periods to forecast.
         last_historical_value (float): Last observed value before differencing (if applied).
@@ -510,11 +510,11 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         elif len(train) <= 24:
             max_lag = min(12, len(train) - 1)
 
-        # Add lag features
+        # Add lag features based on the already differenced "y"
         for lag in range(1, max_lag + 1):
             data_automl[f"lag_{lag}"] = data_automl["y"].shift(lag)
 
-        # Add rolling statistics
+        # Add rolling statistics based on "y"
         for window in [3, 6, 12]:
             data_automl[f"rolling_mean_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).mean()
             data_automl[f"rolling_std_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).std()
@@ -525,17 +525,17 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         else:
             data_automl["yoy_growth"] = 0
 
-        # Add differenced values
-        data_automl["y_diff"] = data_automl["y"].diff().fillna(0)
-
-        # Add rolling mean growth
-        data_automl["rolling_mean_growth"] = data_automl["y"].rolling(window=3).mean().diff().fillna(0)
+        # Note: We remove the extra differenced column and rolling mean growth since the data is already differenced.
+        # Uncomment the lines below if you want to use them as extra features.
+        # data_automl["y_diff"] = data_automl["y"].diff().fillna(0)
+        # data_automl["rolling_mean_growth"] = data_automl["y"].rolling(window=3).mean().diff().fillna(0)
 
         # Add trigonometric features for seasonality
         data_automl["sin_month"] = np.sin(2 * np.pi * data_automl["ds"].dt.month / 12)
         data_automl["cos_month"] = np.cos(2 * np.pi * data_automl["ds"].dt.month / 12)
 
-        # Log-transform if the target variable has a large range and is positive
+        # Log-transform if the target variable has a large range and is positive.
+        # Note: If the training data is differenced, it might contain negative values.
         if data_automl["y"].min() > 0 and (data_automl["y"].max() / data_automl["y"].min() > 5):
             data_automl["y_log"] = np.log1p(data_automl["y"])
             apply_log = True
@@ -569,7 +569,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             verbose=1
         )
 
-        # Generate future features for forecasting
+        # Generate future features for forecasting using the same feature engineering on the differenced "y"
         future_features = []
         last_row = data_automl.iloc[-1].copy()
         for i in range(forecast_period):
@@ -586,8 +586,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
                     future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y"] - last_row[f"lag_{window}"]) / window
                 future_row[f"rolling_std_{window}"] = last_row[f"rolling_std_{window}"]
             future_row["yoy_growth"] = last_row["yoy_growth"]
-            future_row["y_diff"] = last_row["y_diff"]
-            future_row["rolling_mean_growth"] = last_row["rolling_mean_growth"]
+            # We no longer compute an extra differenced column here.
             future_row["sin_month"] = np.sin(2 * np.pi * (last_row["ds"].month + i) / 12)
             future_row["cos_month"] = np.cos(2 * np.pi * (last_row["ds"].month + i) / 12)
             future_features.append(future_row)
@@ -610,8 +609,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             periods=forecast_period,
             freq="MS"
         )
-        st.write("DEBUG: AutoML - forecast start date:", forecast_dates[0])
-        st.write("DEBUG: AutoML - forecast end date:", forecast_dates[-1])
+
         forecast_df = pd.DataFrame({
             "ds": forecast_dates,
             "yhat": automl_forecast,
@@ -621,6 +619,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
 
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
+        # Apply inverse differencing if training data was differenced
         if isinstance(last_historical_value, (int, float)):
             forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
             forecast_df["yhat_lower"] = inverse_difference(forecast_df["yhat_lower"], last_historical_value)
