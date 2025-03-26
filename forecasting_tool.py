@@ -1018,7 +1018,7 @@ def main():
                 time.sleep(1)
                 results = {
                     prophet_model_name: prophet_res,
-                    arima_model_name: arima_res,
+                    # arima_model_name: arima_res,
                     xgb_model_name: xgb_res,
                     automl_model_name: automl_res
                 }
