@@ -898,19 +898,16 @@ def main():
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
-                    # STEP 8: Train AutoML Model (Premium)
+                    # STEP 9: Train AutoML Model
                     step += 1
                     step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
-                    with st.spinner("🚀 Training AutoML model..."):
+                    with st.spinner("🚀 Training AutoML Model..."):
                         automl_model_name, automl_res = train_automl_model(
                             train, test, forecast_period,
-                            last_historical_value, is_diff,
-                            time_budget, demand_shock, seasonality_adjustment, external_shock, category_scenarios
+                            last_historical_value, y_original, time_budget
                         )
                         time.sleep(1)
-                    if is_diff and automl_res.get("Forecast") is not None:
-                        automl_res["Forecast"] = inverse_difference(automl_res["Forecast"], last_historical_value)
-                    st.success("✅ AutoML Model Training Complete!")
+                    automl_status.success("✅ AutoML Model Training Complete!")
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
