@@ -80,7 +80,8 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
     """
     Preprocess the uploaded data for Prophet.
     Returns:
-      - data: Processed DataFrame with columns ds, y, and category columns (if provided)
+      - data: Processed DataFrame with columns ds, y (if non-stationary, y is differenced),
+              and category columns (if provided)
       - last_historical_value: The last y value (if differencing was applied), otherwise None
       - y_original: A copy of the processed data for inspection
       - is_diff: Boolean indicating whether differencing was applied
@@ -123,13 +124,13 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             st.warning("⚠️ Duplicate date/category combinations found. Removing duplicates...")
             data = data.drop_duplicates(subset=subset_cols, keep="last")
 
-        # 7. Save original processed data for inspection (keep category columns if exist)
+        # 7. Save original processed data for inspection
         if category_columns:
             y_original = data.copy()
         else:
             y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
 
-        # 8. Re-aggregate data by ds for charting (to get a single line per month)
+        # 8. Re-aggregate data by ds for charting (one line per month)
         re_agg_chart = data.groupby("ds", as_index=False)["y"].sum()
 
         # 9. Check stationarity on the aggregated series
@@ -144,25 +145,32 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             unsafe_allow_html=True,
         )
 
-        # 10. If non-stationary, apply differencing to the aggregated series (for chart)
+        # 10. If non-stationary, apply differencing to both the aggregated chart and the model data
         if stationarity_result == "Non-Stationary":
-            st.warning("Applying differencing to stabilize the aggregated series.")
+            st.warning("Applying differencing to stabilize the series for charting and modeling.")
+            
+            # For charting: compute differenced aggregated series
             re_agg_chart["y_diff"] = re_agg_chart["y"].diff()
             last_historical_value = re_agg_chart["y"].iloc[-1]
             is_diff = True
+
+            # For modeling: physically difference the actual data
+            data["y"] = data["y"].diff()  # This creates a differenced column
+            data = data.dropna().reset_index(drop=True)
+
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=re_agg_chart["ds"],
                 y=re_agg_chart["y"],
                 mode="lines",
-                name="Original Series",
+                name="Original Aggregated Series",
                 line=dict(color="blue", width=2)
             ))
             fig.add_trace(go.Scatter(
                 x=re_agg_chart["ds"].iloc[1:],
                 y=re_agg_chart["y_diff"].dropna(),
                 mode="lines",
-                name="Differenced Series",
+                name="Differenced Aggregated Series",
                 line=dict(color="orange", width=2, dash="dot")
             ))
             fig.update_layout(
@@ -173,7 +181,6 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
                 xaxis_tickformat="%Y-%m"
             )
             st.plotly_chart(fig, use_container_width=True)
-            # Always return 4 values
             return data, last_historical_value, y_original, is_diff
         else:
             is_diff = False
@@ -194,7 +201,6 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             )
             st.plotly_chart(fig, use_container_width=True)
             data = data.reset_index(drop=True)
-            # Return four values
             return data, None, y_original, is_diff
 
     except Exception as e:
@@ -860,8 +866,8 @@ def main():
                             demand_shock, seasonality_adjustment, external_shock, category_scenarios
                         )
                         time.sleep(1)
-                    # if is_diff and prophet_res.get("Forecast") is not None:
-                    prophet_res["Forecast"] = inverse_difference(prophet_res["Forecast"], last_historical_value)
+                    if is_diff and prophet_res.get("Forecast") is not None:
+                        prophet_res["Forecast"] = inverse_difference(prophet_res["Forecast"], last_historical_value)
                     st.success("✅ Prophet Model Training Complete!")
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
