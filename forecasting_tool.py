@@ -454,47 +454,47 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         st.warning(f"Prophet Model failed: {e}")
     return ("Prophet", result)
 
-def train_arima_model(train, test, forecast_period, last_historical_value, y_original):
-    result = {}
-    try:
-        try:
-            decomposition = seasonal_decompose(train["y"], model="additive", period=12)
-            seasonality_present = np.any(np.abs(decomposition.seasonal) > 0.01)
-            acf_values = acf(train["y"], nlags=12, fft=False)
-            seasonality_confirmed = any(np.abs(acf_values[1:]) > 0.2)
-            seasonal = seasonality_present and seasonality_confirmed
-        except Exception as e:
-            st.warning(f"Error in seasonality analysis: {e}")
-            seasonal = False
-        model = auto_arima(
-            train["y"],
-            seasonal=seasonal,
-            m=12 if seasonal else 1,
-            d=None,
-            D=1 if seasonal else 0,
-            start_p=0, start_q=0,
-            max_p=3, max_q=3,
-            start_P=0, start_Q=0,
-            max_P=2, max_Q=2,
-            trace=False,
-            suppress_warnings=True,
-            error_action="ignore",
-            stepwise=True
-        )
-        arima_forecast = model.predict(n_periods=forecast_period)
-        if len(arima_forecast) < forecast_period:
-            forecast_period = len(arima_forecast)
-        forecast_dates = pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M")
-        forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": arima_forecast[:forecast_period]})
-        if isinstance(last_historical_value, (int, float)):
-            forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
-        matching_length = min(len(test["y"]), len(forecast_df))
-        rmse = mean_squared_error(test["y"].iloc[:matching_length], forecast_df["yhat"].iloc[:matching_length]) ** 0.5
-        mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], forecast_df["yhat"].iloc[:matching_length])
-        result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
-    except Exception as e:
-        st.warning(f"ARIMA Model failed: {e}")
-    return ("ARIMA", result)
+# def train_arima_model(train, test, forecast_period, last_historical_value, y_original):
+#     result = {}
+#     try:
+#         try:
+#             decomposition = seasonal_decompose(train["y"], model="additive", period=12)
+#             seasonality_present = np.any(np.abs(decomposition.seasonal) > 0.01)
+#             acf_values = acf(train["y"], nlags=12, fft=False)
+#             seasonality_confirmed = any(np.abs(acf_values[1:]) > 0.2)
+#             seasonal = seasonality_present and seasonality_confirmed
+#         except Exception as e:
+#             st.warning(f"Error in seasonality analysis: {e}")
+#             seasonal = False
+#         model = auto_arima(
+#             train["y"],
+#             seasonal=seasonal,
+#             m=12 if seasonal else 1,
+#             d=None,
+#             D=1 if seasonal else 0,
+#             start_p=0, start_q=0,
+#             max_p=3, max_q=3,
+#             start_P=0, start_Q=0,
+#             max_P=2, max_Q=2,
+#             trace=False,
+#             suppress_warnings=True,
+#             error_action="ignore",
+#             stepwise=True
+#         )
+#         arima_forecast = model.predict(n_periods=forecast_period)
+#         if len(arima_forecast) < forecast_period:
+#             forecast_period = len(arima_forecast)
+#         forecast_dates = pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="M")
+#         forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": arima_forecast[:forecast_period]})
+#         if isinstance(last_historical_value, (int, float)):
+#             forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
+#         matching_length = min(len(test["y"]), len(forecast_df))
+#         rmse = mean_squared_error(test["y"].iloc[:matching_length], forecast_df["yhat"].iloc[:matching_length]) ** 0.5
+#         mape = mean_absolute_percentage_error(test["y"].iloc[:matching_length], forecast_df["yhat"].iloc[:matching_length])
+#         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
+#     except Exception as e:
+#         st.warning(f"ARIMA Model failed: {e}")
+#     return ("ARIMA", result)
 
 def train_xgb_model(train, test, forecast_period, last_historical_value, y_original):
     result = {}
@@ -972,18 +972,18 @@ def main():
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 7: Train ARIMA Model
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Training ARIMA model...")
-                with st.spinner("🚀 Training ARIMA Model..."):
-                    arima_model_name, arima_res = train_arima_model(
-                        train, test, forecast_period,
-                        last_historical_value, y_original
-                    )
-                    time.sleep(1)
-                arima_status.success("✅ ARIMA Model Training Complete!")
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(1)
+                # # STEP 7: Train ARIMA Model
+                # step += 1
+                # step_message.text(f"Step {step} of {total_steps}: Training ARIMA model...")
+                # with st.spinner("🚀 Training ARIMA Model..."):
+                #     arima_model_name, arima_res = train_arima_model(
+                #         train, test, forecast_period,
+                #         last_historical_value, y_original
+                #     )
+                #     time.sleep(1)
+                # arima_status.success("✅ ARIMA Model Training Complete!")
+                # progress_bar.progress(int((step / total_steps) * 100))
+                # time.sleep(1)
 
                 # STEP 8: Train XGBoost Model
                 step += 1
