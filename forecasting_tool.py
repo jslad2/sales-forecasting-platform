@@ -860,8 +860,8 @@ def main():
                             demand_shock, seasonality_adjustment, external_shock, category_scenarios
                         )
                         time.sleep(1)
-                    if is_diff and prophet_res.get("Forecast") is not None:
-                        prophet_res["Forecast"] = inverse_difference(prophet_res["Forecast"], last_historical_value)
+                    # if is_diff and prophet_res.get("Forecast") is not None:
+                    prophet_res["Forecast"] = inverse_difference(prophet_res["Forecast"], last_historical_value)
                     st.success("✅ Prophet Model Training Complete!")
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
