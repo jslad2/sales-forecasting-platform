@@ -130,6 +130,11 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
         else:
             y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
 
+        y_original = data.copy()
+        if category_columns:
+            y_original = y_original.groupby('ds', as_index=False)['y'].sum()
+        y_original = y_original.rename(columns={'y': 'y_original'})
+
         # 8. Re-aggregate data by ds for charting (one line per month)
         re_agg_chart = data.groupby("ds", as_index=False)["y"].sum()
 
@@ -291,11 +296,25 @@ def adjust_forecast_by_category(forecast_df, category_scenarios):
             end_date = pd.to_datetime(details.get("end_date"))
             mask = (forecast_df["ds"] >= start_date) & (forecast_df["ds"] <= end_date)
             if mask.any():
+                # Apply category-specific adjustment
                 forecast_df.loc[mask, "yhat"] *= (1 + adjustment / 100)
                 if "yhat_lower" in forecast_df.columns:
                     forecast_df.loc[mask, "yhat_lower"] *= (1 + adjustment / 100)
                 if "yhat_upper" in forecast_df.columns:
                     forecast_df.loc[mask, "yhat_upper"] *= (1 + adjustment / 100)
+    
+    # Aggregate category-level forecasts to maintain temporal consistency
+    if any(col in forecast_df.columns for col in category_scenarios.keys()):
+        agg_dict = {
+            "yhat": "sum",
+            "yhat_lower": "sum",
+            "yhat_upper": "sum"
+        }
+        forecast_df = forecast_df.groupby("ds", as_index=False).agg(agg_dict)
+    
+    # Ensure temporal order and reset index
+    forecast_df = forecast_df.sort_values("ds").reset_index(drop=True)
+    
     return forecast_df
 
 def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
