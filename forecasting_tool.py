@@ -78,33 +78,33 @@ def check_stationarity(series):
 
 def preprocess_data(data, date_column, sales_column, category_columns=None):
     """
-    Preprocess the uploaded data for time series forecasting.
-    
+    Preprocess the uploaded data for Prophet.
     Returns:
-      dict: {
-        "processed_data": DataFrame with columns ds, y (differenced if non-stationary),
-        "last_historical_value": Last y value if differencing was applied (else None),
-        "historical_chart_data": Aggregated monthly data for visualization,
-        "is_diff": Boolean indicating whether differencing was applied
-      }
+      - data: Processed DataFrame with columns ds, y (if non-stationary, y is differenced),
+              and category columns (if provided)
+      - last_historical_value: The last y value (if differencing was applied), otherwise None
+      - y_original: A copy of the processed data for inspection
+      - is_diff: Boolean indicating whether differencing was applied
+      Also creates a re-aggregated DataFrame for a clean monthly chart.
     """
     try:
         # 1. Convert date column to datetime and drop missing rows
         data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
         data.dropna(subset=[date_column, sales_column], inplace=True)
 
-        # 2. Rename columns for modeling
+        # 2. Rename columns for Prophet
         data = data.rename(columns={date_column: "ds", sales_column: "y"})
 
         # 3. Create monthly period column
         data["year_month"] = data["ds"].dt.to_period("M")
 
         # 4. Group by year_month and category columns (if provided)
-        grouping_cols = ["year_month"] 
         if category_columns:
             if not isinstance(category_columns, list):
                 category_columns = [category_columns]
-            grouping_cols += category_columns
+            grouping_cols = ["year_month"] + category_columns
+        else:
+            grouping_cols = ["year_month"]
 
         data = data.groupby(grouping_cols, as_index=False)["y"].sum()
 
@@ -116,16 +116,25 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
         data.drop(columns=["year_month"], inplace=True)
 
         # 6. Remove duplicates
-        subset_cols = ["ds", "y"] + (category_columns if category_columns else [])
+        if category_columns:
+            subset_cols = ["ds", "y"] + category_columns
+        else:
+            subset_cols = ["ds", "y"]
         if data.duplicated(subset=subset_cols).any():
             st.warning("⚠️ Duplicate date/category combinations found. Removing duplicates...")
             data = data.drop_duplicates(subset=subset_cols, keep="last")
 
-        # 7. Create aggregated chart data (monthly totals)
-        chart_data = data.groupby("ds", as_index=False)["y"].sum()
+        # 7. Save original processed data for inspection
+        if category_columns:
+            y_original = data.copy()
+        else:
+            y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
 
-        # 8. Check stationarity
-        stationarity_result = check_stationarity(chart_data["y"])
+        # 8. Re-aggregate data by ds for charting (one line per month)
+        re_agg_chart = data.groupby("ds", as_index=False)["y"].sum()
+
+        # 9. Check stationarity on the aggregated series
+        stationarity_result = check_stationarity(re_agg_chart["y"])
         st.markdown(
             f"""
             <div style="text-align: center;">
@@ -136,77 +145,68 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             unsafe_allow_html=True,
         )
 
-        # 9. Handle differencing if non-stationary
-        is_diff = False
-        last_historical_value = None
-        
+        # 10. If non-stationary, apply differencing to both the aggregated chart and the model data
         if stationarity_result == "Non-Stationary":
-            st.warning("Applying differencing to stabilize the series.")
+            st.warning("Applying differencing to stabilize the series for charting and modeling.")
             
-            # Store last value before differencing
-            last_historical_value = chart_data["y"].iloc[-1]
+            # For charting: compute differenced aggregated series
+            re_agg_chart["y_diff"] = re_agg_chart["y"].diff()
+            last_historical_value = re_agg_chart["y"].iloc[-1]
             is_diff = True
-            
-            # Apply differencing to chart data
-            chart_data["y_diff"] = chart_data["y"].diff()
-            
-            # Apply differencing to model data
-            data["y"] = data["y"].diff()
+
+            # For modeling: physically difference the actual data
+            data["y"] = data["y"].diff()  # This creates a differenced column
             data = data.dropna().reset_index(drop=True)
 
-            # Plot comparison
             fig = go.Figure()
             fig.add_trace(go.Scatter(
-                x=chart_data["ds"],
-                y=chart_data["y"],
+                x=re_agg_chart["ds"],
+                y=re_agg_chart["y"],
                 mode="lines",
-                name="Original Series",
+                name="Original Aggregated Series",
                 line=dict(color="blue", width=2)
             ))
             fig.add_trace(go.Scatter(
-                x=chart_data["ds"].iloc[1:],
-                y=chart_data["y_diff"].dropna(),
+                x=re_agg_chart["ds"].iloc[1:],
+                y=re_agg_chart["y_diff"].dropna(),
                 mode="lines",
-                name="Differenced Series",
+                name="Differenced Aggregated Series",
                 line=dict(color="orange", width=2, dash="dot")
             ))
             fig.update_layout(
-                title="Original vs Differenced Series",
-                xaxis_title="Date",
+                title="Original vs Differenced Series (Monthly, Aggregated)",
+                xaxis_title="Date (YYYY-MM)",
                 yaxis_title="Sales",
-                template="plotly_white"
+                template="plotly_white",
+                xaxis_tickformat="%Y-%m"
             )
             st.plotly_chart(fig, use_container_width=True)
+            return data, last_historical_value, y_original, is_diff
         else:
-            # Plot original series
+            is_diff = False
             fig = go.Figure()
             fig.add_trace(go.Scatter(
-                x=chart_data["ds"],
-                y=chart_data["y"],
+                x=re_agg_chart["ds"],
+                y=re_agg_chart["y"],
                 mode="lines",
-                name="Original Series",
+                name="Original Series (Monthly, Aggregated)",
                 line=dict(color="blue", width=2)
             ))
             fig.update_layout(
-                title="Original Series",
-                xaxis_title="Date",
+                title="Original Series (Monthly, Aggregated)",
+                xaxis_title="Date (YYYY-MM)",
                 yaxis_title="Sales",
-                template="plotly_white"
+                template="plotly_white",
+                xaxis_tickformat="%Y-%m"
             )
             st.plotly_chart(fig, use_container_width=True)
-
-        return {
-            "processed_data": data,
-            "last_historical_value": last_historical_value,
-            "historical_chart_data": chart_data,
-            "is_diff": is_diff
-        }
+            data = data.reset_index(drop=True)
+            return data, None, y_original, is_diff
 
     except Exception as e:
-        st.error(f"Preprocessing error: {str(e)}")
-        if 'data' in locals():
-            st.error(f"Debug Info: Columns - {data.columns}, Shape - {data.shape}")
-        return None
+        st.error(f"An error occurred during preprocessing: {e}")
+        st.error(f"Debug Info: Columns in data - {data.columns}, Data Shape - {data.shape}")
+        return None, None, None, None
 
 def inverse_difference(forecast_data, first_value):
     if first_value is not None:
@@ -281,7 +281,7 @@ def find_best_prophet_params(train):
                 best_params = params
     return best_params, best_rmse
 
-def adjust_forecast_by_category(forecast_df, category_scenarios, last_historical_date=None):
+def adjust_forecast_by_category(forecast_df, category_scenarios):
     # For each scenario in the dynamic dictionary,
     # if the forecast date falls within the specified date range, adjust yhat.
     for col, cat_dict in category_scenarios.items():
@@ -290,9 +290,6 @@ def adjust_forecast_by_category(forecast_df, category_scenarios, last_historical
             start_date = pd.to_datetime(details.get("start_date"))
             end_date = pd.to_datetime(details.get("end_date"))
             mask = (forecast_df["ds"] >= start_date) & (forecast_df["ds"] <= end_date)
-            # Only apply adjustment to dates strictly after the last historical date
-            if last_historical_date is not None:
-                mask &= (forecast_df["ds"] > last_historical_date)
             if mask.any():
                 forecast_df.loc[mask, "yhat"] *= (1 + adjustment / 100)
                 if "yhat_lower" in forecast_df.columns:
@@ -301,7 +298,7 @@ def adjust_forecast_by_category(forecast_df, category_scenarios, last_historical
                     forecast_df.loc[mask, "yhat_upper"] *= (1 + adjustment / 100)
     return forecast_df
 
-def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, last_historical_date=None):
+def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     # Apply global adjustments
     if demand_shock != 0:
         forecast_df["yhat"] *= (1 + demand_shock / 100)
@@ -325,7 +322,7 @@ def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_
             forecast_df["yhat_upper"] *= 0.8
     # Then apply category-specific adjustments
     if category_scenarios:
-        forecast_df = adjust_forecast_by_category(forecast_df, category_scenarios, last_historical_date=last_historical_date)
+        forecast_df = adjust_forecast_by_category(forecast_df, category_scenarios)
     return forecast_df
 
 def train_prophet_model(train, test, forecast_period, best_params, last_historical_value,
@@ -480,102 +477,61 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
 
     return "XGBoost", result
 
-def train_automl_model(train, test, forecast_period, last_historical_value, is_diff,
-                      demand_shock, seasonality_adjustment, external_shock, 
-                      category_scenarios=None, time_budget=None):
+def train_automl_model(train, test, forecast_period, last_historical_value, y_original, time_budget=None):
     """
-    Train an AutoML model using FLAML for time series forecasting with category support.
-    
+    Train an AutoML model using FLAML for time series forecasting.
+
     Args:
-        train: Training data (must contain 'ds' and 'y' columns)
-        test: Test data for evaluation
-        forecast_period: Number of periods to forecast
-        last_historical_value: Last actual value (for differencing reversal)
-        is_diff: Whether differencing was applied
-        demand_shock: Percentage demand adjustment
-        seasonality_adjustment: Percentage seasonality adjustment
-        external_shock: Boolean for external shock scenario
-        category_scenarios: Dictionary of category adjustments
-        time_budget: Time limit for AutoML training
-        
+        train (pd.DataFrame): Training data with columns "ds" (date) and "y" (target).
+        test (pd.DataFrame): Test data for evaluation.
+        forecast_period (int): Number of periods to forecast.
+        last_historical_value (float): Last observed value before differencing (if applied).
+        y_original (pd.DataFrame): Original target values for comparison.
+        time_budget (int or None): Time budget in seconds for AutoML training. If None, it is dynamically calculated.
+
     Returns:
-        Tuple of (model_name, results_dict)
+        tuple: Model name ("AutoML") and a dictionary containing RMSE, MAPE, and forecast DataFrame.
     """
     result = {}
     try:
-        # =====================================================================
-        # 1. Data Preparation with Category Handling
-        # =====================================================================
+        # Feature Engineering
         data_automl = train.copy()
-        
-        # Debug output
-        st.session_state.debug_info = {
-            'initial_shape': data_automl.shape,
-            'category_cols': list(category_scenarios.keys()) if category_scenarios else None
-        }
-        
-        # Handle category adjustments by ensuring consistent aggregation
-        if category_scenarios:
-            # Get all category columns that exist in the data
-            valid_categories = [col for col in category_scenarios.keys() if col in data_automl.columns]
-            
-            if not valid_categories:
-                st.warning("No valid category columns found - proceeding without category adjustments")
-                category_scenarios = None
-            else:
-                # Aggregate while preserving category information
-                grouping_cols = ["ds"] + valid_categories
-                data_automl = data_automl.groupby(grouping_cols, as_index=False).agg({"y": "sum"})
-                
-                # Verify we haven't lost too much data
-                if len(data_automl) < len(train) * 0.5:
-                    st.warning("Category aggregation reduced dataset by >50% - reverting to date-only aggregation")
-                    data_automl = train.groupby("ds", as_index=False).agg({"y": "sum"})
-                    category_scenarios = None
 
-        # If no category scenarios, aggregate by date only
-        if not category_scenarios:
-            data_automl = data_automl.groupby("ds", as_index=False).agg({"y": "sum"})
-
-        # =====================================================================
-        # 2. Feature Engineering
-        # =====================================================================
-        n = len(data_automl)
-        
         # Determine maximum lag based on dataset size
-        max_lag = min(24, n - 1)
-        if n <= 6:
-            max_lag = min(3, n - 1)
-        elif n <= 12:
-            max_lag = min(6, n - 1)
-        elif n <= 24:
-            max_lag = min(12, n - 1)
+        max_lag = min(24, len(train) - 1)  # Cap at 24 lags
+        if len(train) <= 6:
+            max_lag = min(3, len(train) - 1)
+        elif len(train) <= 12:
+            max_lag = min(6, len(train) - 1)
+        elif len(train) <= 24:
+            max_lag = min(12, len(train) - 1)
 
         # Add lag features
         for lag in range(1, max_lag + 1):
             data_automl[f"lag_{lag}"] = data_automl["y"].shift(lag)
 
         # Add rolling statistics
-        rolling_windows = [w for w in [3, 6, 12] if w < n]
-        for window in rolling_windows:
+        for window in [3, 6, 12]:
             data_automl[f"rolling_mean_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).mean()
             data_automl[f"rolling_std_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).std()
 
-        # Add time-based features
-        data_automl["month"] = data_automl["ds"].dt.month
-        data_automl["quarter"] = data_automl["ds"].dt.quarter
-        data_automl["year"] = data_automl["ds"].dt.year
-        
-        # Add trigonometric features
-        data_automl["sin_month"] = np.sin(2 * np.pi * data_automl["month"] / 12)
-        data_automl["cos_month"] = np.cos(2 * np.pi * data_automl["month"] / 12)
+        # Add year-over-year growth (if sufficient data)
+        if len(train) > 12:
+            data_automl["yoy_growth"] = (data_automl["y"] / data_automl["y"].shift(12)) - 1
+        else:
+            data_automl["yoy_growth"] = 0
 
-        # Handle differencing if needed
-        if is_diff:
-            data_automl["y_diff"] = data_automl["y"].diff().fillna(0)
-            data_automl["rolling_diff"] = data_automl["y"].rolling(window=3).mean().diff().fillna(0)
+        # Add differenced values
+        data_automl["y_diff"] = data_automl["y"].diff().fillna(0)
 
-        # Log-transform if needed
+        # Add rolling mean growth
+        data_automl["rolling_mean_growth"] = data_automl["y"].rolling(window=3).mean().diff().fillna(0)
+
+        # Add trigonometric features for seasonality
+        data_automl["sin_month"] = np.sin(2 * np.pi * data_automl["ds"].dt.month / 12)
+        data_automl["cos_month"] = np.cos(2 * np.pi * data_automl["ds"].dt.month / 12)
+
+        # Log-transform if the target variable has a large range
         if data_automl["y"].max() / data_automl["y"].min() > 5:
             data_automl["y_log"] = np.log1p(data_automl["y"])
             apply_log = True
@@ -583,135 +539,94 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             data_automl["y_log"] = data_automl["y"]
             apply_log = False
 
-        # Final cleanup
+        # Drop rows with missing values
         data_automl.dropna(inplace=True)
-        
-        # =====================================================================
-        # 3. Model Training
-        # =====================================================================
-        feature_cols = [col for col in data_automl.columns 
-                       if col not in ["y", "ds", "y_log"] 
-                       and np.issubdtype(data_automl[col].dtype, np.number)]
-        
-        X_train = data_automl[feature_cols]
+
+        # Prepare features and target
+        feature_cols = [col for col in data_automl.columns if col not in ["y", "ds", "y_log"]]
         y_train = data_automl["y_log"] if apply_log else data_automl["y"]
+        X_train = data_automl[feature_cols]
 
-        # Dynamic time budget
+        # Dynamic time budget calculation (if not provided)
         if time_budget is None:
-            time_budget = min(600, max(60, n * 0.1 + len(feature_cols) * 2))
-            st.info(f"AutoML time budget: {time_budget} seconds")
+            # Base time budget on dataset size and number of features
+            time_budget = min(600, max(60, len(train) * 0.1 + len(feature_cols) * 2))  # 60s to 600s
+            st.info(f"Dynamic time budget set to {time_budget} seconds based on dataset size and complexity.")
 
-        automl = AutoML()
-        automl.fit(
+        # Train AutoML model
+        automl_model = AutoML()
+        automl_model.fit(
             X_train=X_train,
             y_train=y_train,
             task="regression",
             time_budget=time_budget,
-            metric="rmse",
-            estimator_list=["xgboost", "lgbm", "catboost"],
-            early_stop=True
+            eval_method="cv",
+            estimator_list=["xgboost", "lgbm", "rf", "catboost"],
+            metric="r2",
+            early_stop=True,  # Enable early stopping
+            verbose=1  # Show progress
         )
 
-        # =====================================================================
-        # 4. Forecasting
-        # =====================================================================
+        # Generate future features for forecasting
+        future_features = []
         last_row = data_automl.iloc[-1].copy()
-        preds = []
-        
         for i in range(forecast_period):
-            future_date = data_automl["ds"].iloc[-1] + pd.DateOffset(months=i+1)
-            future_features = {}
-            
-            # Update lag features
-            for lag in range(max_lag, 0, -1):
+            future_row = {}
+            for lag in range(1, max_lag + 1):
                 if lag == 1:
-                    future_features[f"lag_{lag}"] = last_row["y_log"] if apply_log else last_row["y"]
+                    future_row[f"lag_{lag}"] = last_row["y_log"] if apply_log else last_row["y"]
                 else:
-                    future_features[f"lag_{lag}"] = last_row[f"lag_{lag-1}"]
-            
-            # Update rolling features
-            for window in rolling_windows:
-                future_features[f"rolling_mean_{window}"] = (
-                    last_row[f"rolling_mean_{window}"] + 
-                    ((last_row["y_log"] if apply_log else last_row["y"]) - last_row[f"lag_{window}"]) / window
-                )
-                future_features[f"rolling_std_{window}"] = last_row[f"rolling_std_{window}"]
-            
-            # Update time features
-            future_features.update({
-                "month": future_date.month,
-                "quarter": future_date.quarter,
-                "year": future_date.year,
-                "sin_month": np.sin(2 * np.pi * future_date.month / 12),
-                "cos_month": np.cos(2 * np.pi * future_date.month / 12)
-            })
-            
-            # Make prediction
-            pred = automl.predict(pd.DataFrame([future_features]))[0]
-            if apply_log:
-                pred = np.expm1(pred)
-            preds.append(pred)
-            
-            # Update last_row for next iteration
+                    future_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
+            for window in [3, 6, 12]:
+                if apply_log:
+                    future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y_log"] - last_row[f"lag_{window}"]) / window
+                else:
+                    future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y"] - last_row[f"lag_{window}"]) / window
+                future_row[f"rolling_std_{window}"] = last_row[f"rolling_std_{window}"]
+            future_row["yoy_growth"] = last_row["yoy_growth"]
+            future_row["y_diff"] = last_row["y_diff"]
+            future_row["rolling_mean_growth"] = last_row["rolling_mean_growth"]
+            future_row["sin_month"] = np.sin(2 * np.pi * (last_row["ds"].month + i) / 12)
+            future_row["cos_month"] = np.cos(2 * np.pi * (last_row["ds"].month + i) / 12)
+            future_features.append(future_row)
             last_row = last_row.copy()
-            for k, v in future_features.items():
-                last_row[k] = v
-            last_row["y"] = pred
-            if apply_log:
-                last_row["y_log"] = np.log1p(pred)
+            for key, value in future_row.items():
+                last_row[key] = value
 
-        # Create forecast dataframe
+        # Create future DataFrame
+        future_df = pd.DataFrame(future_features)
+        for col in X_train.columns:
+            if col not in future_df.columns:
+                future_df[col] = 0
+        future_df = future_df[X_train.columns]
+
+        # Generate forecasts
+        automl_forecast = automl_model.predict(future_df)
+        if apply_log:
+            automl_forecast = np.expm1(automl_forecast)
+
+        # Create forecast DataFrame
         forecast_df = pd.DataFrame({
-            "ds": pd.date_range(
-                start=data_automl["ds"].iloc[-1] + pd.DateOffset(months=1),
-                periods=forecast_period,
-                freq="MS"
-            ),
-            "yhat": preds,
-            "yhat_lower": np.array(preds) * 0.9,
-            "yhat_upper": np.array(preds) * 1.1
+            "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="MS"),
+            "yhat": automl_forecast,
+            "yhat_lower": automl_forecast * 0.9,
+            "yhat_upper": automl_forecast * 1.1
         })
 
-        # Inverse differencing if needed
-        if is_diff and last_historical_value is not None:
-            forecast_df = inverse_difference(forecast_df, last_historical_value)
+        # Inverse differencing if applicable
+        if isinstance(last_historical_value, (int, float)):
+            forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
+            forecast_df["yhat_lower"] = inverse_difference(forecast_df["yhat_lower"], last_historical_value)
+            forecast_df["yhat_upper"] = inverse_difference(forecast_df["yhat_upper"], last_historical_value)
 
-        # Apply scenario adjustments
-        forecast_df = adjust_forecast(
-            forecast_df, 
-            demand_shock, 
-            seasonality_adjustment, 
-            external_shock,
-            category_scenarios,
-            last_historical_date=data_automl["ds"].max()
-        )
-
-        # =====================================================================
-        # 5. Evaluation
-        # =====================================================================
-        match_len = min(len(test["y"]), len(forecast_df))
-        rmse = np.sqrt(mean_squared_error(
-            test["y"].iloc[:match_len],
-            forecast_df["yhat"].iloc[:match_len]
-        ))
-        mape = mean_absolute_percentage_error(
-            test["y"].iloc[:match_len],
-            forecast_df["yhat"].iloc[:match_len]
-        )
-
-        result = {
-            "RMSE": float(rmse),
-            "MAPE": float(mape),
-            "Forecast": forecast_df,
-            "Model": automl
-        }
+        # Evaluate model performance
+        matching_length = min(len(test["y"]), len(forecast_df))
+        rmse = np.sqrt(mean_squared_error(test["y"].values, forecast_df["yhat"][:len(test["y"])]))
+        mape = mean_absolute_percentage_error(test["y"].values, forecast_df["yhat"][:len(test["y"])])
+        result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
 
     except Exception as e:
-        st.error(f"AutoML failed: {str(e)}")
-        if 'debug_info' in st.session_state:
-            st.json(st.session_state.debug_info)
-        return ("AutoML", {})
-
+        st.error(f"AutoML Model failed: {e}")
     return ("AutoML", result)
 
 def shape_score(actual, forecast):
@@ -796,10 +711,8 @@ def main():
                 forecast_period = 24
 
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
-                # Compute the last date in your dataset and the minimum future date for scenario planning
                 last_date_in_data = data[date_column].max()
-                # Set min_future_date to the start of the next month
-                min_future_date = (last_date_in_data + pd.offsets.MonthBegin(1)).date()
+                min_future_date = (last_date_in_data + pd.DateOffset(days=1)).date()
 
                 if subscription_level != "premium":
                     st.sidebar.info("Scenario planning is available only for premium users.")
@@ -837,14 +750,12 @@ def main():
                                         min_value=-50, max_value=50, value=0, step=5,
                                         help=f"Adjust sales for category '{cat}' within column '{col}'"
                                     )
-                                    # Only allow future dates by using min_future_date as the minimum allowed date
                                     cat_start = st.date_input(
                                         f"Start date for '{cat}'",
                                         value=min_future_date,
                                         min_value=min_future_date
                                     )
-                                    # Default end date: start of the month after next
-                                    default_end = (last_date_in_data + pd.offsets.MonthBegin(2)).date()
+                                    default_end = (last_date_in_data + pd.DateOffset(months=1)).date()
                                     cat_end = st.date_input(
                                         f"End date for '{cat}'",
                                         value=default_end if default_end > min_future_date else min_future_date,
@@ -867,317 +778,303 @@ def main():
                                            help="Click to generate your AI-powered forecast")
             else:
                 start_forecast = st.button("⏳ Select Columns First", disabled=True, key="start_disabled")
-            
-        except Exception as e:
-            st.error(f"Error processing file: {e}")
-
-        if subscription_level == "premium":
-            total_steps = 12
-        else:
-            total_steps = 6
-
-        overall_status = st.empty()
-        prophet_status = st.empty()
-        arima_status = st.empty()
-        xgb_status = st.empty()
-        automl_status = st.empty()
-        progress_bar = st.progress(0)
-        step_message = st.empty()
-
-        if start_forecast:
-            # STEP 1: Preprocess Data
-            step = 1
-            step_message.text(f"Step {step} of {total_steps}: Preprocessing data...")
-            with st.spinner("🔍 Preprocessing data..."):
-                preprocess_result = preprocess_data(
-                    data, date_column, sales_column, category_columns
-                )
-                time.sleep(1)
-            
-            if preprocess_result is None:
-                st.error("Preprocessing failed. Please check your data.")
-                return
-            
-            st.success("✅ Data Preprocessed Successfully!")
-            
-            # Extract components from preprocessing result
-            processed_data = preprocess_result["processed_data"]
-            last_historical_value = preprocess_result["last_historical_value"]
-            chart_data = preprocess_result["historical_chart_data"]
-            is_diff = preprocess_result["is_diff"]
-            
-            last_historical_date = chart_data["ds"].max()
-            overall_status.info(f"🔍 Last Historical Date: {last_historical_date}")
-            progress_bar.progress(int((step / total_steps) * 100))
-            time.sleep(0.5)
-
-            # STEP 2: Review Processed Data
-            step += 1
-            step_message.text(f"Step {step} of {total_steps}: Reviewing processed data...")
-            st.markdown(
-                """
-                <div style="text-align: center;">
-                    <h2 style="color: #2B3A42;">📅 Preprocessed Monthly Data</h2>
-                </div>
-                """, unsafe_allow_html=True)
-            with st.expander("📊 View Processed Data"):
-                st.dataframe(processed_data.style.set_properties(**{"text-align": "center"}), 
-                            width=1400, height=450)
-            progress_bar.progress(int((step / total_steps) * 100))
-            time.sleep(0.5)
-
-           # STEP 3: Split Data into Training and Test Sets
-            step += 1
-            step_message.text(f"Step {step} of {total_steps}: Splitting data into training and test sets...")
-            testing_period = int(len(processed_data) * 0.2)
-            train = processed_data.iloc[:-testing_period]
-            test = processed_data.iloc[-testing_period:]
-            progress_bar.progress(int((step / total_steps) * 100))
-            time.sleep(1)
 
             if subscription_level == "premium":
-                # PREMIUM PIPELINE
-                # STEP 4: Tune Prophet Model
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Tuning Prophet model...")
-                with st.spinner("🚀 Tuning Prophet model..."):
-                    best_params, best_rmse = find_best_prophet_params(train)
+                total_steps = 12
+            else:
+                total_steps = 6
+
+            overall_status = st.empty()
+            prophet_status = st.empty()
+            arima_status = st.empty()
+            xgb_status = st.empty()
+            automl_status = st.empty()
+            progress_bar = st.progress(0)
+            step_message = st.empty()
+
+            if start_forecast:
+                # STEP 1: Preprocess Data
+                step = 1
+                step_message.text(f"Step {step} of {total_steps}: Preprocessing data...")
+                with st.spinner("🔍 Preprocessing data..."):
+                    processed_data, last_historical_value, y_original, is_diff = preprocess_data(
+                        data, date_column, sales_column, category_columns
+                    )
                     time.sleep(1)
-                if best_params is None:
-                    st.error("No valid Prophet parameters were found.")
+                if processed_data is None:
+                    st.error("Preprocessing failed. Please check your data.")
                     return
-                st.success(f"✅ Best Prophet Params: {best_params}")
-                overall_status.write(f"📉 Best RMSE (CV): {best_rmse:.2f}")
+                st.success("✅ Data Preprocessed Successfully!")
+
+                last_historical_date = y_original["ds"].max()
+                overall_status.info(f"🔍 Last Historical Date: {last_historical_date}")
+                progress_bar.progress(int((step / total_steps) * 100))
+                time.sleep(0.5)
+
+                # STEP 2: Review Processed Data
+                step += 1
+                step_message.text(f"Step {step} of {total_steps}: Reviewing processed data...")
+                st.markdown(
+                    """
+                    <div style="text-align: center;">
+                        <h2 style="color: #2B3A42;">📅 Preprocessed Monthly Data</h2>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with st.expander("📊 View Processed Data"):
+                    st.dataframe(processed_data.style.set_properties(**{"text-align": "center"}), width=1400, height=450)
+                progress_bar.progress(int((step / total_steps) * 100))
+                time.sleep(0.5)
+
+                # STEP 3: Split Data into Training and Test Sets
+                step += 1
+                step_message.text(f"Step {step} of {total_steps}: Splitting data into training and test sets...")
+                testing_period = int(len(processed_data) * 0.2)
+                train = processed_data.iloc[:-testing_period]
+                test = processed_data.iloc[-testing_period:]
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 5: Train Prophet Model
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Training Prophet model...")
-                with st.spinner("🚀 Training Prophet model..."):
-                    prophet_model_name, prophet_res = train_prophet_model(
-                        train, test, forecast_period, best_params,
-                        last_historical_value, is_diff,
-                        demand_shock, seasonality_adjustment, external_shock, category_scenarios
-                    )
+                if subscription_level == "premium":
+                    # PREMIUM PIPELINE
+                    # STEP 4: Tune Prophet Model
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Tuning Prophet model...")
+                    with st.spinner("🚀 Tuning Prophet model..."):
+                        best_params, best_rmse = find_best_prophet_params(train)
+                        time.sleep(1)
+                    if best_params is None:
+                        st.error("No valid Prophet parameters were found.")
+                        return
+                    st.success(f"✅ Best Prophet Params: {best_params}")
+                    overall_status.write(f"📉 Best RMSE (CV): {best_rmse:.2f}")
+                    progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
-                if is_diff and prophet_res.get("Forecast") is not None:
-                    prophet_res["Forecast"] = inverse_difference(prophet_res["Forecast"], last_historical_value)
-                st.success("✅ Prophet Model Training Complete!")
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(1)
 
-                # # STEP 6: Train ARIMA Model
-                # step += 1
-                # step_message.text(f"Step {step} of {total_steps}: Training ARIMA model...")
-                # with st.spinner("🚀 Training ARIMA model..."):
-                #     arima_model_name, arima_res = train_arima_model(
-                #         train, test, forecast_period,
-                #         last_historical_value, is_diff,
-                #         demand_shock, seasonality_adjustment, external_shock, category_scenarios
-                #     )
-                #     time.sleep(1)
-                # if is_diff and arima_res.get("Forecast") is not None:
-                #     arima_res["Forecast"] = inverse_difference(arima_res["Forecast"], last_historical_value)
-                # st.success("✅ ARIMA Model Training Complete!")
-                # progress_bar.progress(int((step / total_steps) * 100))
-                # time.sleep(1)
-
-                # STEP 7: Train XGBoost Model
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Training XGBoost model...")
-                with st.spinner("🚀 Training XGBoost model..."):
-                    xgb_model_name, xgb_res = train_xgb_model(
-                        train, test, forecast_period,
-                        last_historical_value, is_diff,
-                        demand_shock, seasonality_adjustment, external_shock, category_scenarios
-                    )
+                    # STEP 5: Train Prophet Model
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Training Prophet model...")
+                    with st.spinner("🚀 Training Prophet model..."):
+                        prophet_model_name, prophet_res = train_prophet_model(
+                            train, test, forecast_period, best_params,
+                            last_historical_value, is_diff,
+                            demand_shock, seasonality_adjustment, external_shock, category_scenarios
+                        )
+                        time.sleep(1)
+                    if is_diff and prophet_res.get("Forecast") is not None:
+                        prophet_res["Forecast"] = inverse_difference(prophet_res["Forecast"], last_historical_value)
+                    st.success("✅ Prophet Model Training Complete!")
+                    progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
-                if is_diff and xgb_res.get("Forecast") is not None:
-                    xgb_res["Forecast"] = inverse_difference(xgb_res["Forecast"], last_historical_value)
-                st.success("✅ XGBoost Model Training Complete!")
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(1)
 
-                # STEP 9: Train AutoML Model
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
-                with st.spinner("🚀 Training AutoML Model..."):
-                    automl_model_name, automl_res = train_automl_model(
-                        train, test, forecast_period,
-                        last_historical_value, is_diff,
-                        demand_shock, seasonality_adjustment, external_shock,
-                        category_scenarios, time_budget
-                    )
+                    # # STEP 6: Train ARIMA Model
+                    # step += 1
+                    # step_message.text(f"Step {step} of {total_steps}: Training ARIMA model...")
+                    # with st.spinner("🚀 Training ARIMA model..."):
+                    #     arima_model_name, arima_res = train_arima_model(
+                    #         train, test, forecast_period,
+                    #         last_historical_value, is_diff,
+                    #         demand_shock, seasonality_adjustment, external_shock, category_scenarios
+                    #     )
+                    #     time.sleep(1)
+                    # if is_diff and arima_res.get("Forecast") is not None:
+                    #     arima_res["Forecast"] = inverse_difference(arima_res["Forecast"], last_historical_value)
+                    # st.success("✅ ARIMA Model Training Complete!")
+                    # progress_bar.progress(int((step / total_steps) * 100))
+                    # time.sleep(1)
+
+                    # STEP 7: Train XGBoost Model
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Training XGBoost model...")
+                    with st.spinner("🚀 Training XGBoost model..."):
+                        xgb_model_name, xgb_res = train_xgb_model(
+                            train, test, forecast_period,
+                            last_historical_value, is_diff,
+                            demand_shock, seasonality_adjustment, external_shock, category_scenarios
+                        )
+                        time.sleep(1)
+                    if is_diff and xgb_res.get("Forecast") is not None:
+                        xgb_res["Forecast"] = inverse_difference(xgb_res["Forecast"], last_historical_value)
+                    st.success("✅ XGBoost Model Training Complete!")
+                    progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
-                automl_status.success("✅ AutoML Model Training Complete!")
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(1)
 
-                # STEP 10: Compile Forecast Results (Premium)
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Compiling forecast results...")
-                st.success("🎉 Forecasting process completed!")
-                time.sleep(1)
-                results = {
-                    prophet_model_name: prophet_res,
-                    # arima_model_name: arima_res,
-                    xgb_model_name: xgb_res,
-                    automl_model_name: automl_res
-                }
-                valid_results = {model: res for model, res in results.items() if res.get("Forecast") is not None}
-                if not valid_results:
-                    st.error("No valid model forecasts produced.")
-                    return
-                st.session_state.model_results = valid_results
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(1)
+                    # STEP 9: Train AutoML Model
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
+                    with st.spinner("🚀 Training AutoML Model..."):
+                        automl_model_name, automl_res = train_automl_model(
+                            train, test, forecast_period,
+                            last_historical_value, y_original, time_budget
+                        )
+                        time.sleep(1)
+                    automl_status.success("✅ AutoML Model Training Complete!")
+                    progress_bar.progress(int((step / total_steps) * 100))
+                    time.sleep(1)
 
-                # STEP 11: Display Model Performance Comparison (Premium)
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Displaying model performance comparison...")
-                comparison_data = []
-                for model, res in st.session_state.model_results.items():
-                    forecast_df = res["Forecast"]
-                    match_len = min(len(test["y"]), len(forecast_df))
-                    actual = test["y"].iloc[:match_len].values
-                    pred = forecast_df["yhat"].iloc[:match_len].values
-                    corr = shape_score(actual, pred)
-                    res["Shape (corr)"] = corr
-                    comparison_data.append({
-                        "Model": model,
-                        "RMSE": res["RMSE"],
-                        "MAPE": res["MAPE"],
-                        "Shape (corr)": res["Shape (corr)"]
-                    })
-                if comparison_data:
-                    max_rmse = max(res["RMSE"] for res in st.session_state.model_results.values())
+                    # STEP 9: Compile Forecast Results (Premium)
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Compiling forecast results...")
+                    st.success("🎉 Forecasting process completed!")
+                    time.sleep(1)
+                    results = {
+                        prophet_model_name: prophet_res,
+                        # arima_model_name: arima_res,
+                        xgb_model_name: xgb_res,
+                        automl_model_name: automl_res
+                    }
+                    valid_results = {model: res for model, res in results.items() if res.get("Forecast") is not None}
+                    if not valid_results:
+                        st.error("No valid model forecasts produced.")
+                        return
+                    st.session_state.model_results = valid_results
+                    progress_bar.progress(int((step / total_steps) * 100))
+                    time.sleep(1)
+
+                    # STEP 10: Display Model Performance Comparison (Premium)
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Displaying model performance comparison...")
+                    comparison_data = []
                     for model, res in st.session_state.model_results.items():
-                        res["Combined Score"] = combined_score(res["RMSE"], res["Shape (corr)"], max_rmse, 0.5, 1.0)
-                    for item in comparison_data:
-                        item["Combined Score"] = combined_score(item["RMSE"], item["Shape (corr)"], max_rmse, 0.5, 1.0)
-                    comparison_df = pd.DataFrame(comparison_data).sort_values(by="Combined Score")
-                    st.dataframe(comparison_df.style.highlight_min(subset=["Combined Score"], color="lightgreen"))
-                    best_model = comparison_df.iloc[0]["Model"]
-                    st.success(f"✨ **AI-Selected Best Model (Combined):** {best_model}")
+                        forecast_df = res["Forecast"]
+                        match_len = min(len(test["y"]), len(forecast_df))
+                        actual = test["y"].iloc[:match_len].values
+                        pred = forecast_df["yhat"].iloc[:match_len].values
+                        corr = shape_score(actual, pred)
+                        res["Shape (corr)"] = corr
+                        comparison_data.append({
+                            "Model": model,
+                            "RMSE": res["RMSE"],
+                            "MAPE": res["MAPE"],
+                            "Shape (corr)": res["Shape (corr)"]
+                        })
+                    if comparison_data:
+                        max_rmse = max(res["RMSE"] for res in st.session_state.model_results.values())
+                        for model, res in st.session_state.model_results.items():
+                            res["Combined Score"] = combined_score(res["RMSE"], res["Shape (corr)"], max_rmse, 0.5, 1.0)
+                        for item in comparison_data:
+                            item["Combined Score"] = combined_score(item["RMSE"], item["Shape (corr)"], max_rmse, 0.5, 1.0)
+                        comparison_df = pd.DataFrame(comparison_data).sort_values(by="Combined Score")
+                        st.dataframe(comparison_df.style.highlight_min(subset=["Combined Score"], color="lightgreen"))
+                        best_model = comparison_df.iloc[0]["Model"]
+                        st.success(f"✨ **AI-Selected Best Model (Combined):** {best_model}")
+                    else:
+                        st.warning("No model results found. Please train the models first.")
+                    progress_bar.progress(int((step / total_steps) * 100))
+                    time.sleep(1)
+
+                    # STEP 11: Finalize Forecast Visualization (Premium)
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
+                    st.markdown("### 🔍 Forecast Comparison Across Models")
+                    model_colors = {
+                        "Prophet": "blue",
+                        "ARIMA": "green",
+                        "XGBoost": "red",
+                        "AutoML": "purple"
+                    }
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=y_original["ds"],
+                        y=y_original["y_original"],
+                        mode="lines",
+                        name="Historical Data",
+                        line=dict(color="black", width=2)
+                    ))
+                    for model_name, res in results.items():
+                        forecast_df = res["Forecast"]
+                        fig.add_trace(go.Scatter(
+                            x=forecast_df["ds"],
+                            y=forecast_df["yhat"],
+                            mode="lines",
+                            name=f"{model_name} Forecast",
+                            line=dict(width=2, color=model_colors.get(model_name, "gray"))
+                        ))
+                    fig.update_layout(
+                        title="📊 Multi-Model Sales Forecast",
+                        xaxis_title="Date",
+                        yaxis_title="Sales",
+                        legend_title="Models",
+                        template="plotly_white",
+                        xaxis_tickformat="%Y-%m"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    progress_bar.progress(100)
+                    step_message.text("All steps completed!")
+                    
+                    st.markdown("### 📥 Download Forecast Data")
+                    try:
+                        csv = st.session_state.model_results[best_model]["Forecast"].to_csv(index=False)
+                        st.download_button(
+                            label="📩 Download Best Model Forecast (CSV)",
+                            data=csv,
+                            file_name="forecast.csv",
+                            mime="text/csv"
+                        )
+                    except Exception as e:
+                        st.error(f"❌ Error generating download file: {e}")
                 else:
-                    st.warning("No model results found. Please train the models first.")
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(1)
-
-                if category_scenarios:
-                    st.info("✅ Category adjustments have been applied to the forecast.")
-
-                # STEP 12: Finalize Forecast Visualization (Premium)
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
-                st.markdown("### 🔍 Forecast Comparison Across Models")
-                model_colors = {
-                    "Prophet": "blue",
-                    "ARIMA": "green",
-                    "XGBoost": "red",
-                    "AutoML": "purple"
-                }
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=chart_data["ds"],
-                    y=chart_data["y_diff"] if is_diff else chart_data["y"],
-                    mode="lines",
-                    name="Historical Data",
-                    line=dict(color="black", width=2)
-                ))
-                for model_name, res in results.items():
-                    forecast_df = res["Forecast"]
+                    # FREE USERS PIPELINE (only AutoML)
+                    # STEP 4 (Free): Train AutoML Model
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Training AutoML model (Limited)...")
+                    with st.spinner("🚀 Training AutoML Model..."):
+                        automl_model_name, automl_res = train_automl_model(
+                            train, test, forecast_period,
+                            last_historical_value, is_diff,
+                            time_budget, demand_shock, seasonality_adjustment, external_shock, category_scenarios
+                        )
+                        time.sleep(1)
+                    if is_diff and automl_res.get("Forecast") is not None:
+                        automl_res["Forecast"] = inverse_difference(automl_res["Forecast"], last_historical_value)
+                    automl_status.success("✅ AutoML Model Training Complete!")
+                    progress_bar.progress(int((step / total_steps) * 100))
+                    time.sleep(1)
+                    
+                    # STEP 5 (Free): Compile Forecast Results
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Compiling forecast results...")
+                    st.success("🎉 Forecasting process completed!")
+                    time.sleep(1)
+                    results = {"AutoML": automl_res}
+                    st.session_state.model_results = results
+                    progress_bar.progress(int((step / total_steps) * 100))
+                    time.sleep(1)
+                    
+                    # STEP 6 (Free): Finalize Forecast Visualization
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
+                    st.markdown("### 🔍 Forecast Visualization")
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=y_original["ds"],
+                        y=y_original["y_original"],
+                        mode="lines",
+                        name="Historical Data",
+                        line=dict(color="black", width=2)
+                    ))
+                    forecast_df = automl_res["Forecast"]
                     fig.add_trace(go.Scatter(
                         x=forecast_df["ds"],
                         y=forecast_df["yhat"],
                         mode="lines",
-                        name=f"{model_name} Forecast",
-                        line=dict(width=2, color=model_colors.get(model_name, "gray"))
+                        name="AutoML Forecast",
+                        line=dict(width=2, color="purple")
                     ))
-                fig.update_layout(
-                    title="📊 Multi-Model Sales Forecast",
-                    xaxis_title="Date",
-                    yaxis_title="Sales",
-                    legend_title="Models",
-                    template="plotly_white",
-                    xaxis_tickformat="%Y-%m"
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                progress_bar.progress(100)
-                step_message.text("All steps completed!")
-                
-                st.markdown("### 📥 Download Forecast Data")
-                try:
-                    csv = st.session_state.model_results[best_model]["Forecast"].to_csv(index=False)
-                    st.download_button(
-                        label="📩 Download Best Model Forecast (CSV)",
-                        data=csv,
-                        file_name="forecast.csv",
-                        mime="text/csv"
+                    fig.update_layout(
+                        title="📊 Sales Forecast",
+                        xaxis_title="Date",
+                        yaxis_title="Sales",
+                        template="plotly_white",
+                        xaxis_tickformat="%Y-%m"
                     )
-                except Exception as e:
-                    st.error(f"❌ Error generating download file: {e}")
-            else:
-                # FREE USERS PIPELINE (only AutoML)
-                # STEP 4 (Free): Train AutoML Model
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Training AutoML model (Limited)...")
-                with st.spinner("🚀 Training AutoML Model..."):
-                    automl_model_name, automl_res = train_automl_model(
-                        train, test, forecast_period,
-                        last_historical_value, is_diff,
-                        time_budget, demand_shock, seasonality_adjustment, external_shock, category_scenarios
-                    )
-                    time.sleep(1)
-                if is_diff and automl_res.get("Forecast") is not None:
-                    automl_res["Forecast"] = inverse_difference(automl_res["Forecast"], last_historical_value)
-                automl_status.success("✅ AutoML Model Training Complete!")
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(1)
-                
-                # STEP 5 (Free): Compile Forecast Results
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Compiling forecast results...")
-                st.success("🎉 Forecasting process completed!")
-                time.sleep(1)
-                results = {"AutoML": automl_res}
-                st.session_state.model_results = results
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(1)
-                
-                # STEP 6 (Free): Finalize Forecast Visualization
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
-                st.markdown("### 🔍 Forecast Visualization")
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=chart_data["ds"],
-                    y=chart_data["y_diff"] if is_diff else chart_data["y"],
-                    mode="lines",
-                    name="Historical Data",
-                    line=dict(color="black", width=2)
-                ))
-                forecast_df = automl_res["Forecast"]
-                fig.add_trace(go.Scatter(
-                    x=forecast_df["ds"],
-                    y=forecast_df["yhat"],
-                    mode="lines",
-                    name="AutoML Forecast",
-                    line=dict(width=2, color="purple")
-                ))
-                fig.update_layout(
-                    title="📊 Sales Forecast",
-                    xaxis_title="Date",
-                    yaxis_title="Sales",
-                    template="plotly_white",
-                    xaxis_tickformat="%Y-%m"
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                progress_bar.progress(100)
-                step_message.text("All steps completed!")
-                
-                st.info("Upgrade to Premium to unlock advanced features like multi-model comparison and forecast download.")
+                    st.plotly_chart(fig, use_container_width=True)
+                    progress_bar.progress(100)
+                    step_message.text("All steps completed!")
+                    
+                    st.info("Upgrade to Premium to unlock advanced features like multi-model comparison and forecast download.")
+
+        except Exception as e:
+            st.error(f"Error processing file: {e}")
 
 if __name__ == "__main__":
     main()
