@@ -502,17 +502,22 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
     """
     result = {}
     try:
-        # Feature Engineering
+        # Feature Engineering: work on a copy of the training data.
         data_automl = train.copy()
 
+        # If there are duplicate dates (which can occur when category columns are used),
+        # aggregate the data by date (e.g. sum up sales) so that we get a single series.
+        if data_automl["ds"].duplicated().any():
+            data_automl = data_automl.groupby("ds", as_index=False).agg({"y": "sum"})
+
         # Determine maximum lag based on dataset size
-        max_lag = min(24, len(train) - 1)  # Cap at 24 lags
-        if len(train) <= 6:
-            max_lag = min(3, len(train) - 1)
-        elif len(train) <= 12:
-            max_lag = min(6, len(train) - 1)
-        elif len(train) <= 24:
-            max_lag = min(12, len(train) - 1)
+        max_lag = min(24, len(data_automl) - 1)  # Cap at 24 lags
+        if len(data_automl) <= 6:
+            max_lag = min(3, len(data_automl) - 1)
+        elif len(data_automl) <= 12:
+            max_lag = min(6, len(data_automl) - 1)
+        elif len(data_automl) <= 24:
+            max_lag = min(12, len(data_automl) - 1)
 
         # Add lag features
         for lag in range(1, max_lag + 1):
@@ -524,7 +529,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             data_automl[f"rolling_std_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).std()
 
         # Add year-over-year growth (if sufficient data)
-        if len(train) > 12:
+        if len(data_automl) > 12:
             data_automl["yoy_growth"] = (data_automl["y"] / data_automl["y"].shift(12)) - 1
         else:
             data_automl["yoy_growth"] = 0
@@ -557,7 +562,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
 
         # Dynamic time budget calculation (if not provided)
         if time_budget is None:
-            time_budget = min(600, max(60, len(train) * 0.1 + len(feature_cols) * 2))  # 60s to 600s
+            time_budget = min(600, max(60, len(data_automl) * 0.1 + len(feature_cols) * 2))  # 60s to 600s
             st.info(f"Dynamic time budget set to {time_budget} seconds based on dataset size and complexity.")
 
         # Train AutoML model using FLAML
@@ -593,6 +598,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             future_row["yoy_growth"] = last_row["yoy_growth"]
             future_row["y_diff"] = last_row["y_diff"]
             future_row["rolling_mean_growth"] = last_row["rolling_mean_growth"]
+            # Use the last available date for seasonal features; you might also update this logic if needed.
             future_row["sin_month"] = np.sin(2 * np.pi * (last_row["ds"].month + i) / 12)
             future_row["cos_month"] = np.cos(2 * np.pi * (last_row["ds"].month + i) / 12)
             future_features.append(future_row)
@@ -843,6 +849,8 @@ def main():
             progress_bar.progress(int((step / total_steps) * 100))
             time.sleep(0.5)
 
+            progress_bar = st.progress(0)
+
             # STEP 3: Split Data into Training and Test Sets
             step += 1
             step_message.text(f"Step {step} of {total_steps}: Splitting data into training and test sets...")
@@ -931,7 +939,7 @@ def main():
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 9: Compile Forecast Results (Premium)
+                # STEP 10: Compile Forecast Results (Premium)
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Compiling forecast results...")
                 st.success("🎉 Forecasting process completed!")
@@ -950,7 +958,7 @@ def main():
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 10: Display Model Performance Comparison (Premium)
+                # STEP 11: Display Model Performance Comparison (Premium)
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Displaying model performance comparison...")
                 comparison_data = []
@@ -982,7 +990,10 @@ def main():
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
-                # STEP 11: Finalize Forecast Visualization (Premium)
+                if category_scenarios:
+                    st.info("✅ Category adjustments have been applied to the forecast.")
+
+                # STEP 12: Finalize Forecast Visualization (Premium)
                 step += 1
                 step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
                 st.markdown("### 🔍 Forecast Comparison Across Models")
