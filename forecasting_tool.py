@@ -281,24 +281,49 @@ def find_best_prophet_params(train):
                 best_params = params
     return best_params, best_rmse
 
-def adjust_forecast_by_category(forecast_df, category_scenarios):
-    # For each scenario in the dynamic dictionary,
-    # if the forecast date falls within the specified date range, adjust yhat.
+def adjust_forecast_by_category(forecast_df, category_scenarios, last_historical_date):
+    """
+    Adjust forecasts by category, ensuring changes only apply to future dates
+    
+    Args:
+        forecast_df: DataFrame containing forecast results
+        category_scenarios: Dictionary of category adjustments
+        last_historical_date: The last date of historical data (pd.Timestamp)
+    
+    Returns:
+        Adjusted forecast DataFrame
+    """
+    # Convert last_historical_date to Timestamp if not already
+    last_historical_date = pd.to_datetime(last_historical_date)
+    
+    # For each scenario in the dynamic dictionary
     for col, cat_dict in category_scenarios.items():
         for cat_val, details in cat_dict.items():
             adjustment = details.get("adjustment", 0)
             start_date = pd.to_datetime(details.get("start_date"))
             end_date = pd.to_datetime(details.get("end_date"))
-            mask = (forecast_df["ds"] >= start_date) & (forecast_df["ds"] <= end_date)
+            
+            # Ensure we only adjust future dates
+            effective_start = max(start_date, last_historical_date + pd.DateOffset(days=1))
+            
+            if effective_start > end_date:
+                continue  # Adjustment period is entirely in the past
+                
+            # Apply adjustment only to future dates within the specified range
+            mask = (forecast_df["ds"] >= effective_start) & \
+                   (forecast_df["ds"] <= end_date)
+                   
             if mask.any():
                 forecast_df.loc[mask, "yhat"] *= (1 + adjustment / 100)
                 if "yhat_lower" in forecast_df.columns:
                     forecast_df.loc[mask, "yhat_lower"] *= (1 + adjustment / 100)
                 if "yhat_upper" in forecast_df.columns:
                     forecast_df.loc[mask, "yhat_upper"] *= (1 + adjustment / 100)
+    
     return forecast_df
 
-def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
+def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, 
+                   external_shock, category_scenarios=None, last_historical_date=None):
     # Apply global adjustments
     if demand_shock != 0:
         forecast_df["yhat"] *= (1 + demand_shock / 100)
@@ -322,7 +347,13 @@ def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_
             forecast_df["yhat_upper"] *= 0.8
     # Then apply category-specific adjustments
     if category_scenarios:
-        forecast_df = adjust_forecast_by_category(forecast_df, category_scenarios)
+        if last_historical_date is None:
+            raise ValueError("last_historical_date must be provided for category adjustments")
+        forecast_df = adjust_forecast_by_category(
+            forecast_df, 
+            category_scenarios,
+            last_historical_date
+        )
     return forecast_df
 
 def train_prophet_model(train, test, forecast_period, best_params, last_historical_value,
@@ -343,8 +374,18 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         forecast = model.predict(future)
         forecast = forecast[forecast["ds"] > train["ds"].max()]
 
-        # Apply only future adjustments
-        forecast = adjust_forecast(forecast, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
+        # Get the last historical date
+        last_historical_date = train["ds"].max()
+        
+        # Updated call to adjust_forecast with last_historical_date
+        forecast = adjust_forecast(
+            forecast, 
+            demand_shock, 
+            seasonality_adjustment, 
+            external_shock, 
+            category_scenarios,
+            last_historical_date=last_historical_date  # Add this parameter
+        )
 
         match_len = min(len(test["y"]), len(forecast))
         rmse = mean_squared_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len], squared=False)
@@ -394,7 +435,19 @@ def train_arima_model(train, test, forecast_period, last_historical_value, is_di
             freq="MS"
         )
         forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": preds})
-        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
+
+        # Get the last historical date
+        last_historical_date = train["ds"].max()
+        
+        # Updated call to adjust_forecast with last_historical_date
+        forecast = adjust_forecast(
+            forecast, 
+            demand_shock, 
+            seasonality_adjustment, 
+            external_shock, 
+            category_scenarios,
+            last_historical_date=last_historical_date  # Add this parameter
+        )
 
         match_len = min(len(test), len(forecast_df))
         rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
@@ -464,7 +517,19 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
             "ds": pd.date_range(start=last_date + pd.DateOffset(months=1), periods=forecast_period, freq="MS"),
             "yhat": preds
         })
-        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
+        
+        # Get the last historical date
+        last_historical_date = train["ds"].max()
+        
+        # Updated call to adjust_forecast with last_historical_date
+        forecast = adjust_forecast(
+            forecast, 
+            demand_shock, 
+            seasonality_adjustment, 
+            external_shock, 
+            category_scenarios,
+            last_historical_date=last_historical_date  # Add this parameter
+        )
 
         match_len = min(len(test), len(forecast_df))
         rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
@@ -624,8 +689,18 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             forecast_df["yhat_lower"] = inverse_difference(forecast_df["yhat_lower"], last_historical_value)
             forecast_df["yhat_upper"] = inverse_difference(forecast_df["yhat_upper"], last_historical_value)
 
-        # Apply forecast adjustments
-        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
+        # Get the last historical date
+        last_historical_date = train["ds"].max()
+        
+        # Updated call to adjust_forecast with last_historical_date
+        forecast = adjust_forecast(
+            forecast, 
+            demand_shock, 
+            seasonality_adjustment, 
+            external_shock, 
+            category_scenarios,
+            last_historical_date=last_historical_date  # Add this parameter
+        )
 
         # Evaluate model performance
         match_len = min(len(test["y"]), len(forecast_df))
@@ -740,8 +815,17 @@ def main():
                     )
                     external_shock = st.sidebar.checkbox("Simulate External Shock (e.g., Economic Downturn)")
                     category_scenarios = {}
+
                     if category_columns:
                         st.sidebar.markdown("### 🎯 Scenario Planning by Category (Dynamic)")
+                        
+                        # Calculate date boundaries
+                        last_historical_date = data[date_column].max()
+                        min_future_date = (last_historical_date + pd.DateOffset(days=1)).date()
+                        max_forecast_date = (last_historical_date + pd.DateOffset(months=forecast_period)).date()
+                        
+                        st.sidebar.markdown(f"*Forecast period: {min_future_date} to {max_forecast_date}*")
+                        
                         for col in category_columns:
                             st.sidebar.markdown(f"#### Adjustments for '{col}'")
                             unique_cats = sorted(data[col].dropna().unique())
@@ -751,24 +835,39 @@ def main():
                                 help=f"Select one or more categories from '{col}' that you want to adjust."
                             )
                             category_scenarios[col] = {}
+                            
                             for cat in selected_cats:
-                                with st.sidebar.expander(f"Adjust '{cat}' in '{col}'"):
+                                with st.sidebar.expander(f"Adjust '{cat}' in '{col}'", expanded=True):
                                     cat_adjust = st.slider(
                                         f"Percentage change for '{cat}'",
                                         min_value=-50, max_value=50, value=0, step=5,
                                         help=f"Adjust sales for category '{cat}' within column '{col}'"
                                     )
-                                    cat_start = st.date_input(
-                                        f"Start date for '{cat}'",
-                                        value=min_future_date,
-                                        min_value=min_future_date
-                                    )
-                                    default_end = (last_date_in_data + pd.DateOffset(months=1)).date()
-                                    cat_end = st.date_input(
-                                        f"End date for '{cat}'",
-                                        value=default_end if default_end > min_future_date else min_future_date,
-                                        min_value=cat_start
-                                    )
+                                    
+                                    # Date range selection with better constraints
+                                    col1, col2 = st.columns(2)
+                                    with col1:
+                                        cat_start = st.date_input(
+                                            f"Start date for '{cat}'",
+                                            value=min_future_date,
+                                            min_value=min_future_date,
+                                            max_value=max_forecast_date,
+                                            key=f"{col}_{cat}_start"
+                                        )
+                                    with col2:
+                                        default_end = max_forecast_date
+                                        cat_end = st.date_input(
+                                            f"End date for '{cat}'",
+                                            value=default_end,
+                                            min_value=cat_start,
+                                            max_value=max_forecast_date,
+                                            key=f"{col}_{cat}_end"
+                                        )
+                                    
+                                    # Show visual indicator of adjustment period
+                                    if cat_start and cat_end:
+                                        st.markdown(f"🔹 Adjustment will apply from **{cat_start}** to **{cat_end}**")
+                                    
                                     category_scenarios[col][cat] = {
                                         "adjustment": cat_adjust,
                                         "start_date": cat_start,
