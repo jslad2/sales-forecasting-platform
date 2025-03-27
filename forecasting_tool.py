@@ -78,33 +78,33 @@ def check_stationarity(series):
 
 def preprocess_data(data, date_column, sales_column, category_columns=None):
     """
-    Preprocess the uploaded data for Prophet.
+    Preprocess the uploaded data for time series forecasting.
+    
     Returns:
-      - data: Processed DataFrame with columns ds, y (if non-stationary, y is differenced),
-              and category columns (if provided)
-      - last_historical_value: The last y value (if differencing was applied), otherwise None
-      - y_original: A copy of the processed data for inspection
-      - is_diff: Boolean indicating whether differencing was applied
-      Also creates a re-aggregated DataFrame for a clean monthly chart.
+      dict: {
+        "processed_data": DataFrame with columns ds, y (differenced if non-stationary),
+        "last_historical_value": Last y value if differencing was applied (else None),
+        "historical_chart_data": Aggregated monthly data for visualization,
+        "is_diff": Boolean indicating whether differencing was applied
+      }
     """
     try:
         # 1. Convert date column to datetime and drop missing rows
         data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
         data.dropna(subset=[date_column, sales_column], inplace=True)
 
-        # 2. Rename columns for Prophet
+        # 2. Rename columns for modeling
         data = data.rename(columns={date_column: "ds", sales_column: "y"})
 
         # 3. Create monthly period column
         data["year_month"] = data["ds"].dt.to_period("M")
 
         # 4. Group by year_month and category columns (if provided)
+        grouping_cols = ["year_month"] 
         if category_columns:
             if not isinstance(category_columns, list):
                 category_columns = [category_columns]
-            grouping_cols = ["year_month"] + category_columns
-        else:
-            grouping_cols = ["year_month"]
+            grouping_cols += category_columns
 
         data = data.groupby(grouping_cols, as_index=False)["y"].sum()
 
@@ -116,25 +116,16 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
         data.drop(columns=["year_month"], inplace=True)
 
         # 6. Remove duplicates
-        if category_columns:
-            subset_cols = ["ds", "y"] + category_columns
-        else:
-            subset_cols = ["ds", "y"]
+        subset_cols = ["ds", "y"] + (category_columns if category_columns else [])
         if data.duplicated(subset=subset_cols).any():
             st.warning("⚠️ Duplicate date/category combinations found. Removing duplicates...")
             data = data.drop_duplicates(subset=subset_cols, keep="last")
 
-        # 7. Save original processed data for inspection
-        if category_columns:
-            y_original = data.copy()
-        else:
-            y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
+        # 7. Create aggregated chart data (monthly totals)
+        chart_data = data.groupby("ds", as_index=False)["y"].sum()
 
-        # 8. Re-aggregate data by ds for charting (one line per month)
-        re_agg_chart = data.groupby("ds", as_index=False)["y"].sum()
-
-        # 9. Check stationarity on the aggregated series
-        stationarity_result = check_stationarity(re_agg_chart["y"])
+        # 8. Check stationarity
+        stationarity_result = check_stationarity(chart_data["y"])
         st.markdown(
             f"""
             <div style="text-align: center;">
@@ -145,68 +136,77 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             unsafe_allow_html=True,
         )
 
-        # 10. If non-stationary, apply differencing to both the aggregated chart and the model data
+        # 9. Handle differencing if non-stationary
+        is_diff = False
+        last_historical_value = None
+        
         if stationarity_result == "Non-Stationary":
-            st.warning("Applying differencing to stabilize the series for charting and modeling.")
+            st.warning("Applying differencing to stabilize the series.")
             
-            # For charting: compute differenced aggregated series
-            re_agg_chart["y_diff"] = re_agg_chart["y"].diff()
-            last_historical_value = re_agg_chart["y"].iloc[-1]
+            # Store last value before differencing
+            last_historical_value = chart_data["y"].iloc[-1]
             is_diff = True
-
-            # For modeling: physically difference the actual data
-            data["y"] = data["y"].diff()  # This creates a differenced column
+            
+            # Apply differencing to chart data
+            chart_data["y_diff"] = chart_data["y"].diff()
+            
+            # Apply differencing to model data
+            data["y"] = data["y"].diff()
             data = data.dropna().reset_index(drop=True)
 
+            # Plot comparison
             fig = go.Figure()
             fig.add_trace(go.Scatter(
-                x=re_agg_chart["ds"],
-                y=re_agg_chart["y"],
+                x=chart_data["ds"],
+                y=chart_data["y"],
                 mode="lines",
-                name="Original Aggregated Series",
+                name="Original Series",
                 line=dict(color="blue", width=2)
             ))
             fig.add_trace(go.Scatter(
-                x=re_agg_chart["ds"].iloc[1:],
-                y=re_agg_chart["y_diff"].dropna(),
+                x=chart_data["ds"].iloc[1:],
+                y=chart_data["y_diff"].dropna(),
                 mode="lines",
-                name="Differenced Aggregated Series",
+                name="Differenced Series",
                 line=dict(color="orange", width=2, dash="dot")
             ))
             fig.update_layout(
-                title="Original vs Differenced Series (Monthly, Aggregated)",
-                xaxis_title="Date (YYYY-MM)",
+                title="Original vs Differenced Series",
+                xaxis_title="Date",
                 yaxis_title="Sales",
-                template="plotly_white",
-                xaxis_tickformat="%Y-%m"
+                template="plotly_white"
             )
             st.plotly_chart(fig, use_container_width=True)
-            return data, last_historical_value, y_original, is_diff
         else:
-            is_diff = False
+            # Plot original series
             fig = go.Figure()
             fig.add_trace(go.Scatter(
-                x=re_agg_chart["ds"],
-                y=re_agg_chart["y"],
+                x=chart_data["ds"],
+                y=chart_data["y"],
                 mode="lines",
-                name="Original Series (Monthly, Aggregated)",
+                name="Original Series",
                 line=dict(color="blue", width=2)
             ))
             fig.update_layout(
-                title="Original Series (Monthly, Aggregated)",
-                xaxis_title="Date (YYYY-MM)",
+                title="Original Series",
+                xaxis_title="Date",
                 yaxis_title="Sales",
-                template="plotly_white",
-                xaxis_tickformat="%Y-%m"
+                template="plotly_white"
             )
             st.plotly_chart(fig, use_container_width=True)
-            data = data.reset_index(drop=True)
-            return data, None, y_original, is_diff
+
+        return {
+            "processed_data": data,
+            "last_historical_value": last_historical_value,
+            "historical_chart_data": chart_data,
+            "is_diff": is_diff
+        }
 
     except Exception as e:
-        st.error(f"An error occurred during preprocessing: {e}")
-        st.error(f"Debug Info: Columns in data - {data.columns}, Data Shape - {data.shape}")
-        return None, None, None, None
+        st.error(f"Preprocessing error: {str(e)}")
+        if 'data' in locals():
+            st.error(f"Debug Info: Columns - {data.columns}, Shape - {data.shape}")
+        return None
 
 def inverse_difference(forecast_data, first_value):
     if first_value is not None:
@@ -889,16 +889,24 @@ def main():
             step = 1
             step_message.text(f"Step {step} of {total_steps}: Preprocessing data...")
             with st.spinner("🔍 Preprocessing data..."):
-                processed_data, last_historical_value, y_original, is_diff = preprocess_data(
+                preprocess_result = preprocess_data(
                     data, date_column, sales_column, category_columns
                 )
                 time.sleep(1)
-            if processed_data is None:
+            
+            if preprocess_result is None:
                 st.error("Preprocessing failed. Please check your data.")
                 return
+            
             st.success("✅ Data Preprocessed Successfully!")
-
-            last_historical_date = y_original["ds"].max()
+            
+            # Extract components from preprocessing result
+            processed_data = preprocess_result["processed_data"]
+            last_historical_value = preprocess_result["last_historical_value"]
+            chart_data = preprocess_result["historical_chart_data"]
+            is_diff = preprocess_result["is_diff"]
+            
+            last_historical_date = chart_data["ds"].max()
             overall_status.info(f"🔍 Last Historical Date: {last_historical_date}")
             progress_bar.progress(int((step / total_steps) * 100))
             time.sleep(0.5)
@@ -913,19 +921,12 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
             with st.expander("📊 View Processed Data"):
-                st.dataframe(processed_data.style.set_properties(**{"text-align": "center"}), width=1400, height=450)
+                st.dataframe(processed_data.style.set_properties(**{"text-align": "center"}), 
+                            width=1400, height=450)
             progress_bar.progress(int((step / total_steps) * 100))
             time.sleep(0.5)
 
-            overall_status = st.empty()
-            prophet_status = st.empty()
-            arima_status = st.empty()
-            xgb_status = st.empty()
-            automl_status = st.empty()
-            progress_bar = st.progress(0)
-            step_message = st.empty()
-
-            # STEP 3: Split Data into Training and Test Sets
+           # STEP 3: Split Data into Training and Test Sets
             step += 1
             step_message.text(f"Step {step} of {total_steps}: Splitting data into training and test sets...")
             testing_period = int(len(processed_data) * 0.2)
@@ -1079,8 +1080,8 @@ def main():
                 }
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(
-                    x=y_original["ds"],
-                    y=y_original["y_original"],
+                    x=chart_data["ds"],
+                    y=chart_data["y_diff"] if is_diff else chart_data["y"],
                     mode="lines",
                     name="Historical Data",
                     line=dict(color="black", width=2)
@@ -1151,8 +1152,8 @@ def main():
                 st.markdown("### 🔍 Forecast Visualization")
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(
-                    x=y_original["ds"],
-                    y=y_original["y_original"],
+                    x=chart_data["ds"],
+                    y=chart_data["y_diff"] if is_diff else chart_data["y"],
                     mode="lines",
                     name="Historical Data",
                     line=dict(color="black", width=2)
