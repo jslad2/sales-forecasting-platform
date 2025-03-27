@@ -126,7 +126,7 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
 
         # 7. Save original processed data for inspection
         if category_columns:
-            y_original = data.copy()
+            y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
         else:
             y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
 
@@ -293,6 +293,11 @@ def adjust_forecast_by_category(forecast_df, category_scenarios, last_historical
     Returns:
         Adjusted forecast DataFrame
     """
+    # Ensure we have datetime columns
+    forecast_df = forecast_df.copy()
+    forecast_df['ds'] = pd.to_datetime(forecast_df['ds'])
+    last_historical_date = pd.to_datetime(last_historical_date)
+
     # Convert last_historical_date to Timestamp if not already
     last_historical_date = pd.to_datetime(last_historical_date)
     
@@ -439,14 +444,14 @@ def train_arima_model(train, test, forecast_period, last_historical_value, is_di
         # Get the last historical date
         last_historical_date = train["ds"].max()
         
-        # Updated call to adjust_forecast with last_historical_date
-        forecast = adjust_forecast(
-            forecast, 
+        # Apply adjustments
+        forecast_df = adjust_forecast(
+            forecast_df, 
             demand_shock, 
             seasonality_adjustment, 
             external_shock, 
             category_scenarios,
-            last_historical_date=last_historical_date  # Add this parameter
+            last_historical_date=train["ds"].max()
         )
 
         match_len = min(len(test), len(forecast_df))
@@ -726,8 +731,8 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
 
         # Evaluate model performance
         match_len = min(len(test["y"]), len(forecast_df))
-        rmse = np.sqrt(mean_squared_error(test["y"].values, forecast_df["yhat"][:len(test["y"])]))
-        mape = mean_absolute_percentage_error(test["y"].values, forecast_df["yhat"][:len(test["y"])])
+        rmse = np.sqrt(mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len]))
+        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
 
     except Exception as e:
