@@ -78,147 +78,120 @@ def check_stationarity(series):
 
 def preprocess_data(data, date_column, sales_column, category_columns=None):
     """
-    Enhanced preprocessing function for time series forecasting.
+    Robust preprocessing function for time series forecasting with complete error handling.
     
     Args:
-        data: Input DataFrame containing the raw data
-        date_column: Name of the column containing dates
-        sales_column: Name of the column containing sales/values to forecast
+        data: Input DataFrame containing raw data
+        date_column: Name of column containing dates
+        sales_column: Name of column containing sales/values
         category_columns: Optional column(s) containing categories (str or list)
     
     Returns:
         Tuple containing:
-        - Processed DataFrame with columns ds, y (and categories if provided)
-        - Last historical value (if differencing was applied), otherwise None
-        - DataFrame with original values for inspection
-        - Boolean indicating if differencing was applied
+        - Processed DataFrame (ds, y, +categories)
+        - Last historical value (if differenced) or None
+        - y_original DataFrame (always created)
+        - is_diff boolean flag
     """
     try:
-        # 1. Validate input data structure
+        # 1. Initial validation
         if not isinstance(data, pd.DataFrame):
-            raise ValueError("Input data must be a pandas DataFrame")
-        if date_column not in data.columns:
-            raise ValueError(f"Date column '{date_column}' not found in data")
-        if sales_column not in data.columns:
-            raise ValueError(f"Sales column '{sales_column}' not found in data")
+            raise ValueError("Input must be a pandas DataFrame")
+        if not date_column or not sales_column:
+            raise ValueError("Date and sales columns must be specified")
         
-        # 2. Create a copy to avoid modifying the original DataFrame
-        processed_data = data.copy()
+        # 2. Create working copy
+        df = data[[date_column, sales_column] + 
+                 ([category_columns] if isinstance(category_columns, str) else 
+                  (category_columns if category_columns else []))].copy()
         
-        # 3. Convert and validate date column
-        processed_data[date_column] = pd.to_datetime(processed_data[date_column], errors="coerce")
-        if processed_data[date_column].isnull().any():
-            invalid_dates = processed_data[processed_data[date_column].isnull()]
-            st.warning(f"Found {len(invalid_dates)} rows with invalid dates. These will be removed.")
-            processed_data = processed_data.dropna(subset=[date_column])
+        # 3. Clean and validate dates
+        df[date_column] = pd.to_datetime(df[date_column], errors='coerce')
+        date_mask = df[date_column].isna()
+        if date_mask.any():
+            st.warning(f"Removed {date_mask.sum()} rows with invalid dates")
+            df = df[~date_mask]
         
         # 4. Handle missing sales values
-        initial_count = len(processed_data)
-        processed_data = processed_data.dropna(subset=[sales_column])
-        if len(processed_data) < initial_count:
-            st.warning(f"Removed {initial_count - len(processed_data)} rows with missing sales values")
+        sales_mask = df[sales_column].isna()
+        if sales_mask.any():
+            st.warning(f"Removed {sales_mask.sum()} rows with missing sales")
+            df = df[~sales_mask]
         
-        # 5. Rename columns for Prophet compatibility
-        processed_data = processed_data.rename(columns={date_column: "ds", sales_column: "y"})
+        if len(df) < 3:
+            raise ValueError("Insufficient data after cleaning (min 3 rows required)")
         
-        # 6. Create monthly aggregation
-        processed_data["year_month"] = processed_data["ds"].dt.to_period("M")
+        # 5. Standardize column names
+        df = df.rename(columns={date_column: "ds", sales_column: "y"})
         
-        # 7. Group by time period and categories (if provided)
-        if category_columns:
-            if not isinstance(category_columns, list):
-                category_columns = [category_columns]
-            grouping_cols = ["year_month"] + category_columns
-        else:
-            grouping_cols = ["year_month"]
+        # 6. Create monthly aggregates
+        df["year_month"] = df["ds"].dt.to_period("M")
+        group_cols = ["year_month"] + ([category_columns] if isinstance(category_columns, str) 
+                      else (category_columns or []))
         
-        processed_data = processed_data.groupby(grouping_cols, as_index=False)["y"].sum()
+        # 7. Group by time period (and categories if provided)
+        agg_df = df.groupby(group_cols, as_index=False)["y"].sum()
         
-        # 8. Convert back to datetime and clean up
-        processed_data["ds"] = pd.to_datetime(
-            processed_data["year_month"].dt.to_timestamp(how="start")
-        )
-        processed_data.drop(columns=["year_month"], inplace=True)
+        # 8. Convert back to datetime
+        agg_df["ds"] = pd.to_datetime(agg_df["year_month"].dt.to_timestamp())
+        agg_df = agg_df.drop(columns=["year_month"])
         
-        # 9. Remove duplicates
-        subset_cols = ["ds", "y"] + (category_columns if category_columns else [])
-        if processed_data.duplicated(subset=subset_cols).any():
-            st.warning("Found duplicate date/category combinations. Keeping the last occurrence.")
-            processed_data = processed_data.drop_duplicates(subset=subset_cols, keep="last")
+        # 9. Remove duplicates (keeping last occurrence)
+        dup_cols = ["ds"] + (category_columns if category_columns else [])
+        if agg_df.duplicated(subset=dup_cols).any():
+            st.warning(f"Removed {agg_df.duplicated(subset=dup_cols).sum()} duplicate time periods")
+            agg_df = agg_df.drop_duplicates(subset=dup_cols, keep="last")
         
-        # 10. Store original values for reference
-        if category_columns:
-            y_original = processed_data.copy()
-        else:
-            y_original = processed_data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
+        # 10. Create y_original (always exists)
+        y_original = agg_df[["ds", "y"] + 
+                          (category_columns if category_columns else [])].copy()
+        y_original = y_original.rename(columns={"y": "y_original"})
         
-        # 11. Create aggregated version for visualization
-        re_agg_chart = processed_data.groupby("ds", as_index=False)["y"].sum()
+        # 11. Check stationarity on aggregated series
+        stationarity_result = check_stationarity(agg_df["y"])
+        st.markdown(f"**Stationarity:** Series is **{stationarity_result}**")
         
-        # 12. Check stationarity
-        stationarity_result = check_stationarity(re_agg_chart["y"])
-        st.markdown(
-            f"""
-            <div style="text-align: center;">
-                <h3 style="color: #2B3A42;">📊 Stationarity Analysis</h3>
-                <p style="font-size: 1.1rem;">The series is <strong>{stationarity_result}</strong></p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        # 12. Handle non-stationary series
+        is_diff = stationarity_result == "Non-Stationary"
+        last_value = agg_df["y"].iloc[-1] if is_diff else None
         
-        # 13. Handle non-stationary data with differencing
-        is_diff = False
-        last_value = None
-        
-        if stationarity_result == "Non-Stationary":
-            st.info("Applying first-order differencing to stabilize the series")
+        if is_diff:
+            st.info("Applying first-order differencing")
+            agg_df["y"] = agg_df["y"].diff().dropna()
             
-            # Store last value for inverse transformation
-            last_value = re_agg_chart["y"].iloc[-1]
-            is_diff = True
-            
-            # Apply differencing to both visualization and modeling data
-            re_agg_chart["y_diff"] = re_agg_chart["y"].diff()
-            processed_data["y"] = processed_data["y"].diff()
-            processed_data = processed_data.dropna().reset_index(drop=True)
-            
-            # Create comparison visualization
-            fig = px.line(re_agg_chart, x="ds", y=["y", "y_diff"],
-                         title="Original vs Differenced Series",
-                         labels={"value": "Sales", "variable": "Series"},
-                         color_discrete_map={"y": "blue", "y_diff": "orange"})
-            fig.update_traces(line=dict(width=2), selector={"name": "y"})
-            fig.update_traces(line=dict(width=2, dash="dot"), selector={"name": "y_diff"})
+            # Visualization
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=y_original["ds"], y=y_original["y_original"],
+                name="Original", line=dict(color="blue")
+            ))
+            fig.add_trace(go.Scatter(
+                x=agg_df["ds"], y=agg_df["y"],
+                name="Differenced", line=dict(color="orange", dash="dot")
+            ))
             fig.update_layout(
-                xaxis_title="Date",
-                yaxis_title="Value",
-                legend_title="Series Type",
-                template="plotly_white",
-                hovermode="x unified"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            # Visualization for stationary data
-            fig = px.line(re_agg_chart, x="ds", y="y",
-                         title="Original Time Series",
-                         labels={"y": "Sales"})
-            fig.update_traces(line=dict(width=2, color="blue"))
-            fig.update_layout(
+                title="Original vs Differenced Series",
                 xaxis_title="Date",
                 yaxis_title="Value",
                 template="plotly_white"
             )
             st.plotly_chart(fig, use_container_width=True)
+        else:
+            # Simple visualization for stationary data
+            fig = px.line(agg_df, x="ds", y="y", 
+                         title="Original Time Series")
+            fig.update_traces(line=dict(width=2, color="blue"))
+            st.plotly_chart(fig, use_container_width=True)
         
-        return processed_data, last_value, y_original, is_diff
+        return agg_df, last_value, y_original, is_diff
         
     except Exception as e:
-        st.error(f"Preprocessing failed: {str(e)}")
-        st.error("Debug Info:")
-        st.error(f"- Data columns: {data.columns.tolist() if isinstance(data, pd.DataFrame) else 'Not available'}")
-        st.error(f"- Data shape: {data.shape if isinstance(data, pd.DataFrame) else 'Not available'}")
-        st.error(f"- Sample data:\n{data.head() if isinstance(data, pd.DataFrame) else 'Not available'}")
+        st.error(f"Preprocessing error: {str(e)}")
+        if 'df' in locals():
+            st.error(f"Current data shape: {df.shape}")
+            st.error(f"Sample data:\n{df.head()}")
+        else:
+            st.error(f"Original data shape: {data.shape if isinstance(data, pd.DataFrame) else 'N/A'}")
         return None, None, None, None
 
 def inverse_difference(forecast_data, first_value):
@@ -491,208 +464,201 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
     return "XGBoost", result
 
 def train_automl_model(train, test, forecast_period, last_historical_value, is_diff,
-                       demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, time_budget=None):
+                      demand_shock, seasonality_adjustment, external_shock, 
+                      category_scenarios=None, time_budget=None):
     """
-    Enhanced AutoML model training for time series forecasting with FLAML.
+    Robust AutoML training for time series forecasting with complete error handling.
     
     Args:
-        train: Training data with columns "ds" (date) and "y" (target)
-        test: Test data for evaluation
+        train: Processed training data (from preprocess_data)
+        test: Processed test data (from preprocess_data)
         forecast_period: Number of periods to forecast
-        last_historical_value: Last value before differencing (if applied)
+        last_historical_value: Last value before differencing
         is_diff: Whether differencing was applied
-        demand_shock: Percentage demand adjustment
-        seasonality_adjustment: Seasonality strength adjustment
+        demand_shock: Demand adjustment percentage
+        seasonality_adjustment: Seasonality adjustment percentage
         external_shock: Whether to apply external shock
         category_scenarios: Category-specific adjustments
-        time_budget: Time limit for AutoML training (seconds)
+        time_budget: Time limit for training (seconds)
     
     Returns:
-        Tuple of (model_name, results_dict) containing:
-        - "RMSE": Root Mean Squared Error
-        - "MAPE": Mean Absolute Percentage Error
-        - "Forecast": DataFrame with predictions
-        - "FeatureImportance": DataFrame of feature importance (if available)
+        Tuple of (model_name, results_dict) with:
+        - Metrics (RMSE, MAPE)
+        - Forecast DataFrame
+        - Feature importance
+        - Model object
     """
     result = {}
     try:
-        # 1. Validate input data
-        if not isinstance(train, pd.DataFrame) or not isinstance(test, pd.DataFrame):
-            raise ValueError("Train and test must be pandas DataFrames")
-        if len(train) < 6:
-            raise ValueError("Insufficient training data (minimum 6 periods required)")
+        # 1. Validate inputs
+        required_cols = {'ds', 'y'}
+        if not all(col in train.columns for col in required_cols):
+            raise ValueError(f"Train data must contain {required_cols}")
+        if not all(col in test.columns for col in required_cols):
+            raise ValueError(f"Test data must contain {required_cols}")
         
-        # 2. Feature engineering
-        data_automl = train.copy()
+        if len(train) < 4:
+            raise ValueError(f"Need at least 4 training samples (got {len(train)})")
+        if len(test) < 1:
+            raise ValueError(f"Need at least 1 test sample (got {len(test)})")
+
+        # 2. Feature engineering with size validation
+        features = train.copy()
         
-        # 2.1 Determine optimal lag length
-        max_lag = min(12, len(train) - 1)  # Cap at 12 months
-        if len(train) <= 12:
-            max_lag = min(6, len(train) - 1)
-        if len(train) <= 6:
-            max_lag = min(3, len(train) - 1)
+        # 2.1 Determine safe lag length
+        max_lag = min(6, len(train)-1)  # Conservative lag length
+        for lag in range(1, max_lag+1):
+            features[f"lag_{lag}"] = features["y"].shift(lag)
         
-        # 2.2 Create lag features
-        for lag in range(1, max_lag + 1):
-            data_automl[f"lag_{lag}"] = data_automl["y"].shift(lag)
+        # 2.2 Time-based features
+        features["month"] = features["ds"].dt.month
+        features["quarter"] = features["ds"].dt.quarter
+        features["year"] = features["ds"].dt.year
+        features["day_of_year"] = features["ds"].dt.dayofyear
         
-        # 2.3 Rolling statistics (dynamic window sizes)
-        rolling_windows = [3, 6] if len(train) > 6 else [3]
-        for window in rolling_windows:
-            data_automl[f"rolling_mean_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).mean()
-            data_automl[f"rolling_std_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).std()
+        # 2.3 Rolling statistics (dynamic windows)
+        windows = [3] if len(train) <= 6 else [3, 6]
+        for window in windows:
+            features[f"rolling_mean_{window}"] = features["y"].rolling(window, min_periods=1).mean()
+            features[f"rolling_std_{window}"] = features["y"].rolling(window, min_periods=1).std()
         
-        # 2.4 Time-based features
-        data_automl["month"] = data_automl["ds"].dt.month
-        data_automl["quarter"] = data_automl["ds"].dt.quarter
-        data_automl["year"] = data_automl["ds"].dt.year
-        
-        # 2.5 Trigonometric features for seasonality
-        data_automl["sin_month"] = np.sin(2 * np.pi * data_automl["month"] / 12)
-        data_automl["cos_month"] = np.cos(2 * np.pi * data_automl["month"] / 12)
-        
-        # 2.6 Target transformations
+        # 2.4 Target transformation
         apply_log = False
-        if (data_automl["y"] > 0).all() and (data_automl["y"].max() / data_automl["y"].min() > 10):
-            data_automl["y_log"] = np.log1p(data_automl["y"])
+        if (features["y"] > 0).all() and (features["y"].max()/features["y"].min() > 10):
+            features["y_log"] = np.log1p(features["y"])
             apply_log = True
-            y_train = data_automl["y_log"]
+            y_train = features["y_log"]
         else:
-            y_train = data_automl["y"]
+            y_train = features["y"]
         
-        # 2.7 Drop rows with missing values
-        data_automl = data_automl.dropna()
-        if len(data_automl) < 3:
+        # 2.5 Final cleaning
+        features = features.dropna()
+        if len(features) < 3:
             raise ValueError("Insufficient data after feature engineering")
         
-        # 3. Prepare features
-        feature_cols = [col for col in data_automl.columns 
-                       if col not in ["y", "ds", "y_log"] and 
-                       data_automl[col].dtype.kind in "bifc"]
-        X_train = data_automl[feature_cols]
+        # 3. Prepare features and verify alignment
+        feature_cols = [col for col in features.columns 
+                       if col not in ['ds', 'y', 'y_log'] and 
+                       pd.api.types.is_numeric_dtype(features[col])]
+        X_train = features[feature_cols]
         
-        # 4. Set dynamic time budget
+        if len(X_train) != len(y_train):
+            raise ValueError(f"X/y size mismatch: X={len(X_train)}, y={len(y_train)}")
+
+        # 4. Configure AutoML
         if time_budget is None:
-            time_budget = min(300, max(30, len(train) * 2))  # 30s to 300s
-            st.info(f"AutoML time budget automatically set to {time_budget} seconds")
+            time_budget = min(120, max(30, len(train)))  # 30-120 seconds
         
-        # 5. Train AutoML model
         automl = AutoML()
-        automl.fit(
-            X_train=X_train,
-            y_train=y_train,
-            task="regression",
-            time_budget=time_budget,
-            metric="rmse",
-            estimator_list=["lgbm", "xgboost", "catboost", "rf"],
-            early_stop=True,
-            verbose=0
-        )
+        automl_settings = {
+            'time_budget': time_budget,
+            'metric': 'rmse',
+            'task': 'regression',
+            'estimator_list': ['lgbm', 'xgboost', 'rf'],
+            'early_stop': True,
+            'verbose': 0
+        }
+
+        # 5. Train model
+        automl.fit(X_train=X_train, y_train=y_train, **automl_settings)
         
-        # 6. Generate future features
-        last_row = data_automl.iloc[-1].copy()
+        # 6. Generate forecasts
+        last_row = features.iloc[-1]
         predictions = []
         
         for i in range(forecast_period):
-            future_features = {}
-            
-            # Update temporal features
+            # Create feature vector
+            X_new = {}
             future_date = last_row["ds"] + pd.DateOffset(months=i+1)
-            future_features["month"] = future_date.month
-            future_features["quarter"] = future_date.quarter
-            future_features["year"] = future_date.year
-            future_features["sin_month"] = np.sin(2 * np.pi * future_date.month / 12)
-            future_features["cos_month"] = np.cos(2 * np.pi * future_date.month / 12)
             
-            # Update lag features
+            # Time features
+            X_new["month"] = future_date.month
+            X_new["quarter"] = future_date.quarter
+            X_new["year"] = future_date.year
+            X_new["day_of_year"] = future_date.dayofyear
+            
+            # Lag features
             for lag in range(max_lag, 1, -1):
-                future_features[f"lag_{lag}"] = last_row[f"lag_{lag-1}"]
-            future_features["lag_1"] = last_row["y_log"] if apply_log else last_row["y"]
+                X_new[f"lag_{lag}"] = last_row[f"lag_{lag-1}"]
+            X_new["lag_1"] = last_row["y_log"] if apply_log else last_row["y"]
             
-            # Update rolling stats
-            for window in rolling_windows:
-                if f"rolling_mean_{window}" in feature_cols:
-                    future_features[f"rolling_mean_{window}"] = (
-                        last_row[f"rolling_mean_{window}"] * (window-1) + 
-                        (last_row["y_log"] if apply_log else last_row["y"])
-                    ) / window
-                if f"rolling_std_{window}" in feature_cols:
-                    future_features[f"rolling_std_{window}"] = last_row[f"rolling_std_{window}"]
+            # Rolling stats
+            for window in windows:
+                X_new[f"rolling_mean_{window}"] = (
+                    last_row[f"rolling_mean_{window}"] * (window-1) + 
+                    (last_row["y_log"] if apply_log else last_row["y"])
+                ) / window
+                X_new[f"rolling_std_{window}"] = last_row[f"rolling_std_{window}"]
             
-            # Make prediction
-            X_future = pd.DataFrame([future_features])[feature_cols]
-            pred = automl.predict(X_future)[0]
+            # Predict and update
+            pred = automl.predict(pd.DataFrame([X_new]))[0]
             predictions.append(pred)
-            
-            # Update last_row for next iteration
             last_row["y"] = np.expm1(pred) if apply_log else pred
-            for k, v in future_features.items():
+            for k, v in X_new.items():
                 last_row[k] = v
         
-        # 7. Create forecast DataFrame
-        forecast_dates = pd.date_range(
-            start=train["ds"].iloc[-1] + pd.DateOffset(months=1),
-            periods=forecast_period,
-            freq="MS"
-        )
-        
-        forecast_df = pd.DataFrame({
-            "ds": forecast_dates,
-            "yhat": np.expm1(predictions) if apply_log else predictions,
-            "yhat_lower": None,
-            "yhat_upper": None
+        # 7. Create output DataFrame
+        forecast = pd.DataFrame({
+            "ds": pd.date_range(
+                start=train["ds"].iloc[-1] + pd.DateOffset(months=1),
+                periods=forecast_period,
+                freq="MS"
+            ),
+            "yhat": np.expm1(predictions) if apply_log else predictions
         })
         
         # 8. Calculate prediction intervals
-        if len(train) > 12:  # Only calculate intervals if sufficient data
+        if len(X_train) > 10:
             residuals = y_train - automl.predict(X_train)
             std_dev = np.std(residuals)
-            forecast_df["yhat_lower"] = forecast_df["yhat"] - 1.96 * std_dev
-            forecast_df["yhat_upper"] = forecast_df["yhat"] + 1.96 * std_dev
+            forecast["yhat_lower"] = forecast["yhat"] - 1.96 * std_dev
+            forecast["yhat_upper"] = forecast["yhat"] + 1.96 * std_dev
         
         # 9. Inverse differencing if needed
         if is_diff and last_historical_value is not None:
-            forecast_df = inverse_difference(forecast_df, last_historical_value)
+            forecast = inverse_difference(forecast, last_historical_value)
         
-        # 10. Apply scenario adjustments
-        forecast_df = adjust_forecast(
-            forecast_df, demand_shock, seasonality_adjustment, 
+        # 10. Apply business scenarios
+        forecast = adjust_forecast(
+            forecast, demand_shock, seasonality_adjustment,
             external_shock, category_scenarios
         )
         
         # 11. Calculate metrics
-        match_len = min(len(test), len(forecast_df))
-        if match_len > 0:
-            rmse = np.sqrt(mean_squared_error(
+        match_len = min(len(test), len(forecast))
+        metrics = {
+            "RMSE": mean_squared_error(
                 test["y"].iloc[:match_len],
-                forecast_df["yhat"].iloc[:match_len]
-            ))
-            mape = mean_absolute_percentage_error(
+                forecast["yhat"].iloc[:match_len],
+                squared=False
+            ),
+            "MAPE": mean_absolute_percentage_error(
                 test["y"].iloc[:match_len],
-                forecast_df["yhat"].iloc[:match_len]
+                forecast["yhat"].iloc[:match_len]
             )
-        else:
-            rmse = float("nan")
-            mape = float("nan")
+        }
         
-        # 12. Get feature importance if available
+        # 12. Get feature importance
         feature_importance = None
-        if hasattr(automl, "feature_importances_"):
+        if hasattr(automl, 'feature_importances_'):
             feature_importance = pd.DataFrame({
-                "feature": feature_cols,
-                "importance": automl.feature_importances_
-            }).sort_values("importance", ascending=False)
+                'feature': feature_cols,
+                'importance': automl.feature_importances_
+            }).sort_values('importance', ascending=False)
         
         result = {
-            "RMSE": float(rmse),
-            "MAPE": float(mape),
-            "Forecast": forecast_df,
+            "RMSE": float(metrics["RMSE"]),
+            "MAPE": float(metrics["MAPE"]),
+            "Forecast": forecast,
             "FeatureImportance": feature_importance,
             "Model": automl
         }
-        
+
     except Exception as e:
-        st.error(f"AutoML training failed: {str(e)}")
+        st.error(f"AutoML training error: {str(e)}")
+        if 'features' in locals():
+            st.error(f"Current data shape: {features.shape}")
+        return "AutoML", {"error": str(e)}
     
     return "AutoML", result
 
