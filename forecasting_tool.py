@@ -281,7 +281,7 @@ def find_best_prophet_params(train):
                 best_params = params
     return best_params, best_rmse
 
-def adjust_forecast_by_category(forecast_df, category_scenarios):
+def adjust_forecast_by_category(forecast_df, category_scenarios, last_historical_date=None):
     # For each scenario in the dynamic dictionary,
     # if the forecast date falls within the specified date range, adjust yhat.
     for col, cat_dict in category_scenarios.items():
@@ -290,6 +290,9 @@ def adjust_forecast_by_category(forecast_df, category_scenarios):
             start_date = pd.to_datetime(details.get("start_date"))
             end_date = pd.to_datetime(details.get("end_date"))
             mask = (forecast_df["ds"] >= start_date) & (forecast_df["ds"] <= end_date)
+            # Only apply adjustment to dates strictly after the last historical date
+            if last_historical_date is not None:
+                mask &= (forecast_df["ds"] > last_historical_date)
             if mask.any():
                 forecast_df.loc[mask, "yhat"] *= (1 + adjustment / 100)
                 if "yhat_lower" in forecast_df.columns:
@@ -298,7 +301,7 @@ def adjust_forecast_by_category(forecast_df, category_scenarios):
                     forecast_df.loc[mask, "yhat_upper"] *= (1 + adjustment / 100)
     return forecast_df
 
-def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
+def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, last_historical_date=None):
     # Apply global adjustments
     if demand_shock != 0:
         forecast_df["yhat"] *= (1 + demand_shock / 100)
@@ -322,7 +325,7 @@ def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_
             forecast_df["yhat_upper"] *= 0.8
     # Then apply category-specific adjustments
     if category_scenarios:
-        forecast_df = adjust_forecast_by_category(forecast_df, category_scenarios)
+        forecast_df = adjust_forecast_by_category(forecast_df, category_scenarios, last_historical_date=last_historical_date)
     return forecast_df
 
 def train_prophet_model(train, test, forecast_period, best_params, last_historical_value,
@@ -719,8 +722,10 @@ def main():
                 forecast_period = 24
 
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
+                # Compute the last date in your dataset and the minimum future date for scenario planning
                 last_date_in_data = data[date_column].max()
-                min_future_date = (last_date_in_data + pd.DateOffset(days=1)).date()
+                # Set min_future_date to the start of the next month
+                min_future_date = (last_date_in_data + pd.offsets.MonthBegin(1)).date()
 
                 if subscription_level != "premium":
                     st.sidebar.info("Scenario planning is available only for premium users.")
@@ -758,12 +763,14 @@ def main():
                                         min_value=-50, max_value=50, value=0, step=5,
                                         help=f"Adjust sales for category '{cat}' within column '{col}'"
                                     )
+                                    # Only allow future dates by using min_future_date as the minimum allowed date
                                     cat_start = st.date_input(
                                         f"Start date for '{cat}'",
                                         value=min_future_date,
                                         min_value=min_future_date
                                     )
-                                    default_end = (last_date_in_data + pd.DateOffset(months=1)).date()
+                                    # Default end date: start of the month after next
+                                    default_end = (last_date_in_data + pd.offsets.MonthBegin(2)).date()
                                     cat_end = st.date_input(
                                         f"End date for '{cat}'",
                                         value=default_end if default_end > min_future_date else min_future_date,
@@ -786,6 +793,9 @@ def main():
                                            help="Click to generate your AI-powered forecast")
             else:
                 start_forecast = st.button("⏳ Select Columns First", disabled=True, key="start_disabled")
+            
+        except Exception as e:
+            st.error(f"Error processing file: {e}")
 
             if subscription_level == "premium":
                 total_steps = 12
