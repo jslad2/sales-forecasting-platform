@@ -484,21 +484,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
                        demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, time_budget=None):
     """
     Train an AutoML model using FLAML for time series forecasting.
-
-    Args:
-        train (pd.DataFrame): Training data with columns "ds" (date) and "y" (target).
-        test (pd.DataFrame): Test data for evaluation.
-        forecast_period (int): Number of periods to forecast.
-        last_historical_value (float): Last observed value before differencing (if applied).
-        is_diff (bool): Indicates whether differencing was applied.
-        demand_shock (float): Global demand shock adjustment percentage.
-        seasonality_adjustment (float): Seasonality adjustment percentage.
-        external_shock (bool): Whether to apply an external shock adjustment.
-        category_scenarios (dict, optional): Category-specific forecast adjustments.
-        time_budget (int or None): Time budget in seconds for AutoML training. If None, it is dynamically calculated.
-
-    Returns:
-        tuple: Model name ("AutoML") and a dictionary containing RMSE, MAPE, and forecast DataFrame.
+    ...
     """
     result = {}
     try:
@@ -509,15 +495,18 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         # aggregate the data by date (e.g. sum up sales) so that we get a single series.
         if data_automl["ds"].duplicated().any():
             data_automl = data_automl.groupby("ds", as_index=False).agg({"y": "sum"})
+        
+        # Now use the aggregated data's length:
+        n = len(data_automl)
 
-        # Determine maximum lag based on dataset size
-        max_lag = min(24, len(data_automl) - 1)  # Cap at 24 lags
-        if len(data_automl) <= 6:
-            max_lag = min(3, len(data_automl) - 1)
-        elif len(data_automl) <= 12:
-            max_lag = min(6, len(data_automl) - 1)
-        elif len(data_automl) <= 24:
-            max_lag = min(12, len(data_automl) - 1)
+        # Determine maximum lag based on the aggregated dataset size
+        max_lag = min(24, n - 1)
+        if n <= 6:
+            max_lag = min(3, n - 1)
+        elif n <= 12:
+            max_lag = min(6, n - 1)
+        elif n <= 24:
+            max_lag = min(12, n - 1)
 
         # Add lag features
         for lag in range(1, max_lag + 1):
@@ -529,7 +518,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             data_automl[f"rolling_std_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).std()
 
         # Add year-over-year growth (if sufficient data)
-        if len(data_automl) > 12:
+        if n > 12:
             data_automl["yoy_growth"] = (data_automl["y"] / data_automl["y"].shift(12)) - 1
         else:
             data_automl["yoy_growth"] = 0
@@ -552,7 +541,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             data_automl["y_log"] = data_automl["y"]
             apply_log = False
 
-        # Drop rows with missing values
+        # Drop rows with missing values (this will now be consistent across all columns)
         data_automl.dropna(inplace=True)
 
         # Prepare features and target
@@ -560,9 +549,9 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         y_train = data_automl["y_log"] if apply_log else data_automl["y"]
         X_train = data_automl[feature_cols]
 
-        # Dynamic time budget calculation (if not provided)
+        # Use the aggregated data length for dynamic time budget calculation
         if time_budget is None:
-            time_budget = min(600, max(60, len(data_automl) * 0.1 + len(feature_cols) * 2))  # 60s to 600s
+            time_budget = min(600, max(60, n * 0.1 + len(feature_cols) * 2))  # 60s to 600s
             st.info(f"Dynamic time budget set to {time_budget} seconds based on dataset size and complexity.")
 
         # Train AutoML model using FLAML
@@ -598,7 +587,6 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             future_row["yoy_growth"] = last_row["yoy_growth"]
             future_row["y_diff"] = last_row["y_diff"]
             future_row["rolling_mean_growth"] = last_row["rolling_mean_growth"]
-            # Use the last available date for seasonal features; you might also update this logic if needed.
             future_row["sin_month"] = np.sin(2 * np.pi * (last_row["ds"].month + i) / 12)
             future_row["cos_month"] = np.cos(2 * np.pi * (last_row["ds"].month + i) / 12)
             future_features.append(future_row)
@@ -645,6 +633,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
     except Exception as e:
         st.error(f"AutoML Model failed: {e}")
     return ("AutoML", result)
+
 
 def shape_score(actual, forecast):
     if len(actual) != len(forecast):
@@ -849,7 +838,13 @@ def main():
             progress_bar.progress(int((step / total_steps) * 100))
             time.sleep(0.5)
 
+            overall_status = st.empty()
+            prophet_status = st.empty()
+            arima_status = st.empty()
+            xgb_status = st.empty()
+            automl_status = st.empty()
             progress_bar = st.progress(0)
+            step_message = st.empty()
 
             # STEP 3: Split Data into Training and Test Sets
             step += 1
