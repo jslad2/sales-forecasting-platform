@@ -477,7 +477,8 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
 
     return "XGBoost", result
 
-def train_automl_model(train, test, forecast_period, last_historical_value, y_original, time_budget=None):
+def train_automl_model(train, test, forecast_period, last_historical_value, is_diff,
+                       demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, time_budget=None):
     """
     Train an AutoML model using FLAML for time series forecasting.
 
@@ -486,7 +487,11 @@ def train_automl_model(train, test, forecast_period, last_historical_value, y_or
         test (pd.DataFrame): Test data for evaluation.
         forecast_period (int): Number of periods to forecast.
         last_historical_value (float): Last observed value before differencing (if applied).
-        y_original (pd.DataFrame): Original target values for comparison.
+        is_diff (bool): Indicates whether differencing was applied.
+        demand_shock (float): Global demand shock adjustment percentage.
+        seasonality_adjustment (float): Seasonality adjustment percentage.
+        external_shock (bool): Whether to apply an external shock adjustment.
+        category_scenarios (dict, optional): Category-specific forecast adjustments.
         time_budget (int or None): Time budget in seconds for AutoML training. If None, it is dynamically calculated.
 
     Returns:
@@ -549,11 +554,10 @@ def train_automl_model(train, test, forecast_period, last_historical_value, y_or
 
         # Dynamic time budget calculation (if not provided)
         if time_budget is None:
-            # Base time budget on dataset size and number of features
             time_budget = min(600, max(60, len(train) * 0.1 + len(feature_cols) * 2))  # 60s to 600s
             st.info(f"Dynamic time budget set to {time_budget} seconds based on dataset size and complexity.")
 
-        # Train AutoML model
+        # Train AutoML model using FLAML
         automl_model = AutoML()
         automl_model.fit(
             X_train=X_train,
@@ -563,8 +567,8 @@ def train_automl_model(train, test, forecast_period, last_historical_value, y_or
             eval_method="cv",
             estimator_list=["xgboost", "lgbm", "rf", "catboost"],
             metric="r2",
-            early_stop=True,  # Enable early stopping
-            verbose=1  # Show progress
+            early_stop=True,
+            verbose=1
         )
 
         # Generate future features for forecasting
@@ -607,7 +611,8 @@ def train_automl_model(train, test, forecast_period, last_historical_value, y_or
 
         # Create forecast DataFrame
         forecast_df = pd.DataFrame({
-            "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1), periods=forecast_period, freq="MS"),
+            "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1),
+                                 periods=forecast_period, freq="MS"),
             "yhat": automl_forecast,
             "yhat_lower": automl_forecast * 0.9,
             "yhat_upper": automl_forecast * 1.1
@@ -619,8 +624,11 @@ def train_automl_model(train, test, forecast_period, last_historical_value, y_or
             forecast_df["yhat_lower"] = inverse_difference(forecast_df["yhat_lower"], last_historical_value)
             forecast_df["yhat_upper"] = inverse_difference(forecast_df["yhat_upper"], last_historical_value)
 
+        # Apply forecast adjustments
+        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
+
         # Evaluate model performance
-        matching_length = min(len(test["y"]), len(forecast_df))
+        match_len = min(len(test["y"]), len(forecast_df))
         rmse = np.sqrt(mean_squared_error(test["y"].values, forecast_df["yhat"][:len(test["y"])]))
         mape = mean_absolute_percentage_error(test["y"].values, forecast_df["yhat"][:len(test["y"])])
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
@@ -904,7 +912,9 @@ def main():
                     with st.spinner("🚀 Training AutoML Model..."):
                         automl_model_name, automl_res = train_automl_model(
                             train, test, forecast_period,
-                            last_historical_value, y_original, time_budget
+                            last_historical_value, is_diff,
+                            demand_shock, seasonality_adjustment, external_shock,
+                            category_scenarios, time_budget
                         )
                         time.sleep(1)
                     automl_status.success("✅ AutoML Model Training Complete!")
