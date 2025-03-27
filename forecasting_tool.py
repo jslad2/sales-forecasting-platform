@@ -490,15 +490,14 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
     try:
         # Feature Engineering: work on a copy of the training data.
         data_automl = train.copy()
-
-        # If there are duplicate dates (which can occur when category columns are used),
-        # aggregate the data by date (e.g. sum up sales) so that we get a single series.
-        if data_automl["ds"].duplicated().any():
+        
+        # If category adjustments are used, force aggregation so that we have one row per date.
+        if category_scenarios:
             data_automl = data_automl.groupby("ds", as_index=False).agg({"y": "sum"})
         
-        # Now use the aggregated data's length:
+        # At this point, we expect data_automl to have unique dates.
         n = len(data_automl)
-
+        
         # Determine maximum lag based on the aggregated dataset size
         max_lag = min(24, n - 1)
         if n <= 6:
@@ -549,7 +548,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         y_train = data_automl["y_log"] if apply_log else data_automl["y"]
         X_train = data_automl[feature_cols]
 
-        # Use the aggregated data length for dynamic time budget calculation
+        # Dynamic time budget calculation using aggregated data length
         if time_budget is None:
             time_budget = min(600, max(60, n * 0.1 + len(feature_cols) * 2))  # 60s to 600s
             st.info(f"Dynamic time budget set to {time_budget} seconds based on dataset size and complexity.")
@@ -568,7 +567,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             verbose=1
         )
 
-        # Generate future features for forecasting
+        # Generate future features for forecasting using the aggregated data
         future_features = []
         last_row = data_automl.iloc[-1].copy()
         for i in range(forecast_period):
@@ -633,7 +632,6 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
     except Exception as e:
         st.error(f"AutoML Model failed: {e}")
     return ("AutoML", result)
-
 
 def shape_score(actual, forecast):
     if len(actual) != len(forecast):
