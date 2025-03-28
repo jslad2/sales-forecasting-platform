@@ -389,7 +389,6 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
 
     return "Prophet", result
 
-
 def train_arima_model(train, test, forecast_period, last_historical_value, is_diff,
                       demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
@@ -935,21 +934,21 @@ def main():
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
-                    # # STEP 6: Train ARIMA Model
-                    # step += 1
-                    # step_message.text(f"Step {step} of {total_steps}: Training ARIMA model...")
-                    # with st.spinner("🚀 Training ARIMA model..."):
-                    #     arima_model_name, arima_res = train_arima_model(
-                    #         train, test, forecast_period,
-                    #         last_historical_value, is_diff,
-                    #         demand_shock, seasonality_adjustment, external_shock, category_scenarios
-                    #     )
-                    #     time.sleep(1)
-                    # if is_diff and arima_res.get("Forecast") is not None:
-                    #     arima_res["Forecast"] = inverse_difference(arima_res["Forecast"], last_historical_value)
-                    # st.success("✅ ARIMA Model Training Complete!")
-                    # progress_bar.progress(int((step / total_steps) * 100))
-                    # time.sleep(1)
+                    # STEP 6: Train ARIMA Model
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Training ARIMA model...")
+                    with st.spinner("🚀 Training ARIMA model..."):
+                        arima_model_name, arima_res = train_arima_model(
+                            train, test, forecast_period,
+                            last_historical_value, is_diff,
+                            demand_shock, seasonality_adjustment, external_shock, category_scenarios
+                        )
+                        time.sleep(1)
+                    if is_diff and arima_res.get("Forecast") is not None:
+                        arima_res["Forecast"] = inverse_difference(arima_res["Forecast"], last_historical_value)
+                    st.success("✅ ARIMA Model Training Complete!")
+                    progress_bar.progress(int((step / total_steps) * 100))
+                    time.sleep(1)
 
                     # STEP 7: Train XGBoost Model
                     step += 1
@@ -967,20 +966,20 @@ def main():
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
-                    # # STEP 9: Train AutoML Model
-                    # step += 1
-                    # step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
-                    # with st.spinner("🚀 Training AutoML Model..."):
-                    #     automl_model_name, automl_res = train_automl_model(
-                    #         train, test, forecast_period,
-                    #         last_historical_value, is_diff,
-                    #         demand_shock, seasonality_adjustment, external_shock,
-                    #         category_scenarios, time_budget
-                    #     )
-                    #     time.sleep(1)
-                    # automl_status.success("✅ AutoML Model Training Complete!")
-                    # progress_bar.progress(int((step / total_steps) * 100))
-                    # time.sleep(1)
+                    # STEP 9: Train AutoML Model
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
+                    with st.spinner("🚀 Training AutoML Model..."):
+                        automl_model_name, automl_res = train_automl_model(
+                            train, test, forecast_period,
+                            last_historical_value, is_diff,
+                            demand_shock, seasonality_adjustment, external_shock,
+                            category_scenarios, time_budget
+                        )
+                        time.sleep(1)
+                    automl_status.success("✅ AutoML Model Training Complete!")
+                    progress_bar.progress(int((step / total_steps) * 100))
+                    time.sleep(1)
 
                     # STEP 9: Compile Forecast Results (Premium)
                     step += 1
@@ -989,9 +988,9 @@ def main():
                     time.sleep(1)
                     results = {
                         prophet_model_name: prophet_res,
-                        # arima_model_name: arima_res,
-                        xgb_model_name: xgb_res
-                        # ,automl_model_name: automl_res
+                        arima_model_name: arima_res,
+                        xgb_model_name: xgb_res,
+                        automl_model_name: automl_res
                     }
                     valid_results = {model: res for model, res in results.items() if res.get("Forecast") is not None}
                     if not valid_results:
