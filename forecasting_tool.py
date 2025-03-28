@@ -977,7 +977,7 @@ def main():
                             category_scenarios, time_budget
                         )
                         time.sleep(1)
-                    automl_status.success("✅ AutoML Model Training Complete!")
+                    st.success("✅ AutoML Model Training Complete!")
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
@@ -986,16 +986,21 @@ def main():
                     step_message.text(f"Step {step} of {total_steps}: Compiling forecast results...")
                     st.success("🎉 Forecasting process completed!")
                     time.sleep(1)
+
+                    # Gather model results
                     results = {
                         prophet_model_name: prophet_res,
                         arima_model_name: arima_res,
                         xgb_model_name: xgb_res,
                         automl_model_name: automl_res
                     }
+
+                    # Filter out any models that failed or returned no forecast
                     valid_results = {model: res for model, res in results.items() if res.get("Forecast") is not None}
                     if not valid_results:
                         st.error("No valid model forecasts produced.")
                         return
+
                     st.session_state.model_results = valid_results
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
@@ -1017,23 +1022,28 @@ def main():
                             "MAPE": res["MAPE"],
                             "Shape (corr)": res["Shape (corr)"]
                         })
+
                     if comparison_data:
                         max_rmse = max(res["RMSE"] for res in st.session_state.model_results.values())
                         for model, res in st.session_state.model_results.items():
                             res["Combined Score"] = combined_score(res["RMSE"], res["Shape (corr)"], max_rmse, 0.5, 1.0)
                         for item in comparison_data:
                             item["Combined Score"] = combined_score(item["RMSE"], item["Shape (corr)"], max_rmse, 0.5, 1.0)
+
                         comparison_df = pd.DataFrame(comparison_data).sort_values(by="Combined Score")
                         st.dataframe(comparison_df.style.highlight_min(subset=["Combined Score"], color="lightgreen"))
+
                         best_model = comparison_df.iloc[0]["Model"]
                         st.success(f"✨ **AI-Selected Best Model (Combined):** {best_model}")
                     else:
                         st.warning("No model results found. Please train the models first.")
+
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
+                    # 🔮 AI-Powered Future Insights + Category Summary + High-Risk Detection
                     try:
-                        # Assume best_model is already selected and forecast_data is from that model.
+                        # Retrieve the best model's forecast DataFrame
                         forecast_data = st.session_state.model_results[best_model]["Forecast"]
 
                         # Compute AI-powered insights
@@ -1047,21 +1057,52 @@ def main():
                     - **Peak Sales Expected:** ${highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}
                     - **Lowest Predicted Sales:** ${lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}
                     - **Optimal Decision Window:** Plan around peak sales in {highest_point['ds'].strftime('%B %Y')}
-                    - **Risk Zones Identified:** Check months marked as 🔥 'High-Risk' above
+                    - **Risk Zones Identified:** Check months marked as 🔥 'High-Risk' below
                     - **Volatility Analysis:** Forecast suggests a {'stable' if abs(projected_growth) < 5 else 'fluctuating'} trend
                         """
-                        
+
                         with st.expander("🔮 AI-Powered Future Insights", expanded=True):
                             st.markdown(insights_text)
-                        
+
                         # Build a summary of category adjustments if any were applied.
                         if category_scenarios:
                             cat_adj_summary = "### Category Adjustments Summary\n"
                             for col, adjustments in category_scenarios.items():
                                 cat_adj_summary += f"- **{col}**:\n"
                                 for cat, details in adjustments.items():
-                                    cat_adj_summary += f"  - **{cat}**: {details['adjustment']}% adjustment from {details['start_date']} to {details['end_date']}\n"
+                                    cat_adj_summary += (
+                                        f"  - **{cat}**: {details['adjustment']}% adjustment "
+                                        f"from {details['start_date']} to {details['end_date']}\n"
+                                    )
                             st.markdown(cat_adj_summary)
+
+                        # 🔥 Detect High-Risk Periods in Forecast
+                        if forecast_data is not None:
+                            try:
+                                forecast_data["volatility"] = forecast_data["yhat"].rolling(3).std()
+                                forecast_data["risk"] = "✅ Stable"
+
+                                # Define thresholds at 75th and 90th percentile
+                                p75 = forecast_data["volatility"].quantile(0.75)
+                                p90 = forecast_data["volatility"].quantile(0.90)
+
+                                forecast_data.loc[forecast_data["volatility"] > p75, "risk"] = "⚠️ High Volatility"
+                                forecast_data.loc[forecast_data["volatility"] > p90, "risk"] = "❌ Major Decline"
+
+                                st.markdown("### 🚨 High-Risk Sales Periods Identified")
+                                st.dataframe(
+                                    forecast_data[["ds", "yhat", "volatility", "risk"]]
+                                    .style.applymap(
+                                        lambda x: (
+                                            "background-color: #FFDDC1" if x == "❌ Major Decline" else
+                                            "background-color: #FFEEAA" if x == "⚠️ High Volatility" else
+                                            "background-color: #C6ECAE"
+                                        ),
+                                        subset=["risk"]
+                                    )
+                                )
+                            except Exception as e:
+                                st.error(f"❌ Error detecting high-risk periods: {e}")
 
                     except Exception as e:
                         st.error(f"❌ Error analyzing forecast data: {e}")
@@ -1070,6 +1111,7 @@ def main():
                     step += 1
                     step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
                     st.markdown("### 🔍 Forecast Comparison Across Models")
+
                     model_colors = {
                         "Prophet": "blue",
                         "ARIMA": "green",
@@ -1104,7 +1146,7 @@ def main():
                     st.plotly_chart(fig, use_container_width=True)
                     progress_bar.progress(100)
                     step_message.text("All steps completed!")
-                    
+
                     st.markdown("### 📥 Download Forecast Data")
                     try:
                         csv = st.session_state.model_results[best_model]["Forecast"].to_csv(index=False)
@@ -1116,7 +1158,7 @@ def main():
                         )
                     except Exception as e:
                         st.error(f"❌ Error generating download file: {e}")
-                else:
+
                     # FREE USERS PIPELINE (only AutoML)
                     # STEP 4 (Free): Train AutoML Model
                     step += 1
