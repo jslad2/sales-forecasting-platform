@@ -639,9 +639,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         forecast_df = pd.DataFrame({
             "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1),
                                  periods=forecast_period, freq="MS"),
-            "yhat": automl_forecast,
-            "yhat_lower": automl_forecast * 0.9,
-            "yhat_upper": automl_forecast * 1.1
+            "yhat": automl_forecast
         })
 
         # Inverse differencing if applicable
