@@ -345,50 +345,42 @@ def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_
     return forecast_df
 
 def train_prophet_model(train, test, forecast_period, best_params, last_historical_value,
-                        is_diff, demand_shock, seasonality_adjustment, external_shock,
-                        category_scenarios=None):
+                        is_diff, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
-        # Initialize Prophet with tuned parameters
+        # If category adjustments are used, aggregate training data by date.
+        if category_scenarios:
+            train = train.groupby("ds", as_index=False).agg({"y": "sum"})
+        
+        # Initialize Prophet with tuned parameters.
         model = Prophet(
             seasonality_mode=best_params["seasonality_mode"],
             changepoint_prior_scale=best_params["changepoint_prior_scale"]
         )
-
-        # Optionally detect and add extra seasonalities
         try:
             model = detect_and_add_seasonalities(model, train)
         except Exception as e:
             st.warning(f"Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
 
-        # Fit Prophet on training data
+        # Fit the model.
         model.fit(train)
-
-        # Create future dataframe
+        
+        # Create a future dataframe.
         future = model.make_future_dataframe(periods=forecast_period, freq="MS", include_history=False)
         forecast = model.predict(future)
-
-        # Keep only new forecast rows
         forecast = forecast[forecast["ds"] > train["ds"].max()]
 
-        # 1) Apply scenario adjustments (if any)
+        # Apply scenario adjustments.
         forecast = adjust_forecast(forecast, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
-        # 2) If the data was differenced, inverse-difference the final forecast
+        # Inverse differencing if needed.
         if is_diff and last_historical_value is not None:
             forecast = inverse_difference(forecast, last_historical_value)
 
-        # Evaluate on overlapping portion
+        # Evaluate on the overlapping period.
         match_len = min(len(test["y"]), len(forecast))
-        rmse = mean_squared_error(
-            test["y"].iloc[:match_len],
-            forecast["yhat"].iloc[:match_len],
-            squared=False
-        )
-        mape = mean_absolute_percentage_error(
-            test["y"].iloc[:match_len],
-            forecast["yhat"].iloc[:match_len]
-        )
+        rmse = mean_squared_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len], squared=False)
+        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len])
 
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast}
 
@@ -397,10 +389,15 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
 
     return "Prophet", result
 
+
 def train_arima_model(train, test, forecast_period, last_historical_value, is_diff,
                       demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
+        # If category adjustments are used, aggregate training data by date.
+        if category_scenarios:
+            train = train.groupby("ds", as_index=False).agg({"y": "sum"})
+        
         # Detect seasonality
         try:
             decomposition = seasonal_decompose(train["y"], model="additive", period=12)
@@ -412,7 +409,7 @@ def train_arima_model(train, test, forecast_period, last_historical_value, is_di
             st.warning(f"Error in seasonality analysis: {e}")
             seasonal = False
 
-        # Auto ARIMA model
+        # Fit auto_arima
         model = auto_arima(
             train["y"],
             seasonal=seasonal,
@@ -428,36 +425,21 @@ def train_arima_model(train, test, forecast_period, last_historical_value, is_di
             stepwise=True
         )
 
-        # Generate ARIMA forecasts
         preds = model.predict(n_periods=forecast_period)
-        forecast_dates = pd.date_range(
-            start=train["ds"].iloc[-1] + pd.DateOffset(months=1),
-            periods=len(preds),
-            freq="MS"
-        )
+        forecast_dates = pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1),
+                                       periods=len(preds), freq="MS")
         forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": preds})
 
-        # 1) Apply scenario adjustments
-        forecast_df = adjust_forecast(
-            forecast_df, demand_shock, seasonality_adjustment,
-            external_shock, category_scenarios
-        )
+        # Apply scenario adjustments.
+        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
-        # 2) Inverse-difference if needed
+        # Inverse differencing if needed.
         if is_diff and last_historical_value is not None:
             forecast_df = inverse_difference(forecast_df, last_historical_value)
 
-        # Evaluate on overlapping portion
-        match_len = min(len(test), len(forecast_df))
-        rmse = mean_squared_error(
-            test["y"].iloc[:match_len],
-            forecast_df["yhat"].iloc[:match_len],
-            squared=False
-        )
-        mape = mean_absolute_percentage_error(
-            test["y"].iloc[:match_len],
-            forecast_df["yhat"].iloc[:match_len]
-        )
+        match_len = min(len(test["y"]), len(forecast_df))
+        rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
+        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
 
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
 
@@ -470,35 +452,36 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
                     demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
-        # Feature Engineering for XGBoost
+        # If category adjustments are used, aggregate training data by date.
+        if category_scenarios:
+            train = train.groupby("ds", as_index=False).agg({"y": "sum"})
+        
         max_lag = min(12, len(train) - 1)
         rolling_windows = [3, 6] if len(train) > 6 else [3]
         data_xgb = train.copy()
 
-        # Lag features
+        # Create lag features.
         for lag in range(1, max_lag + 1):
             data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
 
-        # Rolling means and std
+        # Create rolling statistics.
         for window in rolling_windows:
             data_xgb[f"rolling_mean_{window}"] = data_xgb["y"].rolling(window=window).mean()
             data_xgb[f"rolling_std_{window}"] = data_xgb["y"].rolling(window=window).std()
 
-        # Additional time features
+        # Add time-based features.
         data_xgb["month"] = data_xgb["ds"].dt.month
         data_xgb["quarter"] = data_xgb["ds"].dt.quarter
         data_xgb["year"] = data_xgb["ds"].dt.year
         data_xgb["sin_month"] = np.sin(2 * np.pi * data_xgb["month"] / 12)
         data_xgb["cos_month"] = np.cos(2 * np.pi * data_xgb["month"] / 12)
 
-        # Drop missing rows
         data_xgb.dropna(inplace=True)
-        feature_cols = [c for c in data_xgb.columns if c not in ["y","ds"] and np.issubdtype(data_xgb[c].dtype, np.number)]
+        feature_cols = [c for c in data_xgb.columns if c not in ["y", "ds"] and np.issubdtype(data_xgb[c].dtype, np.number)]
 
-        # Train XGBRegressor
         model = XGBRegressor(
             n_estimators=50,
-            max_depth=min(5, max(2, len(train)//10)),
+            max_depth=min(5, max(2, len(train) // 10)),
             learning_rate=0.1 if len(train) > 50 else 0.2,
             objective="reg:squarederror",
             random_state=42,
@@ -506,57 +489,41 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
         )
         model.fit(data_xgb[feature_cols], data_xgb["y"])
 
-        # Generate future forecasts
+        # Generate future features for forecasting.
         last_row = data_xgb.iloc[-1].copy()
         last_date = train["ds"].iloc[-1]
         preds = []
         for i in range(forecast_period):
-            future_date = last_date + pd.DateOffset(months=i+1)
+            future_date = last_date + pd.DateOffset(months=i + 1)
             future = {col: last_row[col] for col in feature_cols}
             future.update({
                 "month": future_date.month,
                 "quarter": future_date.quarter,
                 "year": future_date.year,
-                "sin_month": np.sin(2*np.pi*future_date.month/12),
-                "cos_month": np.cos(2*np.pi*future_date.month/12)
+                "sin_month": np.sin(2 * np.pi * future_date.month / 12),
+                "cos_month": np.cos(2 * np.pi * future_date.month / 12)
             })
             pred = model.predict(pd.DataFrame([future]))[0]
             preds.append(pred)
-
-            # Update lags for next iteration
             for lag in range(max_lag, 1, -1):
-                last_row[f"lag_{lag}"] = last_row[f"lag_{lag-1}"]
+                last_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
             last_row["lag_1"] = pred
 
-        # Build forecast DataFrame
         forecast_df = pd.DataFrame({
-            "ds": pd.date_range(start=last_date + pd.DateOffset(months=1),
-                                periods=forecast_period, freq="MS"),
+            "ds": pd.date_range(start=last_date + pd.DateOffset(months=1), periods=forecast_period, freq="MS"),
             "yhat": preds
         })
 
-        # 1) Apply scenario adjustments
-        forecast_df = adjust_forecast(
-            forecast_df, demand_shock, seasonality_adjustment,
-            external_shock, category_scenarios
-        )
+        # Apply scenario adjustments.
+        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
-        # 2) Inverse-difference if needed
+        # Inverse differencing if needed.
         if is_diff and last_historical_value is not None:
             forecast_df = inverse_difference(forecast_df, last_historical_value)
 
-        # Evaluate
-        match_len = min(len(test), len(forecast_df))
-        rmse = mean_squared_error(
-            test["y"].iloc[:match_len],
-            forecast_df["yhat"].iloc[:match_len],
-            squared=False
-        )
-        mape = mean_absolute_percentage_error(
-            test["y"].iloc[:match_len],
-            forecast_df["yhat"].iloc[:match_len]
-        )
-
+        match_len = min(len(test["y"]), len(forecast_df))
+        rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
+        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
 
     except Exception as e:
