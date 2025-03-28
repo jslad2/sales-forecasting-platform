@@ -496,7 +496,7 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
 
     return "XGBoost", result
 
-def train_automl_model(train, test, forecast_period, last_historical_value, is_diff,
+def train_automl_model(train, test, forecast_period, last_historical_value, is_diff, 
                        demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, time_budget=None):
     """
     Train an AutoML model using FLAML for time series forecasting.
@@ -518,17 +518,24 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
     """
     result = {}
     try:
-        # Feature Engineering
+        # Feature Engineering: work on a copy of the training data.
         data_automl = train.copy()
 
-        # Determine maximum lag based on dataset size
-        max_lag = min(24, len(train) - 1)  # Cap at 24 lags
-        if len(train) <= 6:
-            max_lag = min(3, len(train) - 1)
-        elif len(train) <= 12:
-            max_lag = min(6, len(train) - 1)
-        elif len(train) <= 24:
-            max_lag = min(12, len(train) - 1)
+        # If category adjustments are used, aggregate the data by date (summing up "y")
+        if category_scenarios:
+            data_automl = data_automl.groupby("ds", as_index=False).agg({"y": "sum"})
+
+        # Use the aggregated dataset's length for subsequent calculations.
+        n = len(data_automl)
+
+        # Determine maximum lag based on aggregated dataset size
+        max_lag = min(24, n - 1)
+        if n <= 6:
+            max_lag = min(3, n - 1)
+        elif n <= 12:
+            max_lag = min(6, n - 1)
+        elif n <= 24:
+            max_lag = min(12, n - 1)
 
         # Add lag features
         for lag in range(1, max_lag + 1):
@@ -540,7 +547,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             data_automl[f"rolling_std_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).std()
 
         # Add year-over-year growth (if sufficient data)
-        if len(train) > 12:
+        if n > 12:
             data_automl["yoy_growth"] = (data_automl["y"] / data_automl["y"].shift(12)) - 1
         else:
             data_automl["yoy_growth"] = 0
@@ -563,7 +570,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             data_automl["y_log"] = data_automl["y"]
             apply_log = False
 
-        # Drop rows with missing values
+        # Drop rows with missing values so that X and y align
         data_automl.dropna(inplace=True)
 
         # Prepare features and target
@@ -571,9 +578,9 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         y_train = data_automl["y_log"] if apply_log else data_automl["y"]
         X_train = data_automl[feature_cols]
 
-        # Dynamic time budget calculation (if not provided)
+        # Dynamic time budget calculation using the aggregated data length
         if time_budget is None:
-            time_budget = min(600, max(60, len(train) * 0.1 + len(feature_cols) * 2))  # 60s to 600s
+            time_budget = min(600, max(60, n * 0.1 + len(feature_cols) * 2))  # 60s to 600s
             st.info(f"Dynamic time budget set to {time_budget} seconds based on dataset size and complexity.")
 
         # Train AutoML model using FLAML
@@ -646,15 +653,16 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         # Apply forecast adjustments
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
-        # Evaluate model performance
+        # Evaluate model performance: use the minimum length from test and forecast
         match_len = min(len(test["y"]), len(forecast_df))
-        rmse = np.sqrt(mean_squared_error(test["y"].values, forecast_df["yhat"][:len(test["y"])]))
-        mape = mean_absolute_percentage_error(test["y"].values, forecast_df["yhat"][:len(test["y"])])
+        rmse = np.sqrt(mean_squared_error(test["y"].values[:match_len], forecast_df["yhat"].iloc[:match_len]))
+        mape = mean_absolute_percentage_error(test["y"].values[:match_len], forecast_df["yhat"].iloc[:match_len])
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
 
     except Exception as e:
         st.error(f"AutoML Model failed: {e}")
     return ("AutoML", result)
+
 
 def shape_score(actual, forecast):
     if len(actual) != len(forecast):
