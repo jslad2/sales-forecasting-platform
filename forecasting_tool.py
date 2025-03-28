@@ -1032,6 +1032,40 @@ def main():
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
+                    try:
+                        # Assume best_model is already selected and forecast_data is from that model.
+                        forecast_data = st.session_state.model_results[best_model]["Forecast"]
+
+                        # Compute AI-powered insights
+                        highest_point = forecast_data.loc[forecast_data["yhat"].idxmax()]
+                        lowest_point = forecast_data.loc[forecast_data["yhat"].idxmin()]
+                        projected_growth = ((forecast_data["yhat"].iloc[-1] - test["y"].iloc[-1]) / test["y"].iloc[-1]) * 100
+                        trend = "📈 **Growth Expected**" if projected_growth > 0 else "📉 **Potential Decline**"
+
+                        insights_text = f"""
+                    - **Projected Sales Growth:** {abs(projected_growth):.2f}% {trend}
+                    - **Peak Sales Expected:** ${highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}
+                    - **Lowest Predicted Sales:** ${lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}
+                    - **Optimal Decision Window:** Plan around peak sales in {highest_point['ds'].strftime('%B %Y')}
+                    - **Risk Zones Identified:** Check months marked as 🔥 'High-Risk' above
+                    - **Volatility Analysis:** Forecast suggests a {'stable' if abs(projected_growth) < 5 else 'fluctuating'} trend
+                        """
+                        
+                        with st.expander("🔮 AI-Powered Future Insights", expanded=True):
+                            st.markdown(insights_text)
+                        
+                        # Build a summary of category adjustments if any were applied.
+                        if category_scenarios:
+                            cat_adj_summary = "### Category Adjustments Summary\n"
+                            for col, adjustments in category_scenarios.items():
+                                cat_adj_summary += f"- **{col}**:\n"
+                                for cat, details in adjustments.items():
+                                    cat_adj_summary += f"  - **{cat}**: {details['adjustment']}% adjustment from {details['start_date']} to {details['end_date']}\n"
+                            st.markdown(cat_adj_summary)
+
+                    except Exception as e:
+                        st.error(f"❌ Error analyzing forecast data: {e}")
+
                     # STEP 11: Finalize Forecast Visualization (Premium)
                     step += 1
                     step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
