@@ -597,7 +597,8 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         data_automl["cos_month"] = np.cos(2 * np.pi * data_automl["ds"].dt.month / 12)
 
         # Log-transform if the target variable has a large range
-        if data_automl["y"].max() / data_automl["y"].min() > 5:
+        # Force conversion to float to avoid type errors.
+        if float(data_automl["y"].max()) / float(data_automl["y"].min()) > 5:
             data_automl["y_log"] = np.log1p(data_automl["y"])
             apply_log = True
         else:
@@ -614,7 +615,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
 
         # Dynamic time budget calculation using the aggregated data length
         if time_budget is None:
-            time_budget = min(600, max(60, n * 0.1 + len(feature_cols) * 2))  # 60s to 600s
+            time_budget = min(600, max(60, n * 0.1 + len(feature_cols) * 2))
             st.info(f"Dynamic time budget set to {time_budget} seconds based on dataset size and complexity.")
 
         # Train AutoML model using FLAML
@@ -899,7 +900,7 @@ def main():
                 testing_period = int(len(processed_data) * 0.2)
                 train = processed_data.iloc[:-testing_period]
                 test = processed_data.iloc[-testing_period:]
-                progress_bar.progress(int((step / total_steps) * 100))
+                progress_bar.progress(min(100, int((step / total_steps) * 100)))
                 time.sleep(1)
 
                 if subscription_level == "premium":
