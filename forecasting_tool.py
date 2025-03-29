@@ -1160,65 +1160,65 @@ def main():
                     except Exception as e:
                         st.error(f"❌ Error generating download file: {e}")
 
-                    # FREE USERS PIPELINE (only AutoML)
-                    # STEP 4 (Free): Train AutoML Model
-                    step += 1
-                    step_message.text(f"Step {step} of {total_steps}: Training AutoML model (Limited)...")
-                    with st.spinner("🚀 Training AutoML Model..."):
-                        automl_model_name, automl_res = train_automl_model(
-                            train, test, forecast_period,
-                            last_historical_value, is_diff,
-                            time_budget, demand_shock, seasonality_adjustment, external_shock, category_scenarios
-                        )
-                        time.sleep(1)
-                    if is_diff and automl_res.get("Forecast") is not None:
-                        automl_res["Forecast"] = inverse_difference(automl_res["Forecast"], last_historical_value)
-                    automl_status.success("✅ AutoML Model Training Complete!")
-                    progress_bar.progress(int((step / total_steps) * 100))
-                    time.sleep(1)
-                    
-                    # STEP 5 (Free): Compile Forecast Results
-                    step += 1
-                    step_message.text(f"Step {step} of {total_steps}: Compiling forecast results...")
-                    st.success("🎉 Forecasting process completed!")
-                    time.sleep(1)
-                    results = {"AutoML": automl_res}
-                    st.session_state.model_results = results
-                    progress_bar.progress(int((step / total_steps) * 100))
-                    time.sleep(1)
-                    
-                    # STEP 6 (Free): Finalize Forecast Visualization
-                    step += 1
-                    step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
-                    st.markdown("### 🔍 Forecast Visualization")
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(
-                        x=y_original["ds"],
-                        y=y_original["y_original"],
-                        mode="lines",
-                        name="Historical Data",
-                        line=dict(color="black", width=2)
-                    ))
-                    forecast_df = automl_res["Forecast"]
-                    fig.add_trace(go.Scatter(
-                        x=forecast_df["ds"],
-                        y=forecast_df["yhat"],
-                        mode="lines",
-                        name="AutoML Forecast",
-                        line=dict(width=2, color="purple")
-                    ))
-                    fig.update_layout(
-                        title="📊 Sales Forecast",
-                        xaxis_title="Date",
-                        yaxis_title="Sales",
-                        template="plotly_white",
-                        xaxis_tickformat="%Y-%m"
+                # FREE USERS PIPELINE (only AutoML)
+                # STEP 4 (Free): Train AutoML Model
+                step += 1
+                step_message.text(f"Step {step} of {total_steps}: Training AutoML model (Limited)...")
+                with st.spinner("🚀 Training AutoML Model..."):
+                    automl_model_name, automl_res = train_automl_model(
+                        train, test, forecast_period,
+                        last_historical_value, is_diff,
+                        time_budget, demand_shock, seasonality_adjustment, external_shock, category_scenarios
                     )
-                    st.plotly_chart(fig, use_container_width=True)
-                    progress_bar.progress(100)
-                    step_message.text("All steps completed!")
-                    
-                    st.info("Upgrade to Premium to unlock advanced features like multi-model comparison and forecast download.")
+                    time.sleep(1)
+                if is_diff and automl_res.get("Forecast") is not None:
+                    automl_res["Forecast"] = inverse_difference(automl_res["Forecast"], last_historical_value)
+                automl_status.success("✅ AutoML Model Training Complete!")
+                progress_bar.progress(int((step / total_steps) * 100))
+                time.sleep(1)
+                
+                # STEP 5 (Free): Compile Forecast Results
+                step += 1
+                step_message.text(f"Step {step} of {total_steps}: Compiling forecast results...")
+                st.success("🎉 Forecasting process completed!")
+                time.sleep(1)
+                results = {"AutoML": automl_res}
+                st.session_state.model_results = results
+                progress_bar.progress(int((step / total_steps) * 100))
+                time.sleep(1)
+                
+                # STEP 6 (Free): Finalize Forecast Visualization
+                step += 1
+                step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
+                st.markdown("### 🔍 Forecast Visualization")
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=y_original["ds"],
+                    y=y_original["y_original"],
+                    mode="lines",
+                    name="Historical Data",
+                    line=dict(color="black", width=2)
+                ))
+                forecast_df = automl_res["Forecast"]
+                fig.add_trace(go.Scatter(
+                    x=forecast_df["ds"],
+                    y=forecast_df["yhat"],
+                    mode="lines",
+                    name="AutoML Forecast",
+                    line=dict(width=2, color="purple")
+                ))
+                fig.update_layout(
+                    title="📊 Sales Forecast",
+                    xaxis_title="Date",
+                    yaxis_title="Sales",
+                    template="plotly_white",
+                    xaxis_tickformat="%Y-%m"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+                progress_bar.progress(100)
+                step_message.text("All steps completed!")
+                
+                st.info("Upgrade to Premium to unlock advanced features like multi-model comparison and forecast download.")
 
         except Exception as e:
             st.error(f"Error processing file: {e}")
