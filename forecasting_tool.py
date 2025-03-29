@@ -346,61 +346,28 @@ def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_
 
 def train_prophet_model(train, test, forecast_period, best_params, last_historical_value,
                         is_diff, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
-    """
-    Train a Prophet model for time series forecasting with enhancements.
-
-    If category adjustments are provided, the training data is aggregated by date.
-    Optionally, you can add custom regressors or holidays by modifying the code.
-    Forecast adjustments and inverse differencing are applied if necessary.
-    
-    Args:
-        train (pd.DataFrame): Training data with columns "ds" (date) and "y" (target).
-        test (pd.DataFrame): Test data for evaluation.
-        forecast_period (int): Number of periods to forecast.
-        best_params (dict): Tuned parameters for Prophet.
-        last_historical_value (float): The last observed value (for inverse differencing).
-        is_diff (bool): Indicates if differencing was applied.
-        demand_shock (float): Global demand shock adjustment percentage.
-        seasonality_adjustment (float): Seasonality adjustment percentage.
-        external_shock (bool): External shock adjustment flag.
-        category_scenarios (dict, optional): Category-specific adjustments.
-        
-    Returns:
-        tuple: ("Prophet", { "RMSE": float, "MAPE": float, "Forecast": forecast_df })
-    """
     result = {}
     try:
-        # If category adjustments are used, aggregate training data by date (summing "y")
+        # If category adjustments are used, aggregate training data by date.
         if category_scenarios:
             train = train.groupby("ds", as_index=False).agg({"y": "sum"})
-
+        
         # Initialize Prophet with tuned parameters.
         model = Prophet(
             seasonality_mode=best_params["seasonality_mode"],
             changepoint_prior_scale=best_params["changepoint_prior_scale"]
         )
-        
-        # (Optional) Add holidays or extra regressors here if desired.
-        # Example:
-        # model.add_regressor("your_regressor")
-        # model.add_country_holidays(country_name='US')
-        
         try:
             model = detect_and_add_seasonalities(model, train)
         except Exception as e:
-            st.warning(f"Seasonality detection failed: {e}. Proceeding with default seasonality.")
+            st.warning(f"Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
 
-        # Fit the model and log training info (you could add timing here if desired)
+        # Fit the model.
         model.fit(train)
         
-        # (Optional) You can inspect changepoints:
-        # changepoints = model.changepoints
-        # st.write("Changepoints:", changepoints)
-
-        # Create future dataframe for forecast periods.
+        # Create a future dataframe.
         future = model.make_future_dataframe(periods=forecast_period, freq="MS", include_history=False)
         forecast = model.predict(future)
-        # Filter to ensure only future dates (should be redundant with include_history=False)
         forecast = forecast[forecast["ds"] > train["ds"].max()]
 
         # Apply scenario adjustments.
@@ -410,7 +377,7 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         if is_diff and last_historical_value is not None:
             forecast = inverse_difference(forecast, last_historical_value)
 
-        # Evaluate performance on overlapping forecast horizon.
+        # Evaluate on the overlapping period.
         match_len = min(len(test["y"]), len(forecast))
         rmse = mean_squared_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len], squared=False)
         mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len])
