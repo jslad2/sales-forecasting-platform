@@ -597,8 +597,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         data_automl["cos_month"] = np.cos(2 * np.pi * data_automl["ds"].dt.month / 12)
 
         # Log-transform if the target variable has a large range
-        # Force conversion to float to avoid type errors.
-        if float(data_automl["y"].max()) / float(data_automl["y"].min()) > 5:
+        if data_automl["y"].max() / data_automl["y"].min() > 5:
             data_automl["y_log"] = np.log1p(data_automl["y"])
             apply_log = True
         else:
@@ -615,7 +614,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
 
         # Dynamic time budget calculation using the aggregated data length
         if time_budget is None:
-            time_budget = min(600, max(60, n * 0.1 + len(feature_cols) * 2))
+            time_budget = min(600, max(60, n * 0.1 + len(feature_cols) * 2))  # 60s to 600s
             st.info(f"Dynamic time budget set to {time_budget} seconds based on dataset size and complexity.")
 
         # Train AutoML model using FLAML
@@ -900,7 +899,7 @@ def main():
                 testing_period = int(len(processed_data) * 0.2)
                 train = processed_data.iloc[:-testing_period]
                 test = processed_data.iloc[-testing_period:]
-                progress_bar.progress(min(100, int((step / total_steps) * 100)))
+                progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(1)
 
                 if subscription_level == "premium":
@@ -978,7 +977,7 @@ def main():
                             category_scenarios, time_budget
                         )
                         time.sleep(1)
-                    st.success("✅ AutoML Model Training Complete!")
+                    automl_status.success("✅ AutoML Model Training Complete!")
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
@@ -987,21 +986,16 @@ def main():
                     step_message.text(f"Step {step} of {total_steps}: Compiling forecast results...")
                     st.success("🎉 Forecasting process completed!")
                     time.sleep(1)
-
-                    # Gather model results
                     results = {
                         prophet_model_name: prophet_res,
                         arima_model_name: arima_res,
                         xgb_model_name: xgb_res,
                         automl_model_name: automl_res
                     }
-
-                    # Filter out any models that failed or returned no forecast
                     valid_results = {model: res for model, res in results.items() if res.get("Forecast") is not None}
                     if not valid_results:
                         st.error("No valid model forecasts produced.")
                         return
-
                     st.session_state.model_results = valid_results
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
@@ -1023,96 +1017,25 @@ def main():
                             "MAPE": res["MAPE"],
                             "Shape (corr)": res["Shape (corr)"]
                         })
-
                     if comparison_data:
                         max_rmse = max(res["RMSE"] for res in st.session_state.model_results.values())
                         for model, res in st.session_state.model_results.items():
                             res["Combined Score"] = combined_score(res["RMSE"], res["Shape (corr)"], max_rmse, 0.5, 1.0)
                         for item in comparison_data:
                             item["Combined Score"] = combined_score(item["RMSE"], item["Shape (corr)"], max_rmse, 0.5, 1.0)
-
                         comparison_df = pd.DataFrame(comparison_data).sort_values(by="Combined Score")
                         st.dataframe(comparison_df.style.highlight_min(subset=["Combined Score"], color="lightgreen"))
-
                         best_model = comparison_df.iloc[0]["Model"]
                         st.success(f"✨ **AI-Selected Best Model (Combined):** {best_model}")
                     else:
                         st.warning("No model results found. Please train the models first.")
-
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
-
-                    # 🔮 AI-Powered Future Insights + Category Summary + High-Risk Detection
-                    try:
-                        # Retrieve the best model's forecast DataFrame
-                        forecast_data = st.session_state.model_results[best_model]["Forecast"]
-
-                        # Compute AI-powered insights
-                        highest_point = forecast_data.loc[forecast_data["yhat"].idxmax()]
-                        lowest_point = forecast_data.loc[forecast_data["yhat"].idxmin()]
-                        projected_growth = ((forecast_data["yhat"].iloc[-1] - test["y"].iloc[-1]) / test["y"].iloc[-1]) * 100
-                        trend = "📈 **Growth Expected**" if projected_growth > 0 else "📉 **Potential Decline**"
-
-                        insights_text = f"""
-                    - **Projected Sales Growth:** {abs(projected_growth):.2f}% {trend}
-                    - **Peak Sales Expected:** ${highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}
-                    - **Lowest Predicted Sales:** ${lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}
-                    - **Optimal Decision Window:** Plan around peak sales in {highest_point['ds'].strftime('%B %Y')}
-                    - **Risk Zones Identified:** Check months marked as 🔥 'High-Risk' below
-                    - **Volatility Analysis:** Forecast suggests a {'stable' if abs(projected_growth) < 5 else 'fluctuating'} trend
-                        """
-
-                        with st.expander("🔮 AI-Powered Future Insights", expanded=True):
-                            st.markdown(insights_text)
-
-                        # Build a summary of category adjustments if any were applied.
-                        if category_scenarios:
-                            cat_adj_summary = "### Category Adjustments Summary\n"
-                            for col, adjustments in category_scenarios.items():
-                                cat_adj_summary += f"- **{col}**:\n"
-                                for cat, details in adjustments.items():
-                                    cat_adj_summary += (
-                                        f"  - **{cat}**: {details['adjustment']}% adjustment "
-                                        f"from {details['start_date']} to {details['end_date']}\n"
-                                    )
-                            st.markdown(cat_adj_summary)
-
-                        # 🔥 Detect High-Risk Periods in Forecast
-                        if forecast_data is not None:
-                            try:
-                                forecast_data["volatility"] = forecast_data["yhat"].rolling(3).std()
-                                forecast_data["risk"] = "✅ Stable"
-
-                                # Define thresholds at 75th and 90th percentile
-                                p75 = forecast_data["volatility"].quantile(0.75)
-                                p90 = forecast_data["volatility"].quantile(0.90)
-
-                                forecast_data.loc[forecast_data["volatility"] > p75, "risk"] = "⚠️ High Volatility"
-                                forecast_data.loc[forecast_data["volatility"] > p90, "risk"] = "❌ Major Decline"
-
-                                st.markdown("### 🚨 High-Risk Sales Periods Identified")
-                                st.dataframe(
-                                    forecast_data[["ds", "yhat", "volatility", "risk"]]
-                                    .style.applymap(
-                                        lambda x: (
-                                            "background-color: #FFDDC1" if x == "❌ Major Decline" else
-                                            "background-color: #FFEEAA" if x == "⚠️ High Volatility" else
-                                            "background-color: #C6ECAE"
-                                        ),
-                                        subset=["risk"]
-                                    )
-                                )
-                            except Exception as e:
-                                st.error(f"❌ Error detecting high-risk periods: {e}")
-
-                    except Exception as e:
-                        st.error(f"❌ Error analyzing forecast data: {e}")
 
                     # STEP 11: Finalize Forecast Visualization (Premium)
                     step += 1
                     step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
                     st.markdown("### 🔍 Forecast Comparison Across Models")
-
                     model_colors = {
                         "Prophet": "blue",
                         "ARIMA": "green",
@@ -1147,7 +1070,7 @@ def main():
                     st.plotly_chart(fig, use_container_width=True)
                     progress_bar.progress(100)
                     step_message.text("All steps completed!")
-
+                    
                     st.markdown("### 📥 Download Forecast Data")
                     try:
                         csv = st.session_state.model_results[best_model]["Forecast"].to_csv(index=False)
@@ -1159,66 +1082,66 @@ def main():
                         )
                     except Exception as e:
                         st.error(f"❌ Error generating download file: {e}")
-
-                # FREE USERS PIPELINE (only AutoML)
-                # STEP 4 (Free): Train AutoML Model
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Training AutoML model (Limited)...")
-                with st.spinner("🚀 Training AutoML Model..."):
-                    automl_model_name, automl_res = train_automl_model(
-                        train, test, forecast_period,
-                        last_historical_value, is_diff,
-                        time_budget, demand_shock, seasonality_adjustment, external_shock, category_scenarios
-                    )
+                else:
+                    # FREE USERS PIPELINE (only AutoML)
+                    # STEP 4 (Free): Train AutoML Model
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Training AutoML model (Limited)...")
+                    with st.spinner("🚀 Training AutoML Model..."):
+                        automl_model_name, automl_res = train_automl_model(
+                            train, test, forecast_period,
+                            last_historical_value, is_diff,
+                            time_budget, demand_shock, seasonality_adjustment, external_shock, category_scenarios
+                        )
+                        time.sleep(1)
+                    if is_diff and automl_res.get("Forecast") is not None:
+                        automl_res["Forecast"] = inverse_difference(automl_res["Forecast"], last_historical_value)
+                    automl_status.success("✅ AutoML Model Training Complete!")
+                    progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
-                if is_diff and automl_res.get("Forecast") is not None:
-                    automl_res["Forecast"] = inverse_difference(automl_res["Forecast"], last_historical_value)
-                automl_status.success("✅ AutoML Model Training Complete!")
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(1)
-                
-                # STEP 5 (Free): Compile Forecast Results
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Compiling forecast results...")
-                st.success("🎉 Forecasting process completed!")
-                time.sleep(1)
-                results = {"AutoML": automl_res}
-                st.session_state.model_results = results
-                progress_bar.progress(int((step / total_steps) * 100))
-                time.sleep(1)
-                
-                # STEP 6 (Free): Finalize Forecast Visualization
-                step += 1
-                step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
-                st.markdown("### 🔍 Forecast Visualization")
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=y_original["ds"],
-                    y=y_original["y_original"],
-                    mode="lines",
-                    name="Historical Data",
-                    line=dict(color="black", width=2)
-                ))
-                forecast_df = automl_res["Forecast"]
-                fig.add_trace(go.Scatter(
-                    x=forecast_df["ds"],
-                    y=forecast_df["yhat"],
-                    mode="lines",
-                    name="AutoML Forecast",
-                    line=dict(width=2, color="purple")
-                ))
-                fig.update_layout(
-                    title="📊 Sales Forecast",
-                    xaxis_title="Date",
-                    yaxis_title="Sales",
-                    template="plotly_white",
-                    xaxis_tickformat="%Y-%m"
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                progress_bar.progress(100)
-                step_message.text("All steps completed!")
-                
-                st.info("Upgrade to Premium to unlock advanced features like multi-model comparison and forecast download.")
+                    
+                    # STEP 5 (Free): Compile Forecast Results
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Compiling forecast results...")
+                    st.success("🎉 Forecasting process completed!")
+                    time.sleep(1)
+                    results = {"AutoML": automl_res}
+                    st.session_state.model_results = results
+                    progress_bar.progress(int((step / total_steps) * 100))
+                    time.sleep(1)
+                    
+                    # STEP 6 (Free): Finalize Forecast Visualization
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
+                    st.markdown("### 🔍 Forecast Visualization")
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=y_original["ds"],
+                        y=y_original["y_original"],
+                        mode="lines",
+                        name="Historical Data",
+                        line=dict(color="black", width=2)
+                    ))
+                    forecast_df = automl_res["Forecast"]
+                    fig.add_trace(go.Scatter(
+                        x=forecast_df["ds"],
+                        y=forecast_df["yhat"],
+                        mode="lines",
+                        name="AutoML Forecast",
+                        line=dict(width=2, color="purple")
+                    ))
+                    fig.update_layout(
+                        title="📊 Sales Forecast",
+                        xaxis_title="Date",
+                        yaxis_title="Sales",
+                        template="plotly_white",
+                        xaxis_tickformat="%Y-%m"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    progress_bar.progress(100)
+                    step_message.text("All steps completed!")
+                    
+                    st.info("Upgrade to Premium to unlock advanced features like multi-model comparison and forecast download.")
 
         except Exception as e:
             st.error(f"Error processing file: {e}")
