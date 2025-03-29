@@ -389,6 +389,7 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
 
     return "Prophet", result
 
+
 def train_arima_model(train, test, forecast_period, last_historical_value, is_diff,
                       demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
@@ -966,20 +967,20 @@ def main():
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
-                    # STEP 9: Train AutoML Model
-                    step += 1
-                    step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
-                    with st.spinner("🚀 Training AutoML Model..."):
-                        automl_model_name, automl_res = train_automl_model(
-                            train, test, forecast_period,
-                            last_historical_value, is_diff,
-                            demand_shock, seasonality_adjustment, external_shock,
-                            category_scenarios, time_budget
-                        )
-                        time.sleep(1)
-                    st.success("✅ AutoML Model Training Complete!")
-                    progress_bar.progress(int((step / total_steps) * 100))
-                    time.sleep(1)
+                    # # STEP 9: Train AutoML Model
+                    # step += 1
+                    # step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
+                    # with st.spinner("🚀 Training AutoML Model..."):
+                    #     automl_model_name, automl_res = train_automl_model(
+                    #         train, test, forecast_period,
+                    #         last_historical_value, is_diff,
+                    #         demand_shock, seasonality_adjustment, external_shock,
+                    #         category_scenarios, time_budget
+                    #     )
+                    #     time.sleep(1)
+                    # automl_status.success("✅ AutoML Model Training Complete!")
+                    # progress_bar.progress(int((step / total_steps) * 100))
+                    # time.sleep(1)
 
                     # STEP 9: Compile Forecast Results (Premium)
                     step += 1
@@ -989,8 +990,8 @@ def main():
                     results = {
                         prophet_model_name: prophet_res,
                         # arima_model_name: arima_res,
-                        xgb_model_name: xgb_res,
-                        automl_model_name: automl_res
+                        xgb_model_name: xgb_res
+                        # ,automl_model_name: automl_res
                     }
                     valid_results = {model: res for model, res in results.items() if res.get("Forecast") is not None}
                     if not valid_results:
@@ -1032,79 +1033,13 @@ def main():
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
-                    # 🔮 AI-Powered Future Insights + Category Summary + High-Risk Detection
-                    try:
-                        # Retrieve the best model's forecast DataFrame
-                        forecast_data = st.session_state.model_results[best_model]["Forecast"]
-
-                        # Compute AI-powered insights
-                        highest_point = forecast_data.loc[forecast_data["yhat"].idxmax()]
-                        lowest_point = forecast_data.loc[forecast_data["yhat"].idxmin()]
-                        projected_growth = ((forecast_data["yhat"].iloc[-1] - test["y"].iloc[-1]) / test["y"].iloc[-1]) * 100
-                        trend = "📈 **Growth Expected**" if projected_growth > 0 else "📉 **Potential Decline**"
-
-                        insights_text = f"""
-                    - **Projected Sales Growth:** {abs(projected_growth):.2f}% {trend}
-                    - **Peak Sales Expected:** ${highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}
-                    - **Lowest Predicted Sales:** ${lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}
-                    - **Optimal Decision Window:** Plan around peak sales in {highest_point['ds'].strftime('%B %Y')}
-                    - **Risk Zones Identified:** Check months marked as 🔥 'High-Risk' below
-                    - **Volatility Analysis:** Forecast suggests a {'stable' if abs(projected_growth) < 5 else 'fluctuating'} trend
-                        """
-
-                        with st.expander("🔮 AI-Powered Future Insights", expanded=True):
-                            st.markdown(insights_text)
-
-                        # Build a summary of category adjustments if any were applied.
-                        if category_scenarios:
-                            cat_adj_summary = "### Category Adjustments Summary\n"
-                            for col, adjustments in category_scenarios.items():
-                                cat_adj_summary += f"- **{col}**:\n"
-                                for cat, details in adjustments.items():
-                                    cat_adj_summary += (
-                                        f"  - **{cat}**: {details['adjustment']}% adjustment "
-                                        f"from {details['start_date']} to {details['end_date']}\n"
-                                    )
-                            st.markdown(cat_adj_summary)
-
-                        # 🔥 Detect High-Risk Periods in Forecast
-                        if forecast_data is not None:
-                            try:
-                                forecast_data["volatility"] = forecast_data["yhat"].rolling(3).std()
-                                forecast_data["risk"] = "✅ Stable"
-
-                                # Define thresholds at 75th and 90th percentile
-                                p75 = forecast_data["volatility"].quantile(0.75)
-                                p90 = forecast_data["volatility"].quantile(0.90)
-
-                                forecast_data.loc[forecast_data["volatility"] > p75, "risk"] = "⚠️ High Volatility"
-                                forecast_data.loc[forecast_data["volatility"] > p90, "risk"] = "❌ Major Decline"
-
-                                st.markdown("### 🚨 High-Risk Sales Periods Identified")
-                                st.dataframe(
-                                    forecast_data[["ds", "yhat", "volatility", "risk"]]
-                                    .style.applymap(
-                                        lambda x: (
-                                            "background-color: #FFDDC1" if x == "❌ Major Decline" else
-                                            "background-color: #FFEEAA" if x == "⚠️ High Volatility" else
-                                            "background-color: #C6ECAE"
-                                        ),
-                                        subset=["risk"]
-                                    )
-                                )
-                            except Exception as e:
-                                st.error(f"❌ Error detecting high-risk periods: {e}")
-
-                    except Exception as e:
-                        st.error(f"❌ Error analyzing forecast data: {e}")
-
                     # STEP 11: Finalize Forecast Visualization (Premium)
                     step += 1
                     step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
                     st.markdown("### 🔍 Forecast Comparison Across Models")
                     model_colors = {
                         "Prophet": "blue",
-                        # "ARIMA": "green",
+                        "ARIMA": "green",
                         "XGBoost": "red",
                         "AutoML": "purple"
                     }
