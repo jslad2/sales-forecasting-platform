@@ -88,20 +88,17 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
       Also creates a re-aggregated DataFrame for a clean monthly chart.
     """
     try:
-        # 1. Convert date column to datetime and drop missing rows.
+        # 1. Convert date column to datetime and drop missing rows
         data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
         data.dropna(subset=[date_column, sales_column], inplace=True)
-        
-        # Standardize all dates to the first day of the month.
-        data[date_column] = data[date_column].apply(lambda d: d.replace(day=1))
-        
-        # 2. Rename columns for Prophet.
+
+        # 2. Rename columns for Prophet
         data = data.rename(columns={date_column: "ds", sales_column: "y"})
 
-        # 3. Create monthly period column.
+        # 3. Create monthly period column
         data["year_month"] = data["ds"].dt.to_period("M")
 
-        # 4. Group by year_month and category columns (if provided).
+        # 4. Group by year_month and category columns (if provided)
         if category_columns:
             if not isinstance(category_columns, list):
                 category_columns = [category_columns]
@@ -111,14 +108,14 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
 
         data = data.groupby(grouping_cols, as_index=False)["y"].sum()
 
-        # 5. Convert year_month back to datetime (start-of-month).
+        # 5. Convert year_month back to datetime (start-of-month)
         data["ds"] = pd.to_datetime(
             data["year_month"].dt.to_timestamp(how="start").dt.strftime("%Y-%m"),
             format="%Y-%m"
         )
         data.drop(columns=["year_month"], inplace=True)
 
-        # 6. Remove duplicates.
+        # 6. Remove duplicates
         if category_columns:
             subset_cols = ["ds", "y"] + category_columns
         else:
@@ -127,16 +124,21 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             st.warning("⚠️ Duplicate date/category combinations found. Removing duplicates...")
             data = data.drop_duplicates(subset=subset_cols, keep="last")
 
-        # 7. Save original processed data for inspection.
+        # 7. Save original processed data for inspection
+        if category_columns:
+            y_original = data.copy()
+        else:
+            y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
+
         y_original = data.copy()
         if category_columns:
             y_original = y_original.groupby('ds', as_index=False)['y'].sum()
         y_original = y_original.rename(columns={'y': 'y_original'})
 
-        # 8. Re-aggregate data by ds for charting (one line per month).
+        # 8. Re-aggregate data by ds for charting (one line per month)
         re_agg_chart = data.groupby("ds", as_index=False)["y"].sum()
 
-        # 9. Check stationarity on the aggregated series.
+        # 9. Check stationarity on the aggregated series
         stationarity_result = check_stationarity(re_agg_chart["y"])
         st.markdown(
             f"""
@@ -148,17 +150,17 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
             unsafe_allow_html=True,
         )
 
-        # 10. If non-stationary, apply differencing to both the aggregated chart and the model data.
+        # 10. If non-stationary, apply differencing to both the aggregated chart and the model data
         if stationarity_result == "Non-Stationary":
             st.warning("Applying differencing to stabilize the series for charting and modeling.")
             
-            # For charting: compute differenced aggregated series.
+            # For charting: compute differenced aggregated series
             re_agg_chart["y_diff"] = re_agg_chart["y"].diff()
             last_historical_value = re_agg_chart["y"].iloc[-1]
             is_diff = True
 
-            # For modeling: physically difference the actual data.
-            data["y"] = data["y"].diff()  # This creates a differenced column.
+            # For modeling: physically difference the actual data
+            data["y"] = data["y"].diff()  # This creates a differenced column
             data = data.dropna().reset_index(drop=True)
 
             fig = go.Figure()
@@ -210,7 +212,6 @@ def preprocess_data(data, date_column, sales_column, category_columns=None):
         st.error(f"An error occurred during preprocessing: {e}")
         st.error(f"Debug Info: Columns in data - {data.columns}, Data Shape - {data.shape}")
         return None, None, None, None
-
 
 def inverse_difference(forecast_data, first_value):
     if first_value is not None:
@@ -437,6 +438,9 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
                     demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
+        # Convert training dates to the first day of the month.
+        train["ds"] = train["ds"].apply(lambda d: d.replace(day=1))
+        
         # If category adjustments are used, aggregate training data by date.
         if category_scenarios:
             train = train.groupby("ds", as_index=False).agg({"y": "sum"})
@@ -477,11 +481,10 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
         # Generate future forecasts.
         last_row = data_xgb.iloc[-1].copy()
         last_date = train["ds"].iloc[-1]
-        # Set the forecast start date to the first day of the next month.
-        start_date = last_date.replace(day=1) + pd.DateOffset(months=1)
+        # Set forecast start date to first day of next month.
+        start_date = (last_date + pd.DateOffset(months=1)).replace(day=1)
         preds = []
         for i in range(forecast_period):
-            # Future date is calculated from start_date.
             future_date = start_date + pd.DateOffset(months=i)
             future = {col: last_row[col] for col in feature_cols}
             future.update({
@@ -493,21 +496,20 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
             })
             pred = model.predict(pd.DataFrame([future]))[0]
             preds.append(pred)
-            # Update lag features for iterative forecasting.
+            # Update lag features for next iteration.
             for lag in range(max_lag, 1, -1):
                 last_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
             last_row["lag_1"] = pred
+            # **Update the date in last_row** to the current future date for correct seasonal features.
+            last_row["ds"] = future_date
 
-        # Create the forecast DataFrame using start_date.
         forecast_df = pd.DataFrame({
             "ds": pd.date_range(start=start_date, periods=forecast_period, freq="MS"),
             "yhat": preds
         })
 
-        # Apply scenario adjustments.
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
-        # Evaluate model performance.
         match_len = min(len(test["y"]), len(forecast_df))
         rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
         mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
@@ -517,6 +519,7 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
         st.warning(f"XGBoost Model failed: {e}")
 
     return "XGBoost", result
+
 
 def train_automl_model(train, test, forecast_period, last_historical_value, is_diff, 
                        demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, time_budget=None):
