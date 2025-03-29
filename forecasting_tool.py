@@ -438,13 +438,11 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
                     demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
-        # Convert training dates to the first day of the month.
-        train["ds"] = train["ds"].apply(lambda d: d.replace(day=1))
-        
         # If category adjustments are used, aggregate training data by date.
         if category_scenarios:
             train = train.groupby("ds", as_index=False).agg({"y": "sum"})
         
+        # Do not alter the original 'ds' dates.
         max_lag = min(12, len(train) - 1)
         rolling_windows = [3, 6] if len(train) > 6 else [3]
         data_xgb = train.copy()
@@ -481,8 +479,8 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
         # Generate future forecasts.
         last_row = data_xgb.iloc[-1].copy()
         last_date = train["ds"].iloc[-1]
-        # Set forecast start date to first day of next month.
-        start_date = (last_date + pd.DateOffset(months=1)).replace(day=1)
+        # Set forecast start date: one month after the last date (preserving the original day).
+        start_date = last_date + pd.DateOffset(months=1)
         preds = []
         for i in range(forecast_period):
             future_date = start_date + pd.DateOffset(months=i)
@@ -496,20 +494,23 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
             })
             pred = model.predict(pd.DataFrame([future]))[0]
             preds.append(pred)
-            # Update lag features for next iteration.
+            # Update lag features for iterative forecasting.
             for lag in range(max_lag, 1, -1):
                 last_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
             last_row["lag_1"] = pred
-            # **Update the date in last_row** to the current future date for correct seasonal features.
+            # Optionally update the 'ds' field if used in feature calculation.
             last_row["ds"] = future_date
 
+        # Create forecast DataFrame using 'M' frequency for end-of-month dates.
         forecast_df = pd.DataFrame({
-            "ds": pd.date_range(start=start_date, periods=forecast_period, freq="MS"),
+            "ds": pd.date_range(start=start_date, periods=forecast_period, freq="M"),
             "yhat": preds
         })
 
+        # Apply scenario adjustments.
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
+        # Evaluate model performance.
         match_len = min(len(test["y"]), len(forecast_df))
         rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
         mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
