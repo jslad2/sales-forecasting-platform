@@ -438,24 +438,16 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
                     demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
-        # If category adjustments are used, aggregate training data by date.
-        if category_scenarios:
-            train = train.groupby("ds", as_index=False).agg({"y": "sum"})
-        
         max_lag = min(12, len(train) - 1)
         rolling_windows = [3, 6] if len(train) > 6 else [3]
         data_xgb = train.copy()
 
-        # Create lag features.
         for lag in range(1, max_lag + 1):
             data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
-
-        # Create rolling statistics.
         for window in rolling_windows:
             data_xgb[f"rolling_mean_{window}"] = data_xgb["y"].rolling(window=window).mean()
             data_xgb[f"rolling_std_{window}"] = data_xgb["y"].rolling(window=window).std()
 
-        # Add time-based features.
         data_xgb["month"] = data_xgb["ds"].dt.month
         data_xgb["quarter"] = data_xgb["ds"].dt.quarter
         data_xgb["year"] = data_xgb["ds"].dt.year
@@ -463,53 +455,48 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
         data_xgb["cos_month"] = np.cos(2 * np.pi * data_xgb["month"] / 12)
 
         data_xgb.dropna(inplace=True)
-        feature_cols = [c for c in data_xgb.columns if c not in ["y", "ds"] and np.issubdtype(data_xgb[c].dtype, np.number)]
+        feature_cols = [c for c in data_xgb.columns if c not in ["y","ds"] and np.issubdtype(data_xgb[c].dtype, np.number)]
 
         model = XGBRegressor(
             n_estimators=50,
-            max_depth=min(5, max(2, len(train) // 10)),
-            learning_rate=0.1 if len(train) > 50 else 0.2,
+            max_depth=min(5, max(2, len(train)//10)),
+            learning_rate=0.1 if len(train)>50 else 0.2,
             objective="reg:squarederror",
             random_state=42,
             n_jobs=-1
         )
         model.fit(data_xgb[feature_cols], data_xgb["y"])
 
-        # Generate future features for forecasting.
+        # Generate future forecasts
         last_row = data_xgb.iloc[-1].copy()
         last_date = train["ds"].iloc[-1]
         preds = []
         for i in range(forecast_period):
-            future_date = last_date + pd.DateOffset(months=i + 1)
+            future_date = last_date + pd.DateOffset(months=i+1)
             future = {col: last_row[col] for col in feature_cols}
             future.update({
                 "month": future_date.month,
                 "quarter": future_date.quarter,
                 "year": future_date.year,
-                "sin_month": np.sin(2 * np.pi * future_date.month / 12),
-                "cos_month": np.cos(2 * np.pi * future_date.month / 12)
+                "sin_month": np.sin(2*np.pi*future_date.month/12),
+                "cos_month": np.cos(2*np.pi*future_date.month/12)
             })
             pred = model.predict(pd.DataFrame([future]))[0]
             preds.append(pred)
-            for lag in range(max_lag, 1, -1):
-                last_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
+            for lag in range(max_lag,1,-1):
+                last_row[f"lag_{lag}"] = last_row[f"lag_{lag-1}"]
             last_row["lag_1"] = pred
 
         forecast_df = pd.DataFrame({
             "ds": pd.date_range(start=last_date + pd.DateOffset(months=1), periods=forecast_period, freq="MS"),
             "yhat": preds
         })
-
-        # Apply scenario adjustments.
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
-        # Inverse differencing if needed.
-        if is_diff and last_historical_value is not None:
-            forecast_df = inverse_difference(forecast_df, last_historical_value)
-
-        match_len = min(len(test["y"]), len(forecast_df))
+        match_len = min(len(test), len(forecast_df))
         rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
         mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
+
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
 
     except Exception as e:
