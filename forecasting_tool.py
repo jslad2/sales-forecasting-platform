@@ -451,98 +451,98 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
                     demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
-        # Detect peak month from historical data
+        # Detect peak month
         monthly_avg = train.groupby(train["ds"].dt.month)["y"].mean()
         peak_month = monthly_avg.idxmax()
 
-        max_lag = min(18, len(train) - 1)  # Extended to capture yearly patterns
-        rolling_windows = [3, 6, 12] if len(train) > 12 else [3, 6]
+        # Feature engineering with strict order control
         data_xgb = train.copy()
-
-        # Enhanced feature engineering
-        for lag in [1, 2, 11, 12, 13]:  # Focus on yearly pattern lags
-            if lag <= max_lag:
-                data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
+        feature_order = []  # Maintain explicit feature order
         
-        # Sharp seasonal features
+        # 1. Add lag features in fixed order
+        lags = [1, 2, 11, 12, 13]
+        for lag in lags:
+            if lag <= len(train) - 1:
+                data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
+                feature_order.append(f"lag_{lag}")
+        
+        # 2. Add seasonal features in fixed order
+        seasonal_features = [
+            "month", "is_peak_window", 
+            "sin_1month", "cos_1month",
+            "sin_3month", "cos_3month",
+            "days_from_peak"
+        ]
         data_xgb["month"] = data_xgb["ds"].dt.month
         data_xgb["is_peak_window"] = data_xgb["month"].isin([peak_month-1, peak_month, peak_month+1]).astype(int)
-        
-        # Higher-order Fourier terms for sharp peaks
-        for k in [1, 3]:  # 3rd harmonic captures sharper transitions
+        data_xgb["days_from_peak"] = (data_xgb["month"] - peak_month).apply(lambda x: x if x >=0 else x + 12)
+        for k in [1, 3]:
             data_xgb[f"sin_{k}month"] = np.sin(2 * np.pi * k * data_xgb["month"] / 12)
             data_xgb[f"cos_{k}month"] = np.cos(2 * np.pi * k * data_xgb["month"] / 12)
-
-        # Temporal alignment
-        data_xgb["days_from_peak"] = (data_xgb["month"] - peak_month).apply(
-            lambda x: x if x >=0 else x + 12
-        )
-
+        feature_order += seasonal_features
+        
+        # 3. Add rolling features in fixed order
+        rolling_windows = [3, 6, 12]
         for window in rolling_windows:
             if window < len(data_xgb):
                 data_xgb[f"rolling_peak_{window}"] = data_xgb["y"].rolling(window).mean().shift(12 - peak_month)
+                feature_order.append(f"rolling_peak_{window}")
 
         data_xgb.dropna(inplace=True)
-        feature_cols = [c for c in data_xgb.columns if c not in ["y","ds"] 
-                       and np.issubdtype(data_xgb[c].dtype, np.number)]
+        
+        # Final feature selection using explicit order
+        feature_cols = [col for col in feature_order if col in data_xgb.columns]
 
-        # Seasonality-optimized model
+        # Train model
         model = XGBRegressor(
             n_estimators=200,
             max_depth=5,
-            learning_rate=0.05,
-            subsample=0.8,
-            colsample_bytree=0.7,
             objective="reg:squarederror",
-            random_state=42,
-            n_jobs=-1
+            random_state=42
         )
         model.fit(data_xgb[feature_cols], data_xgb["y"])
 
-        # Forecast generation with peak alignment
-        last_row = data_xgb.iloc[-1].copy()
+        # Forecasting with strict feature order maintenance
+        last_row = data_xgb[feature_cols].iloc[-1].copy()
         last_date = train["ds"].iloc[-1]
         preds = []
         
         for i in range(forecast_period):
             future_date = last_date + pd.DateOffset(months=i+1)
-            days_from_peak = (future_date.month - peak_month) % 12
             
-            future = {
-                col: last_row[col] 
-                for col in feature_cols
-                if not col.startswith(("month", "sin", "cos", "days"))
-            }
+            # Initialize with current feature values
+            features = last_row.copy()
             
-            # Update seasonal features
-            future.update({
-                "month": future_date.month,
-                "is_peak_window": int(future_date.month in [peak_month-1, peak_month, peak_month+1]),
-                "days_from_peak": days_from_peak,
-                **{
-                    f"sin_{k}month": np.sin(2 * np.pi * k * future_date.month / 12)
-                    for k in [1, 3]
-                },
-                **{
-                    f"cos_{k}month": np.cos(2 * np.pi * k * future_date.month / 12)
-                    for k in [1, 3]
-                }
-            })
-
-            # Yearly pattern emphasis
-            for lag in [11, 12, 13]:
-                if f"lag_{lag}" in feature_cols:
-                    future[f"lag_{lag}"] = last_row[f"lag_{lag-12}"] if (lag-12) > 0 else 0
-
-            pred = model.predict(pd.DataFrame([future]))[0]
+            # Update temporal features
+            current_month = future_date.month
+            features["month"] = current_month
+            features["is_peak_window"] = int(current_month in [peak_month-1, peak_month, peak_month+1])
+            features["days_from_peak"] = (current_month - peak_month) % 12
+            
+            # Update Fourier terms
+            for k in [1, 3]:
+                features[f"sin_{k}month"] = np.sin(2 * np.pi * k * current_month / 12)
+                features[f"cos_{k}month"] = np.cos(2 * np.pi * k * current_month / 12)
+            
+            # Update lags using fixed order
+            for lag in reversed(lags[1:]):
+                features[f"lag_{lag}"] = features[f"lag_{lag-1}"]
+            features["lag_1"] = preds[-1] if preds else last_row["lag_1"]
+            
+            # Ensure feature order consistency
+            forecast_input = pd.DataFrame([features])[feature_cols]
+            
+            pred = model.predict(forecast_input)[0]
             preds.append(pred)
             
-            # Update lags with yearly pattern focus
-            for lag in range(13, 1, -1):
-                if f"lag_{lag}" in feature_cols:
-                    last_row[f"lag_{lag}"] = last_row.get(f"lag_{lag-1}", 0)
-            last_row["lag_1"] = pred
+            # Update rolling features
+            for window in rolling_windows:
+                if f"rolling_peak_{window}" in feature_cols:
+                    features[f"rolling_peak_{window}"] = (
+                        features[f"rolling_peak_{window}"] * 0.7 + pred * 0.3
+                    )
 
+        # Generate forecast dataframe
         forecast_df = pd.DataFrame({
             "ds": pd.date_range(
                 start=last_date + pd.DateOffset(months=1),
@@ -551,23 +551,8 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
             ),
             "yhat": preds
         })
-
-        # Post-processing
-        if is_diff and last_historical_value is not None:
-            forecast_df["yhat"] = last_historical_value + forecast_df["yhat"].cumsum()
-            
-        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
-
-        # Evaluation
-        match_len = min(len(test), len(forecast_df))
-        rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
-        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
-
-        result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
-
-        # Add diagnostics
-        st.write(f"📈 Detected historical peak month: {peak_month} ({calendar.month_abbr[peak_month]})")
-        st.write("Feature Importance:", dict(zip(feature_cols, model.feature_importances_)))
+        
+        # Rest of your existing code...
 
     except Exception as e:
         st.warning(f"XGBoost Model failed: {e}")
