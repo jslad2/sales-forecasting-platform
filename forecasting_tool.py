@@ -451,130 +451,130 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
                     demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
+        # 1. Handle category aggregation
         if category_scenarios:
             train = train.groupby("ds", as_index=False).agg({"y": "sum"})
 
-        # =====================================================================
-        # 1. Enhanced Temporal Alignment
-        # =====================================================================
-        # Ensure consistent month-start alignment throughout
-        train = train.copy()
+        # 2. Ensure temporal alignment
         train["ds"] = train["ds"].dt.to_period("M").dt.start_time
+
+        # 3. Adaptive feature engineering
+        data_length = len(train)
+        max_lags = min(6, data_length - 1)  # Conservative lag limit
+        rolling_windows = [3] if data_length < 6 else [3, 6]
         
-        # =====================================================================
-        # 2. Adaptive Feature Engineering
-        # =====================================================================
-        data_xgb = train.copy()
+        data_xgb = train[["ds", "y"]].copy()
+
+        # 4. Safe lag feature creation
+        if max_lags > 0 and data_length > 3:
+            for lag in range(1, max_lags + 1):
+                data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
         
-        # Dynamic lag selection based on data length
-        max_lags = min(18, len(train) - 1)  # Balance between yearly and multi-year patterns
-        for lag in range(1, max_lags + 1):
-            data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
-        
-        # Enhanced cyclical encoding with multiple harmonics
-        data_xgb["month"] = data_xgb["ds"].dt.month
-        harmonics = 2  # Reduced from 3 to prevent overfitting
-        for k in range(1, harmonics + 1):
-            data_xgb[f"sin_{k}"] = np.sin(2 * np.pi * k * data_xgb["month"] / 12)
-            data_xgb[f"cos_{k}"] = np.cos(2 * np.pi * k * data_xgb["month"] / 12)
-        
-        # Quarter-aware rolling features
-        rolling_windows = [3, 6, 12] if len(train) >= 12 else [3, 6]
+        # 5. Rolling features with validation
         for window in rolling_windows:
-            if window < len(data_xgb):
+            if window < data_length:
                 data_xgb[f"roll_mean_{window}"] = data_xgb["y"].rolling(window).mean()
                 data_xgb[f"roll_std_{window}"] = data_xgb["y"].rolling(window).std()
-        
-        data_xgb.dropna(inplace=True)
-        feature_cols = [c for c in data_xgb.columns if c not in ["y", "ds"] 
-                        and np.issubdtype(data_xgb[c].dtype, np.number)]
 
-        # =====================================================================
-        # 3. Optimized Model Configuration
-        # =====================================================================
+        # 6. Temporal features
+        data_xgb["month"] = data_xgb["ds"].dt.month
+        data_xgb["sin_month"] = np.sin(2 * np.pi * data_xgb["month"] / 12)
+        data_xgb["cos_month"] = np.cos(2 * np.pi * data_xgb["month"] / 12)
+
+        # 7. Safe NA handling
+        initial_rows = len(data_xgb)
+        data_xgb.dropna(inplace=True)
+        
+        if len(data_xgb) == 0:
+            raise ValueError("No valid data remaining after feature engineering")
+        
+        if 'y' not in data_xgb.columns:
+            raise KeyError("Target variable 'y' missing in training data")
+
+        # 8. Feature selection
+        feature_cols = [col for col in data_xgb.columns 
+                       if col not in ["ds", "y"] 
+                       and not data_xgb[col].isnull().all()]
+
+        # 9. Fallback to basic features
+        if not feature_cols:
+            feature_cols = ["month", "sin_month", "cos_month"]
+            st.warning("Using minimal temporal features due to insufficient data")
+
+        # 10. Model configuration
         model = XGBRegressor(
-            n_estimators=200,  # Increased capacity for complex patterns
-            max_depth=5,       # Balance between learning and overfitting
-            learning_rate=0.05,  # Slower learning for better seasonal capture
-            subsample=0.7,
-            colsample_bytree=0.7,
+            n_estimators=50,
+            max_depth=3,
+            learning_rate=0.1,
             objective="reg:squarederror",
             random_state=42,
             n_jobs=-1
         )
         model.fit(data_xgb[feature_cols], data_xgb["y"])
 
-        # =====================================================================
-        # 4. Robust Recursive Forecasting
-        # =====================================================================
-        last_known_date = data_xgb["ds"].iloc[-1]
-        forecast_dates = pd.date_range(
-            start=last_known_date + pd.offsets.MonthBegin(1),
-            periods=forecast_period,
-            freq="MS"
-        )
+        # 11. Forecast generation
+        last_known = data_xgb.iloc[-1].copy()
+        start_date = data_xgb["ds"].iloc[-1] + pd.offsets.MonthBegin(1)
         
-        # Initialize forecasting state
-        state = data_xgb.iloc[-1][feature_cols].copy()
         preds = []
-        
         for _ in range(forecast_period):
-            # Update temporal features
-            current_date = forecast_dates[len(preds)]
-            state["month"] = current_date.month
-            for k in range(1, harmonics + 1):
-                state[f"sin_{k}"] = np.sin(2 * np.pi * k * current_date.month / 12)
-                state[f"cos_{k}"] = np.cos(2 * np.pi * k * current_date.month / 12)
+            current_date = start_date + pd.DateOffset(months=len(preds))
             
-            # Update lag features (shift previous values)
-            for lag in range(max_lags, 1, -1):
-                state[f"lag_{lag}"] = state[f"lag_{lag-1}"]
-            state["lag_1"] = state["y"] if len(preds) == 0 else preds[-1]
+            # Feature updates
+            features = {
+                "month": current_date.month,
+                "sin_month": np.sin(2 * np.pi * current_date.month / 12),
+                "cos_month": np.cos(2 * np.pi * current_date.month / 12)
+            }
             
-            # Predict and store
-            pred = model.predict(pd.DataFrame([state]))[0]
+            # Update lag features
+            if max_lags > 0:
+                for lag in range(max_lags, 1, -1):
+                    features[f"lag_{lag}"] = last_known.get(f"lag_{lag-1}", 0)
+                features["lag_1"] = last_known["y"]
+
+            # Update rolling features
+            for window in rolling_windows:
+                if f"roll_mean_{window}" in feature_cols:
+                    features[f"roll_mean_{window}"] = last_known.get(
+                        f"roll_mean_{window}", 
+                        data_xgb["y"].mean()
+                    )
+
+            pred = model.predict(pd.DataFrame([features]))[0]
             preds.append(pred)
-        
-        # =====================================================================
-        # 5. Post-Processing & Evaluation
-        # =====================================================================
+            last_known["y"] = pred
+
+        # 12. Create forecast dataframe
         forecast_df = pd.DataFrame({
-            "ds": forecast_dates,
+            "ds": pd.date_range(start=start_date, periods=forecast_period, freq="MS"),
             "yhat": preds
         })
 
-        # Apply differencing reversal if needed
+        # 13. Differencing reversal
         if is_diff and last_historical_value is not None:
-            forecast_df["yhat"] = inverse_difference(
-                forecast_df["yhat"], 
-                last_historical_value
-            )
+            forecast_df["yhat"] = last_historical_value + forecast_df["yhat"].cumsum()
 
-        forecast_df = adjust_forecast(forecast_df, demand_shock, 
-                                    seasonality_adjustment, external_shock,
-                                    category_scenarios)
+        # 14. Apply scenario adjustments
+        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
-        # Align test data with forecast dates
-        test_aligned = test.set_index("ds").reindex(forecast_dates).reset_index()
-        match_mask = test_aligned["index"].isin(test["ds"])
+        # 15. Evaluation
+        aligned_test = test.set_index("ds").reindex(forecast_df["ds"]).reset_index()
+        valid_mask = aligned_test["y"].notna()
         
-        if match_mask.any():
-            rmse = mean_squared_error(
-                test_aligned.loc[match_mask, "y"], 
-                forecast_df.loc[match_mask, "yhat"], 
-                squared=False
-            )
-            mape = mean_absolute_percentage_error(
-                test_aligned.loc[match_mask, "y"], 
-                forecast_df.loc[match_mask, "yhat"]
-            )
+        if valid_mask.any():
+            rmse = mean_squared_error(aligned_test[valid_mask]["y"], forecast_df[valid_mask]["yhat"], squared=False)
+            mape = mean_absolute_percentage_error(aligned_test[valid_mask]["y"], forecast_df[valid_mask]["yhat"])
         else:
             rmse, mape = np.nan, np.nan
 
-        result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
+        result = {"RMSE": rmse, "MAPE": mape, "Forecast": forecast_df}
 
     except Exception as e:
-        st.warning(f"XGBoost Model failed: {e}")
+        st.error(f"XGBoost Error: {str(e)}")
+        st.error("Debug Info: " + 
+                f"Train shape: {train.shape if 'train' in locals() else 'N/A'}, " +
+                f"DataXGB cols: {data_xgb.columns.tolist() if 'data_xgb' in locals() else 'N/A'}")
 
     return "XGBoost", result
 
