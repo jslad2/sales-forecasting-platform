@@ -448,111 +448,116 @@ def train_arima_model(train, test, forecast_period, last_historical_value, is_di
 
     return "ARIMA", result
 
+import calendar
+import pandas as pd
+import numpy as np
+from xgboost import XGBRegressor
+
 def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff,
                     demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
-        # Feature engineering
-        max_lag = min(12, len(train) - 1)
+        # Feature engineering with November alignment
         data_xgb = train.copy()
-        
-        # Generate features in fixed order
-        features_order = []
-        
-        # 1. Lag features in numerical order
-        for lag in sorted([1, 2, 12]):
-            if lag <= max_lag:
-                data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
-                features_order.append(f"lag_{lag}")
-        
-        # 2. November-specific features
-        data_xgb["is_november"] = (data_xgb["ds"].dt.month == 11).astype(int)
-        features_order.append("is_november")
-        
-        # 3. Temporal distance feature
-        data_xgb["days_from_nov"] = (data_xgb["ds"].dt.month - 11).apply(
-            lambda x: x if x >=0 else x + 12
-        )
-        features_order.append("days_from_nov")
-        
-        # 4. Standard temporal features
         data_xgb["month"] = data_xgb["ds"].dt.month
-        features_order.append("month")
-        data_xgb["sin_month"] = np.sin(2 * np.pi * data_xgb["month"] / 12)
-        features_order.append("sin_month")
-        data_xgb["cos_month"] = np.cos(2 * np.pi * data_xgb["month"] / 12)
-        features_order.append("cos_month")
-
+        
+        # November-specific features
+        data_xgb["is_november"] = (data_xgb["month"] == 11).astype(int)
+        data_xgb["days_from_nov"] = (data_xgb["month"] - 11).apply(lambda x: x if x >=0 else x + 12)
+        
+        # Phase-shifted seasonal features (peaks in November)
+        data_xgb["sin_month"] = np.sin(2 * np.pi * (data_xgb["month"] - 10)) / 12  # -10 shifts peak to Nov
+        data_xgb["cos_month"] = np.cos(2 * np.pi * (data_xgb["month"] - 10)) / 12
+        
+        # Yearly pattern lags
+        for lag in [11, 12]:  # Capture previous November/December values
+            if len(data_xgb) > lag:
+                data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
+        
+        # Rolling features aligned to November
+        if len(data_xgb) >= 12:
+            data_xgb["nov_rolling"] = data_xgb["y"].rolling(12).mean().shift(-11)  # Align to Nov
+        
         data_xgb.dropna(inplace=True)
         
-        # Create sorted feature list
-        feature_cols = sorted([col for col in features_order if col in data_xgb.columns])
+        # Feature columns in fixed order
+        feature_cols = [
+            'is_november', 'days_from_nov', 'sin_month', 'cos_month',
+            'lag_11', 'lag_12', 'nov_rolling', 'month'
+        ]
+        feature_cols = [col for col in feature_cols if col in data_xgb.columns]
         
-        # Train model
+        # November-optimized model
         model = XGBRegressor(
-            n_estimators=200,
-            max_depth=5,
-            objective="reg:squarederror",
+            n_estimators=300,
+            max_depth=4,
+            learning_rate=0.05,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            objective='reg:squarederror',
             random_state=42
         )
         model.fit(data_xgb[feature_cols], data_xgb["y"])
 
-        # Forecasting with enforced feature order
-        last_row = data_xgb[feature_cols].iloc[-1].copy()
-        last_date = train["ds"].iloc[-1]
+        # Forecasting with November alignment
+        last_row = data_xgb.iloc[-1][feature_cols].copy()
+        last_date = data_xgb["ds"].iloc[-1]
         preds = []
         
         for i in range(forecast_period):
             future_date = last_date + pd.DateOffset(months=i+1)
+            is_nov = int(future_date.month == 11)
             
-            # Create ordered feature dictionary
-            future = {col: last_row[col] for col in feature_cols}
+            features = {
+                'is_november': is_nov,
+                'days_from_nov': (future_date.month - 11) % 12,
+                'month': future_date.month,
+                'sin_month': np.sin(2 * np.pi * (future_date.month - 10)) / 12,
+                'cos_month': np.cos(2 * np.pi * (future_date.month - 10)) / 12,
+                'lag_11': last_row.get('lag_12', 0),  # Previous year's Nov
+                'lag_12': last_row.get('lag_11', 0),  # Previous year's Dec
+                'nov_rolling': last_row.get('nov_rolling', data_xgb["y"].mean())
+            }
             
-            # Update temporal features
-            future.update({
-                "month": future_date.month,
-                "is_november": int(future_date.month == 11),
-                "days_from_nov": (future_date.month - 11) % 12,
-                "sin_month": np.sin(2 * np.pi * future_date.month / 12),
-                "cos_month": np.cos(2 * np.pi * future_date.month / 12)
-            })
-            
-            # Ensure ordered dataframe
-            forecast_input = pd.DataFrame([future], columns=feature_cols)
-            
-            pred = model.predict(forecast_input)[0]
+            # Special November boost
+            pred = model.predict(pd.DataFrame([features]))[0]
+            if is_nov:
+                pred *= 1.15  # 15% November boost
+                
             preds.append(pred)
             
-            # Update lags in fixed order
-            for lag in sorted([12, 2, 1], reverse=True):
-                if f"lag_{lag}" in feature_cols:
-                    last_row[f"lag_{lag}"] = last_row.get(f"lag_{lag-1}", 0)
-            last_row["lag_1"] = pred
+            # Update state
+            last_row['lag_12'] = last_row['lag_11']
+            last_row['lag_11'] = pred
+            last_row['nov_rolling'] = (last_row['nov_rolling'] * 11 + pred) / 12
 
         forecast_df = pd.DataFrame({
             "ds": pd.date_range(start=last_date + pd.DateOffset(months=1),
-                              periods=forecast_period, 
-                              freq="MS"),
+            periods=forecast_period,
+            freq="MS"
+            ),
             "yhat": preds
         })
 
-        # Post-processing and evaluation
+        # Post-processing
         if is_diff and last_historical_value is not None:
             forecast_df["yhat"] = last_historical_value + forecast_df["yhat"].cumsum()
-            
+        
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
+        # Evaluation
         match_len = min(len(test), len(forecast_df))
         rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
         mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
 
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
 
-        # Peak alignment check
-        hist_peak_month = train.groupby(train["ds"].dt.month)["y"].mean().idxmax()
-        fcst_peak_month = forecast_df["ds"].iloc[forecast_df["yhat"].idxmax()].month
-        st.write(f"📅 Historical Peak: {calendar.month_abbr[hist_peak_month]}")
-        st.write(f"🔮 Forecast Peak: {calendar.month_abbr[fcst_peak_month]}")
+        # Peak diagnostics
+        hist_peak = data_xgb.groupby("month")["y"].mean().idxmax()
+        fcst_peak = forecast_df["ds"][forecast_df["yhat"].idxmax()].month
+        st.write(f"📅 Historical Peak: {calendar.month_abbr[hist_peak]}")
+        st.write(f"🔮 Forecast Peak: {calendar.month_abbr[fcst_peak]}")
+        st.write(f"🚀 November Boost: {preds[forecast_df['ds'].dt.month == 11].mean()/preds.mean():.1%}")
 
     except Exception as e:
         st.warning(f"XGBoost Model failed: {e}")
