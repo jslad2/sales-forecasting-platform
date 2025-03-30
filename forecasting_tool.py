@@ -438,89 +438,121 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
                     demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
-        # If category adjustments are used, aggregate training data by date.
+        # Aggregate data if category scenarios exist
         if category_scenarios:
             train = train.groupby("ds", as_index=False).agg({"y": "sum"})
+
+        # Dynamic lag selection based on data length
+        max_possible_lags = min(24, len(train) - 1)  # Increased max lags for better seasonality capture
+        rolling_windows = [3, 6, 12] if len(train) > 12 else [3, 6]
         
-        # Do not alter the original 'ds' dates.
-        max_lag = min(12, len(train) - 1)
-        rolling_windows = [3, 6] if len(train) > 6 else [3]
         data_xgb = train.copy()
-
-        # Create lag features.
-        for lag in range(1, max_lag + 1):
+        
+        # Enhanced feature engineering
+        # 1. Lag features with dynamic range
+        for lag in range(1, max_possible_lags + 1):
             data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
-        # Create rolling statistics.
+        
+        # 2. Rolling statistics with adaptive windows
         for window in rolling_windows:
-            data_xgb[f"rolling_mean_{window}"] = data_xgb["y"].rolling(window=window).mean()
-            data_xgb[f"rolling_std_{window}"] = data_xgb["y"].rolling(window=window).std()
-
-        # Add time-based features.
+            if len(train) > window:
+                data_xgb[f"rolling_mean_{window}"] = data_xgb["y"].rolling(window=window).mean()
+                data_xgb[f"rolling_std_{window}"] = data_xgb["y"].rolling(window=window).std()
+        
+        # 3. Enhanced temporal features
         data_xgb["month"] = data_xgb["ds"].dt.month
         data_xgb["quarter"] = data_xgb["ds"].dt.quarter
         data_xgb["year"] = data_xgb["ds"].dt.year
-        data_xgb["sin_month"] = np.sin(2 * np.pi * data_xgb["month"] / 12)
-        data_xgb["cos_month"] = np.cos(2 * np.pi * data_xgb["month"] / 12)
+        
+        # 4. Higher-order Fourier terms for seasonal capture
+        n_fourier = 3  # Captures sharper seasonal transitions
+        for k in range(1, n_fourier+1):
+            data_xgb[f"sin_{k}month"] = np.sin(2 * np.pi * k * data_xgb["month"] / 12)
+            data_xgb[f"cos_{k}month"] = np.cos(2 * np.pi * k * data_xgb["month"] / 12)
 
         data_xgb.dropna(inplace=True)
-        feature_cols = [c for c in data_xgb.columns if c not in ["y", "ds"] and np.issubdtype(data_xgb[c].dtype, np.number)]
+        feature_cols = [c for c in data_xgb.columns if c not in ["y", "ds"] 
+                        and np.issubdtype(data_xgb[c].dtype, np.number)]
 
-        # Train the XGBoost model.
+        # Optimized model parameters
         model = XGBRegressor(
-            n_estimators=50,
-            max_depth=min(5, max(2, len(train) // 10)),
-            learning_rate=0.1 if len(train) > 50 else 0.2,
+            n_estimators=100,  # Increased capacity for seasonal patterns
+            max_depth=6,       # Deeper trees for complex relationships
+            learning_rate=0.1,
+            subsample=0.8,
+            colsample_bytree=0.8,
             objective="reg:squarederror",
             random_state=42,
             n_jobs=-1
         )
         model.fit(data_xgb[feature_cols], data_xgb["y"])
 
-        # Generate future forecasts.
+        # Forecast generation with proper temporal alignment
         last_row = data_xgb.iloc[-1].copy()
         last_date = train["ds"].iloc[-1]
-        # Set forecast start date: one month after the last date (preserving the original day).
-        start_date = last_date + pd.DateOffset(months=1)
+        
+        # Align to month start (MS) instead of month end (M)
+        start_date = last_date + pd.offsets.MonthBegin(1)
         preds = []
+        
         for i in range(forecast_period):
             future_date = start_date + pd.DateOffset(months=i)
-            future = {col: last_row[col] for col in feature_cols}
-            future.update({
+            future_features = {
                 "month": future_date.month,
                 "quarter": future_date.quarter,
-                "year": future_date.year,
-                "sin_month": np.sin(2 * np.pi * future_date.month / 12),
-                "cos_month": np.cos(2 * np.pi * future_date.month / 12)
-            })
-            pred = model.predict(pd.DataFrame([future]))[0]
+                "year": future_date.year
+            }
+            
+            # Update Fourier features
+            for k in range(1, n_fourier+1):
+                future_features[f"sin_{k}month"] = np.sin(2 * np.pi * k * future_date.month / 12)
+                future_features[f"cos_{k}month"] = np.cos(2 * np.pi * k * future_date.month / 12)
+            
+            # Update lag features iteratively
+            for lag in range(max_possible_lags, 1, -1):
+                future_features[f"lag_{lag}"] = last_row[f"lag_{lag-1}"]
+            future_features["lag_1"] = last_row["y"]
+            
+            # Add rolling features
+            for window in rolling_windows:
+                if f"rolling_mean_{window}" in feature_cols:
+                    future_features[f"rolling_mean_{window}"] = (
+                        last_row[f"rolling_mean_{window}"] * (window-1) + last_row["y"]
+                    ) / window
+                
+            pred = model.predict(pd.DataFrame([future_features]))[0]
             preds.append(pred)
-            # Update lag features for iterative forecasting.
-            for lag in range(max_lag, 1, -1):
-                last_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
-            last_row["lag_1"] = pred
-            # Optionally update the 'ds' field if used in feature calculation.
-            last_row["ds"] = future_date
+            last_row["y"] = pred  # Update the key value for next iteration
 
-        # Create forecast DataFrame using 'M' frequency for end-of-month dates.
+        # Create properly aligned forecast DataFrame
         forecast_df = pd.DataFrame({
-            "ds": pd.date_range(start=start_date, periods=forecast_period, freq="M"),
+            "ds": pd.date_range(
+                start=start_date,
+                periods=forecast_period,
+                freq="MS"  # Month start alignment
+            ),
             "yhat": preds
         })
 
-        # Apply scenario adjustments.
-        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
+        # Apply scenario adjustments
+        forecast_df = adjust_forecast(forecast_df, demand_shock, 
+                                    seasonality_adjustment, external_shock,
+                                    category_scenarios)
 
-        # Evaluate model performance.
+        # Evaluation metrics
         match_len = min(len(test["y"]), len(forecast_df))
-        rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
-        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
+        rmse = mean_squared_error(test["y"].iloc[:match_len], 
+                                forecast_df["yhat"].iloc[:match_len], 
+                                squared=False)
+        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len],
+                                            forecast_df["yhat"].iloc[:match_len])
+        
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
 
     except Exception as e:
         st.warning(f"XGBoost Model failed: {e}")
 
     return "XGBoost", result
-
 
 def train_automl_model(train, test, forecast_period, last_historical_value, is_diff, 
                        demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, time_budget=None):
