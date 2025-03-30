@@ -348,6 +348,11 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
                         is_diff, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
+        # If category adjustments are used, aggregate training data by date.
+        if category_scenarios:
+            train = train.groupby("ds", as_index=False).agg({"y": "sum"})
+        
+        # Initialize Prophet with tuned parameters.
         model = Prophet(
             seasonality_mode=best_params["seasonality_mode"],
             changepoint_prior_scale=best_params["changepoint_prior_scale"]
@@ -357,14 +362,22 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         except Exception as e:
             st.warning(f"Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
 
+        # Fit the model.
         model.fit(train)
+        
+        # Create a future dataframe.
         future = model.make_future_dataframe(periods=forecast_period, freq="MS", include_history=False)
         forecast = model.predict(future)
         forecast = forecast[forecast["ds"] > train["ds"].max()]
 
-        # Apply only future adjustments
+        # Apply scenario adjustments.
         forecast = adjust_forecast(forecast, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
+        # Inverse differencing if needed.
+        if is_diff and last_historical_value is not None:
+            forecast = inverse_difference(forecast, last_historical_value)
+
+        # Evaluate on the overlapping period.
         match_len = min(len(test["y"]), len(forecast))
         rmse = mean_squared_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len], squared=False)
         mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len])
@@ -438,126 +451,78 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
                     demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
+        # If category adjustments are used, aggregate training data by date.
         if category_scenarios:
             train = train.groupby("ds", as_index=False).agg({"y": "sum"})
-
-        # =====================================================================
-        # 1. Enhanced Temporal Alignment
-        # =====================================================================
-        # Ensure consistent month-start alignment throughout
-        train = train.copy()
-        train["ds"] = train["ds"].dt.to_period("M").dt.start_time
         
-        # =====================================================================
-        # 2. Adaptive Feature Engineering
-        # =====================================================================
+        max_lag = min(12, len(train) - 1)
+        rolling_windows = [3, 6] if len(train) > 6 else [3]
         data_xgb = train.copy()
-        
-        # Dynamic lag selection based on data length
-        max_lags = min(18, len(train) - 1)  # Balance between yearly and multi-year patterns
-        for lag in range(1, max_lags + 1):
-            data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
-        
-        # Enhanced cyclical encoding with multiple harmonics
-        data_xgb["month"] = data_xgb["ds"].dt.month
-        harmonics = 2  # Reduced from 3 to prevent overfitting
-        for k in range(1, harmonics + 1):
-            data_xgb[f"sin_{k}"] = np.sin(2 * np.pi * k * data_xgb["month"] / 12)
-            data_xgb[f"cos_{k}"] = np.cos(2 * np.pi * k * data_xgb["month"] / 12)
-        
-        # Quarter-aware rolling features
-        rolling_windows = [3, 6, 12] if len(train) >= 12 else [3, 6]
-        for window in rolling_windows:
-            if window < len(data_xgb):
-                data_xgb[f"roll_mean_{window}"] = data_xgb["y"].rolling(window).mean()
-                data_xgb[f"roll_std_{window}"] = data_xgb["y"].rolling(window).std()
-        
-        data_xgb.dropna(inplace=True)
-        feature_cols = [c for c in data_xgb.columns if c not in ["y", "ds"] 
-                        and np.issubdtype(data_xgb[c].dtype, np.number)]
 
-        # =====================================================================
-        # 3. Optimized Model Configuration
-        # =====================================================================
+        # Create lag features.
+        for lag in range(1, max_lag + 1):
+            data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
+
+        # Create rolling statistics.
+        for window in rolling_windows:
+            data_xgb[f"rolling_mean_{window}"] = data_xgb["y"].rolling(window=window).mean()
+            data_xgb[f"rolling_std_{window}"] = data_xgb["y"].rolling(window=window).std()
+
+        # Add time-based features.
+        data_xgb["month"] = data_xgb["ds"].dt.month
+        data_xgb["quarter"] = data_xgb["ds"].dt.quarter
+        data_xgb["year"] = data_xgb["ds"].dt.year
+        data_xgb["sin_month"] = np.sin(2 * np.pi * data_xgb["month"] / 12)
+        data_xgb["cos_month"] = np.cos(2 * np.pi * data_xgb["month"] / 12)
+
+        data_xgb.dropna(inplace=True)
+        feature_cols = [c for c in data_xgb.columns if c not in ["y", "ds"] and np.issubdtype(data_xgb[c].dtype, np.number)]
+
         model = XGBRegressor(
-            n_estimators=200,  # Increased capacity for complex patterns
-            max_depth=5,       # Balance between learning and overfitting
-            learning_rate=0.05,  # Slower learning for better seasonal capture
-            subsample=0.7,
-            colsample_bytree=0.7,
+            n_estimators=50,
+            max_depth=min(5, max(2, len(train) // 10)),
+            learning_rate=0.1 if len(train) > 50 else 0.2,
             objective="reg:squarederror",
             random_state=42,
             n_jobs=-1
         )
         model.fit(data_xgb[feature_cols], data_xgb["y"])
 
-        # =====================================================================
-        # 4. Robust Recursive Forecasting
-        # =====================================================================
-        last_known_date = data_xgb["ds"].iloc[-1]
-        forecast_dates = pd.date_range(
-            start=last_known_date + pd.offsets.MonthBegin(1),
-            periods=forecast_period,
-            freq="MS"
-        )
-        
-        # Initialize forecasting state
-        state = data_xgb.iloc[-1][feature_cols].copy()
+        # Generate future features for forecasting.
+        last_row = data_xgb.iloc[-1].copy()
+        last_date = train["ds"].iloc[-1]
         preds = []
-        
-        for _ in range(forecast_period):
-            # Update temporal features
-            current_date = forecast_dates[len(preds)]
-            state["month"] = current_date.month
-            for k in range(1, harmonics + 1):
-                state[f"sin_{k}"] = np.sin(2 * np.pi * k * current_date.month / 12)
-                state[f"cos_{k}"] = np.cos(2 * np.pi * k * current_date.month / 12)
-            
-            # Update lag features (shift previous values)
-            for lag in range(max_lags, 1, -1):
-                state[f"lag_{lag}"] = state[f"lag_{lag-1}"]
-            state["lag_1"] = state["y"] if len(preds) == 0 else preds[-1]
-            
-            # Predict and store
-            pred = model.predict(pd.DataFrame([state]))[0]
+        for i in range(forecast_period):
+            future_date = last_date + pd.DateOffset(months=i + 1)
+            future = {col: last_row[col] for col in feature_cols}
+            future.update({
+                "month": future_date.month,
+                "quarter": future_date.quarter,
+                "year": future_date.year,
+                "sin_month": np.sin(2 * np.pi * future_date.month / 12),
+                "cos_month": np.cos(2 * np.pi * future_date.month / 12)
+            })
+            pred = model.predict(pd.DataFrame([future]))[0]
             preds.append(pred)
-        
-        # =====================================================================
-        # 5. Post-Processing & Evaluation
-        # =====================================================================
+            for lag in range(max_lag, 1, -1):
+                last_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
+            last_row["lag_1"] = pred
+
         forecast_df = pd.DataFrame({
-            "ds": forecast_dates,
+            "ds": pd.date_range(start=last_date + pd.DateOffset(months=1), periods=forecast_period, freq="MS"),
             "yhat": preds
         })
 
-        # Apply differencing reversal if needed
+        # Apply scenario adjustments.
+        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
+
+        # Inverse differencing if needed.
         if is_diff and last_historical_value is not None:
-            forecast_df["yhat"] = inverse_difference(
-                forecast_df["yhat"], 
-                last_historical_value
-            )
+            forecast_df = inverse_difference(forecast_df, last_historical_value)
 
-        forecast_df = adjust_forecast(forecast_df, demand_shock, 
-                                    seasonality_adjustment, external_shock,
-                                    category_scenarios)
-
-        # Align test data with forecast dates
-        test_aligned = test.set_index("ds").reindex(forecast_dates).reset_index()
-        match_mask = test_aligned["index"].isin(test["ds"])
-        
-        if match_mask.any():
-            rmse = mean_squared_error(
-                test_aligned.loc[match_mask, "y"], 
-                forecast_df.loc[match_mask, "yhat"], 
-                squared=False
-            )
-            mape = mean_absolute_percentage_error(
-                test_aligned.loc[match_mask, "y"], 
-                forecast_df.loc[match_mask, "yhat"]
-            )
-        else:
-            rmse, mape = np.nan, np.nan
-
+        match_len = min(len(test["y"]), len(forecast_df))
+        rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
+        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
 
     except Exception as e:
