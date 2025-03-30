@@ -380,10 +380,6 @@ def train_arima_model(train, test, forecast_period, last_historical_value, is_di
                       demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
-        # If category adjustments are used, aggregate training data by date.
-        if category_scenarios:
-            train = train.groupby("ds", as_index=False).agg({"y": "sum"})
-        
         # Detect seasonality
         try:
             decomposition = seasonal_decompose(train["y"], model="additive", period=12)
@@ -395,7 +391,6 @@ def train_arima_model(train, test, forecast_period, last_historical_value, is_di
             st.warning(f"Error in seasonality analysis: {e}")
             seasonal = False
 
-        # Fit auto_arima
         model = auto_arima(
             train["y"],
             seasonal=seasonal,
@@ -412,18 +407,15 @@ def train_arima_model(train, test, forecast_period, last_historical_value, is_di
         )
 
         preds = model.predict(n_periods=forecast_period)
-        forecast_dates = pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1),
-                                       periods=len(preds), freq="MS")
+        forecast_dates = pd.date_range(
+            start=train["ds"].iloc[-1] + pd.DateOffset(months=1),
+            periods=len(preds),
+            freq="MS"
+        )
         forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": preds})
-
-        # Apply scenario adjustments.
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
-        # Inverse differencing if needed.
-        if is_diff and last_historical_value is not None:
-            forecast_df = inverse_difference(forecast_df, last_historical_value)
-
-        match_len = min(len(test["y"]), len(forecast_df))
+        match_len = min(len(test), len(forecast_df))
         rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
         mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
 
@@ -438,115 +430,65 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
                     demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
-        # Aggregate data if category scenarios exist
-        if category_scenarios:
-            train = train.groupby("ds", as_index=False).agg({"y": "sum"})
-
-        # Dynamic lag selection based on data length
-        max_possible_lags = min(24, len(train) - 1)  # Increased max lags for better seasonality capture
-        rolling_windows = [3, 6, 12] if len(train) > 12 else [3, 6]
-        
+        max_lag = min(12, len(train) - 1)
+        rolling_windows = [3, 6] if len(train) > 6 else [3]
         data_xgb = train.copy()
-        
-        # Enhanced feature engineering
-        # 1. Lag features with dynamic range
-        for lag in range(1, max_possible_lags + 1):
+
+        for lag in range(1, max_lag + 1):
             data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
-        
-        # 2. Rolling statistics with adaptive windows
         for window in rolling_windows:
-            if len(train) > window:
-                data_xgb[f"rolling_mean_{window}"] = data_xgb["y"].rolling(window=window).mean()
-                data_xgb[f"rolling_std_{window}"] = data_xgb["y"].rolling(window=window).std()
-        
-        # 3. Enhanced temporal features
+            data_xgb[f"rolling_mean_{window}"] = data_xgb["y"].rolling(window=window).mean()
+            data_xgb[f"rolling_std_{window}"] = data_xgb["y"].rolling(window=window).std()
+
         data_xgb["month"] = data_xgb["ds"].dt.month
         data_xgb["quarter"] = data_xgb["ds"].dt.quarter
         data_xgb["year"] = data_xgb["ds"].dt.year
-        
-        # 4. Higher-order Fourier terms for seasonal capture
-        n_fourier = 3  # Captures sharper seasonal transitions
-        for k in range(1, n_fourier+1):
-            data_xgb[f"sin_{k}month"] = np.sin(2 * np.pi * k * data_xgb["month"] / 12)
-            data_xgb[f"cos_{k}month"] = np.cos(2 * np.pi * k * data_xgb["month"] / 12)
+        data_xgb["sin_month"] = np.sin(2 * np.pi * data_xgb["month"] / 12)
+        data_xgb["cos_month"] = np.cos(2 * np.pi * data_xgb["month"] / 12)
 
         data_xgb.dropna(inplace=True)
-        feature_cols = [c for c in data_xgb.columns if c not in ["y", "ds"] 
-                        and np.issubdtype(data_xgb[c].dtype, np.number)]
+        feature_cols = [c for c in data_xgb.columns if c not in ["y","ds"] and np.issubdtype(data_xgb[c].dtype, np.number)]
 
-        # Optimized model parameters
         model = XGBRegressor(
-            n_estimators=100,  # Increased capacity for seasonal patterns
-            max_depth=6,       # Deeper trees for complex relationships
-            learning_rate=0.1,
-            subsample=0.8,
-            colsample_bytree=0.8,
+            n_estimators=50,
+            max_depth=min(5, max(2, len(train)//10)),
+            learning_rate=0.1 if len(train)>50 else 0.2,
             objective="reg:squarederror",
             random_state=42,
             n_jobs=-1
         )
         model.fit(data_xgb[feature_cols], data_xgb["y"])
 
-        # Forecast generation with proper temporal alignment
+        # Generate future forecasts
         last_row = data_xgb.iloc[-1].copy()
         last_date = train["ds"].iloc[-1]
-        
-        # Align to month start (MS) instead of month end (M)
-        start_date = last_date + pd.offsets.MonthBegin(1)
         preds = []
-        
         for i in range(forecast_period):
-            future_date = start_date + pd.DateOffset(months=i)
-            future_features = {
+            future_date = last_date + pd.DateOffset(months=i+1)
+            future = {col: last_row[col] for col in feature_cols}
+            future.update({
                 "month": future_date.month,
                 "quarter": future_date.quarter,
-                "year": future_date.year
-            }
-            
-            # Update Fourier features
-            for k in range(1, n_fourier+1):
-                future_features[f"sin_{k}month"] = np.sin(2 * np.pi * k * future_date.month / 12)
-                future_features[f"cos_{k}month"] = np.cos(2 * np.pi * k * future_date.month / 12)
-            
-            # Update lag features iteratively
-            for lag in range(max_possible_lags, 1, -1):
-                future_features[f"lag_{lag}"] = last_row[f"lag_{lag-1}"]
-            future_features["lag_1"] = last_row["y"]
-            
-            # Add rolling features
-            for window in rolling_windows:
-                if f"rolling_mean_{window}" in feature_cols:
-                    future_features[f"rolling_mean_{window}"] = (
-                        last_row[f"rolling_mean_{window}"] * (window-1) + last_row["y"]
-                    ) / window
-                
-            pred = model.predict(pd.DataFrame([future_features]))[0]
+                "year": future_date.year,
+                "sin_month": np.sin(2*np.pi*future_date.month/12),
+                "cos_month": np.cos(2*np.pi*future_date.month/12)
+            })
+            pred = model.predict(pd.DataFrame([future]))[0]
             preds.append(pred)
-            last_row["y"] = pred  # Update the key value for next iteration
+            for lag in range(max_lag,1,-1):
+                last_row[f"lag_{lag}"] = last_row[f"lag_{lag-1}"]
+            last_row["lag_1"] = pred
 
-        # Create properly aligned forecast DataFrame
         forecast_df = pd.DataFrame({
-            "ds": pd.date_range(
-                start=start_date,
-                periods=forecast_period,
-                freq="MS"  # Month start alignment
-            ),
+            "ds": pd.date_range(start=last_date + pd.DateOffset(months=1), periods=forecast_period, freq="MS"),
             "yhat": preds
         })
+        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
-        # Apply scenario adjustments
-        forecast_df = adjust_forecast(forecast_df, demand_shock, 
-                                    seasonality_adjustment, external_shock,
-                                    category_scenarios)
+        match_len = min(len(test), len(forecast_df))
+        rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
+        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
 
-        # Evaluation metrics
-        match_len = min(len(test["y"]), len(forecast_df))
-        rmse = mean_squared_error(test["y"].iloc[:match_len], 
-                                forecast_df["yhat"].iloc[:match_len], 
-                                squared=False)
-        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len],
-                                            forecast_df["yhat"].iloc[:match_len])
-        
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
 
     except Exception as e:
@@ -554,7 +496,7 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
 
     return "XGBoost", result
 
-def train_automl_model(train, test, forecast_period, last_historical_value, is_diff, 
+def train_automl_model(train, test, forecast_period, last_historical_value, is_diff,
                        demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, time_budget=None):
     """
     Train an AutoML model using FLAML for time series forecasting.
@@ -576,24 +518,17 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
     """
     result = {}
     try:
-        # Feature Engineering: work on a copy of the training data.
+        # Feature Engineering
         data_automl = train.copy()
 
-        # If category adjustments are used, aggregate the data by date (summing up "y")
-        if category_scenarios:
-            data_automl = data_automl.groupby("ds", as_index=False).agg({"y": "sum"})
-
-        # Use the aggregated dataset's length for subsequent calculations.
-        n = len(data_automl)
-
-        # Determine maximum lag based on aggregated dataset size
-        max_lag = min(24, n - 1)
-        if n <= 6:
-            max_lag = min(3, n - 1)
-        elif n <= 12:
-            max_lag = min(6, n - 1)
-        elif n <= 24:
-            max_lag = min(12, n - 1)
+        # Determine maximum lag based on dataset size
+        max_lag = min(24, len(train) - 1)  # Cap at 24 lags
+        if len(train) <= 6:
+            max_lag = min(3, len(train) - 1)
+        elif len(train) <= 12:
+            max_lag = min(6, len(train) - 1)
+        elif len(train) <= 24:
+            max_lag = min(12, len(train) - 1)
 
         # Add lag features
         for lag in range(1, max_lag + 1):
@@ -605,7 +540,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             data_automl[f"rolling_std_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).std()
 
         # Add year-over-year growth (if sufficient data)
-        if n > 12:
+        if len(train) > 12:
             data_automl["yoy_growth"] = (data_automl["y"] / data_automl["y"].shift(12)) - 1
         else:
             data_automl["yoy_growth"] = 0
@@ -628,7 +563,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             data_automl["y_log"] = data_automl["y"]
             apply_log = False
 
-        # Drop rows with missing values so that X and y align
+        # Drop rows with missing values
         data_automl.dropna(inplace=True)
 
         # Prepare features and target
@@ -636,9 +571,9 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         y_train = data_automl["y_log"] if apply_log else data_automl["y"]
         X_train = data_automl[feature_cols]
 
-        # Dynamic time budget calculation using the aggregated data length
+        # Dynamic time budget calculation (if not provided)
         if time_budget is None:
-            time_budget = min(600, max(60, n * 0.1 + len(feature_cols) * 2))  # 60s to 600s
+            time_budget = min(600, max(60, len(train) * 0.1 + len(feature_cols) * 2))  # 60s to 600s
             st.info(f"Dynamic time budget set to {time_budget} seconds based on dataset size and complexity.")
 
         # Train AutoML model using FLAML
@@ -711,10 +646,10 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         # Apply forecast adjustments
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
-        # Evaluate model performance: use the minimum length from test and forecast
+        # Evaluate model performance
         match_len = min(len(test["y"]), len(forecast_df))
-        rmse = np.sqrt(mean_squared_error(test["y"].values[:match_len], forecast_df["yhat"].iloc[:match_len]))
-        mape = mean_absolute_percentage_error(test["y"].values[:match_len], forecast_df["yhat"].iloc[:match_len])
+        rmse = np.sqrt(mean_squared_error(test["y"].values, forecast_df["yhat"][:len(test["y"])]))
+        mape = mean_absolute_percentage_error(test["y"].values, forecast_df["yhat"][:len(test["y"])])
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
 
     except Exception as e:
@@ -1001,7 +936,7 @@ def main():
                             category_scenarios, time_budget
                         )
                         time.sleep(1)
-                    st.success("✅ AutoML Model Training Complete!")
+                    automl_status.success("✅ AutoML Model Training Complete!")
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
@@ -1056,79 +991,13 @@ def main():
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
-                    # 🔮 AI-Powered Future Insights + Category Summary + High-Risk Detection
-                    try:
-                        # Retrieve the best model's forecast DataFrame
-                        forecast_data = st.session_state.model_results[best_model]["Forecast"]
-
-                        # Compute AI-powered insights
-                        highest_point = forecast_data.loc[forecast_data["yhat"].idxmax()]
-                        lowest_point = forecast_data.loc[forecast_data["yhat"].idxmin()]
-                        projected_growth = ((forecast_data["yhat"].iloc[-1] - test["y"].iloc[-1]) / test["y"].iloc[-1]) * 100
-                        trend = "📈 **Growth Expected**" if projected_growth > 0 else "📉 **Potential Decline**"
-
-                        insights_text = f"""
-                    - **Projected Sales Growth:** {abs(projected_growth):.2f}% {trend}
-                    - **Peak Sales Expected:** ${highest_point['yhat']:.2f} on {highest_point['ds'].strftime('%Y-%m-%d')}
-                    - **Lowest Predicted Sales:** ${lowest_point['yhat']:.2f} on {lowest_point['ds'].strftime('%Y-%m-%d')}
-                    - **Optimal Decision Window:** Plan around peak sales in {highest_point['ds'].strftime('%B %Y')}
-                    - **Risk Zones Identified:** Check months marked as 🔥 'High-Risk' below
-                    - **Volatility Analysis:** Forecast suggests a {'stable' if abs(projected_growth) < 5 else 'fluctuating'} trend
-                        """
-
-                        with st.expander("🔮 AI-Powered Future Insights", expanded=True):
-                            st.markdown(insights_text)
-
-                        # Build a summary of category adjustments if any were applied.
-                        if category_scenarios:
-                            cat_adj_summary = "### Category Adjustments Summary\n"
-                            for col, adjustments in category_scenarios.items():
-                                cat_adj_summary += f"- **{col}**:\n"
-                                for cat, details in adjustments.items():
-                                    cat_adj_summary += (
-                                        f"  - **{cat}**: {details['adjustment']}% adjustment "
-                                        f"from {details['start_date']} to {details['end_date']}\n"
-                                    )
-                            st.markdown(cat_adj_summary)
-
-                        # 🔥 Detect High-Risk Periods in Forecast
-                        if forecast_data is not None:
-                            try:
-                                forecast_data["volatility"] = forecast_data["yhat"].rolling(3).std()
-                                forecast_data["risk"] = "✅ Stable"
-
-                                # Define thresholds at 75th and 90th percentile
-                                p75 = forecast_data["volatility"].quantile(0.75)
-                                p90 = forecast_data["volatility"].quantile(0.90)
-
-                                forecast_data.loc[forecast_data["volatility"] > p75, "risk"] = "⚠️ High Volatility"
-                                forecast_data.loc[forecast_data["volatility"] > p90, "risk"] = "❌ Major Decline"
-
-                                st.markdown("### 🚨 High-Risk Sales Periods Identified")
-                                st.dataframe(
-                                    forecast_data[["ds", "yhat", "volatility", "risk"]]
-                                    .style.applymap(
-                                        lambda x: (
-                                            "background-color: #FFDDC1" if x == "❌ Major Decline" else
-                                            "background-color: #FFEEAA" if x == "⚠️ High Volatility" else
-                                            "background-color: #C6ECAE"
-                                        ),
-                                        subset=["risk"]
-                                    )
-                                )
-                            except Exception as e:
-                                st.error(f"❌ Error detecting high-risk periods: {e}")
-
-                    except Exception as e:
-                        st.error(f"❌ Error analyzing forecast data: {e}")
-
                     # STEP 11: Finalize Forecast Visualization (Premium)
                     step += 1
                     step_message.text(f"Step {step} of {total_steps}: Finalizing forecast visualization...")
                     st.markdown("### 🔍 Forecast Comparison Across Models")
                     model_colors = {
                         "Prophet": "blue",
-                        # "ARIMA": "green",
+                        "ARIMA": "green",
                         "XGBoost": "red",
                         "AutoML": "purple"
                     }
