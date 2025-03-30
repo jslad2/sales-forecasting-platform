@@ -451,43 +451,49 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
                     demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
-        # Keep original lag logic that works
+        # Original working lag implementation
         max_lag = min(12, len(train) - 1)
         rolling_windows = [3, 6] if len(train) > 6 else [3]
         data_xgb = train.copy()
 
-        # Original working lag implementation
         for lag in range(1, max_lag + 1):
             data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
-        
-        # Add peak detection without breaking existing features
+
+        # Add unique peak alignment feature
         monthly_avg = train.groupby(train["ds"].dt.month)["y"].mean()
         peak_month = monthly_avg.idxmax()
         data_xgb["days_from_peak"] = (data_xgb["ds"].dt.month - peak_month).apply(
             lambda x: x if x >=0 else x + 12
         )
 
-        # Original working rolling features
+        # Original rolling features
         for window in rolling_windows:
             data_xgb[f"rolling_mean_{window}"] = data_xgb["y"].rolling(window=window).mean()
             data_xgb[f"rolling_std_{window}"] = data_xgb["y"].rolling(window=window).std()
 
-        # Keep original time features
+        # Time features with unique names
         data_xgb["month"] = data_xgb["ds"].dt.month
         data_xgb["quarter"] = data_xgb["ds"].dt.quarter
         data_xgb["year"] = data_xgb["ds"].dt.year
         data_xgb["sin_month"] = np.sin(2 * np.pi * data_xgb["month"] / 12)
         data_xgb["cos_month"] = np.cos(2 * np.pi * data_xgb["month"] / 12)
 
+        # Safe feature selection with duplicate check
         data_xgb.dropna(inplace=True)
-        feature_cols = [c for c in data_xgb.columns if c not in ["y","ds"] 
-                       and np.issubdtype(data_xgb[c].dtype, np.number)]
-
-        # Add peak alignment to existing features
-        feature_cols.append("days_from_peak")
+        base_features = [c for c in data_xgb.columns 
+                        if c not in ["y","ds"] 
+                        and np.issubdtype(data_xgb[c].dtype, np.number)]
+                        
+        # Ensure unique feature names
+        seen = set()
+        feature_cols = []
+        for col in base_features + ["days_from_peak"]:
+            if col not in seen:
+                seen.add(col)
+                feature_cols.append(col)
 
         model = XGBRegressor(
-            n_estimators=100,  # Increased for better pattern capture
+            n_estimators=100,
             max_depth=5,
             learning_rate=0.1,
             objective="reg:squarederror",
@@ -496,7 +502,7 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
         )
         model.fit(data_xgb[feature_cols], data_xgb["y"])
 
-        # Forecasting with peak-aware updates
+        # Forecasting with unique feature maintenance
         last_row = data_xgb.iloc[-1].copy()
         last_date = train["ds"].iloc[-1]
         preds = []
@@ -514,7 +520,7 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
                 "days_from_peak": (future_date.month - peak_month) % 12
             })
 
-            # Original working lag update
+            # Original lag updates
             for lag in range(max_lag, 1, -1):
                 last_row[f"lag_{lag}"] = last_row[f"lag_{lag-1}"]
             last_row["lag_1"] = preds[-1] if preds else data_xgb["y"].iloc[-1]
@@ -529,22 +535,21 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
             "yhat": preds
         })
 
-        # Post-processing
+        # Post-processing and evaluation
         if is_diff and last_historical_value is not None:
             forecast_df["yhat"] = last_historical_value + forecast_df["yhat"].cumsum()
             
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
-        # Evaluation
         match_len = min(len(test), len(forecast_df))
         rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
         mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
 
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
 
-        # Add peak diagnostics
-        st.write(f"🔍 Historical peak detected in: {monthly_avg.idxmax().month_name()}")
-        st.write(f"📅 Forecast peaks in: {forecast_df.loc[forecast_df['yhat'].idxmax()]['ds'].month_name()}")
+        # Diagnostic output
+        st.write(f"🏔️ Historical peaks in {calendar.month_abbr[peak_month]}")
+        st.write(f"📈 Forecast peaks in {forecast_df['ds'][forecast_df['yhat'].idxmax()].strftime('%B')}")
 
     except Exception as e:
         st.warning(f"XGBoost Model failed: {e}")
