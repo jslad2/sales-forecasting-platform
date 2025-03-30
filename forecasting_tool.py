@@ -455,60 +455,59 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
         if category_scenarios:
             train = train.groupby("ds", as_index=False).agg({"y": "sum"})
 
-        # 2. Ensure temporal alignment
-        train["ds"] = train["ds"].dt.to_period("M").dt.start_time
+        # 2. Ensure temporal alignment and sorting
+        train["ds"] = pd.to_datetime(train["ds"]).dt.to_period("M").dt.start_time
         train = train.sort_values("ds").reset_index(drop=True)
 
-        # 3. Adaptive feature engineering
-        data_length = len(train)
-        max_lags = min(6, data_length - 1)  # Conservative lag limit
-        rolling_windows = [3] if data_length < 6 else [3, 6]
-        
+        # 3. Initialize core dataframe
         data_xgb = train[["ds", "y"]].copy()
+        data_length = len(data_xgb)
 
-        # 4. Feature generation with validation
-        # Lag features
-        lag_features = []
-        if max_lags > 0 and data_length > 3:
-            for lag in range(1, max_lags + 1):
-                data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
-                lag_features.append(f"lag_{lag}")
+        # 4. Dynamic feature configuration
+        max_lags = min(6, data_length - 1)
+        rolling_windows = [3, 6] if data_length >= 6 else [3]
         
+        # 5. Feature engineering with safeguards
+        # Lag features
+        valid_lags = []
+        for lag in range(1, max_lags + 1):
+            if lag < data_length:
+                data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
+                valid_lags.append(f"lag_{lag}")
+
         # Rolling features
-        roll_features = []
+        valid_rolls = []
         for window in rolling_windows:
             if window < data_length:
                 data_xgb[f"roll_mean_{window}"] = data_xgb["y"].rolling(window).mean()
                 data_xgb[f"roll_std_{window}"] = data_xgb["y"].rolling(window).std()
-                roll_features.extend([f"roll_mean_{window}", f"roll_std_{window}"])
+                valid_rolls.extend([f"roll_mean_{window}", f"roll_std_{window}"])
 
         # Temporal features
         data_xgb["month"] = data_xgb["ds"].dt.month
         data_xgb["sin_month"] = np.sin(2 * np.pi * data_xgb["month"] / 12)
         data_xgb["cos_month"] = np.cos(2 * np.pi * data_xgb["month"] / 12)
-        time_features = ["month", "sin_month", "cos_month"]
 
-        # 5. Define explicit feature order
-        feature_order = lag_features + roll_features + time_features
+        # 6. Define explicit feature order
+        feature_order = valid_lags + valid_rolls + ["month", "sin_month", "cos_month"]
         feature_cols = [col for col in feature_order if col in data_xgb.columns]
-        
-        # 6. Safe NA handling and validation
-        initial_rows = len(data_xgb)
+
+        # 7. Safe NA handling
+        initial_count = len(data_xgb)
         data_xgb.dropna(inplace=True)
-        
         if len(data_xgb) == 0:
             raise ValueError("No valid data remaining after feature engineering")
         
+        # 8. Verify target existence
         if 'y' not in data_xgb.columns:
-            raise KeyError("Target variable 'y' missing in training data")
+            raise KeyError("Target variable 'y' missing in processed data")
 
-        # 7. Final feature selection
-        feature_cols = [col for col in feature_order if col in data_xgb.columns]
+        # 9. Final feature validation
         if not feature_cols:
-            feature_cols = time_features
+            feature_cols = ["month", "sin_month", "cos_month"]
             st.warning("Using minimal temporal features due to insufficient data")
 
-        # 8. Model configuration
+        # 10. Model configuration
         model = XGBRegressor(
             n_estimators=100,
             max_depth=3,
@@ -519,64 +518,71 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
         )
         model.fit(data_xgb[feature_cols], data_xgb["y"])
 
-        # 9. Forecast state initialization
-        last_known = data_xgb.iloc[-1][feature_cols].copy()
+        # 11. Forecast initialization
+        last_known_y = data_xgb["y"].iloc[-1]
+        last_known_features = data_xgb[feature_cols].iloc[-1].copy()
         start_date = data_xgb["ds"].iloc[-1] + pd.offsets.MonthBegin(1)
         preds = []
-        
-        # 10. Recursive forecasting with feature maintenance
+
+        # 12. Recursive forecasting
         for _ in range(forecast_period):
             current_date = start_date + pd.DateOffset(months=len(preds))
             
-            # Initialize features with last known values
-            features = last_known.to_dict()
+            # Initialize features from last known state
+            features = last_known_features.to_dict()
             
-            # Update temporal features
+            # Update temporal components
+            month = current_date.month
             features.update({
-                "month": current_date.month,
-                "sin_month": np.sin(2 * np.pi * current_date.month / 12),
-                "cos_month": np.cos(2 * np.pi * current_date.month / 12)
+                "month": month,
+                "sin_month": np.sin(2 * np.pi * month / 12),
+                "cos_month": np.cos(2 * np.pi * month / 12)
             })
-            
+
             # Update lag features
-            if max_lags > 0:
-                for lag in range(max_lags, 1, -1):
+            if valid_lags:
+                for lag in range(len(valid_lags), 1, -1):
                     features[f"lag_{lag}"] = features.get(f"lag_{lag-1}", 0)
-                features["lag_1"] = last_known["y"] if not preds else preds[-1]
+                features["lag_1"] = last_known_y if not preds else preds[-1]
 
             # Update rolling features with decay
-            for window in rolling_windows:
-                for stat in ["mean", "std"]:
-                    col = f"roll_{stat}_{window}"
-                    if col in feature_cols:
-                        # Decay previous value towards series mean/std
-                        decay_factor = 0.7
-                        current_val = features.get(col, data_xgb["y"].mean() if stat == "mean" else data_xgb["y"].std())
-                        features[col] = decay_factor * current_val + (1-decay_factor) * (data_xgb["y"].mean() if stat == "mean" else data_xgb["y"].std())
+            for col in valid_rolls:
+                if "mean" in col:
+                    base_value = data_xgb["y"].mean()
+                elif "std" in col:
+                    base_value = data_xgb["y"].std()
+                features[col] = 0.7 * features.get(col, base_value) + 0.3 * base_value
 
-            # Ensure feature order consistency
+            # Generate prediction
             forecast_input = pd.DataFrame([features])[feature_cols]
-            
-            # Predict and update state
             pred = model.predict(forecast_input)[0]
             preds.append(pred)
-            features["y"] = pred  # Update for next iteration
-            last_known = pd.Series(features)
 
-        # 11. Create forecast dataframe
+            # Update state
+            last_known_y = pred
+            for lag in range(1, len(valid_lags)+1):
+                if f"lag_{lag}" in features:
+                    last_known_features[f"lag_{lag}"] = features[f"lag_{lag}"]
+            
+            # Update rolling features in state
+            for col in valid_rolls:
+                if col in features:
+                    last_known_features[col] = features[col]
+
+        # 13. Create forecast dataframe
         forecast_df = pd.DataFrame({
             "ds": pd.date_range(start=start_date, periods=forecast_period, freq="MS"),
             "yhat": preds
         })
 
-        # 12. Differencing reversal
+        # 14. Differencing reversal
         if is_diff and last_historical_value is not None:
             forecast_df["yhat"] = last_historical_value + forecast_df["yhat"].cumsum()
 
-        # 13. Apply scenario adjustments
+        # 15. Apply scenario adjustments
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
-        # 14. Evaluation with aligned dates
+        # 16. Evaluation
         aligned_test = test.set_index("ds").reindex(forecast_df["ds"]).reset_index()
         valid_mask = aligned_test["y"].notna()
         
@@ -591,8 +597,8 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
     except Exception as e:
         st.error(f"XGBoost Error: {str(e)}")
         st.error("Debug Info: " + 
-                f"Train shape: {train.shape if 'train' in locals() else 'N/A'}, " +
-                f"Features: {feature_cols if 'feature_cols' in locals() else 'N/A'}")
+                f"Data length: {len(train)} rows, " +
+                f"Final features: {feature_cols if 'feature_cols' in locals() else 'N/A'}")
 
     return "XGBoost", result
 
