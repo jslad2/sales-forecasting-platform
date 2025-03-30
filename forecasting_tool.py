@@ -452,49 +452,34 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
                     demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
-        # Original working lag implementation
+        # 1. Basic feature engineering
         max_lag = min(12, len(train) - 1)
-        rolling_windows = [3, 6] if len(train) > 6 else [3]
         data_xgb = train.copy()
+        
+        # Lag features with yearly emphasis
+        for lag in [1, 2, 12]:  # Focus on monthly and yearly patterns
+            if lag <= max_lag:
+                data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
 
-        for lag in range(1, max_lag + 1):
-            data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
-
-        # Add unique peak alignment feature
-        monthly_avg = train.groupby(train["ds"].dt.month)["y"].mean()
-        peak_month = monthly_avg.idxmax()
-        data_xgb["days_from_peak"] = (data_xgb["ds"].dt.month - peak_month).apply(
+        # 2. November-specific features
+        data_xgb["is_november"] = (data_xgb["ds"].dt.month == 11).astype(int)
+        data_xgb["days_from_nov"] = (data_xgb["ds"].dt.month - 11).apply(
             lambda x: x if x >=0 else x + 12
         )
 
-        # Original rolling features
-        for window in rolling_windows:
-            data_xgb[f"rolling_mean_{window}"] = data_xgb["y"].rolling(window=window).mean()
-            data_xgb[f"rolling_std_{window}"] = data_xgb["y"].rolling(window=window).std()
-
-        # Time features with unique names
+        # 3. Temporal features
         data_xgb["month"] = data_xgb["ds"].dt.month
-        data_xgb["quarter"] = data_xgb["ds"].dt.quarter
-        data_xgb["year"] = data_xgb["ds"].dt.year
         data_xgb["sin_month"] = np.sin(2 * np.pi * data_xgb["month"] / 12)
         data_xgb["cos_month"] = np.cos(2 * np.pi * data_xgb["month"] / 12)
 
-        # Safe feature selection with duplicate check
         data_xgb.dropna(inplace=True)
-        base_features = [c for c in data_xgb.columns 
-                        if c not in ["y","ds"] 
-                        and np.issubdtype(data_xgb[c].dtype, np.number)]
-                        
-        # Ensure unique feature names
-        seen = set()
-        feature_cols = []
-        for col in base_features + ["days_from_peak"]:
-            if col not in seen:
-                seen.add(col)
-                feature_cols.append(col)
+        feature_cols = [c for c in data_xgb.columns 
+                       if c not in ["y","ds"] 
+                       and np.issubdtype(data_xgb[c].dtype, np.number)]
 
+        # 4. November-optimized model
         model = XGBRegressor(
-            n_estimators=100,
+            n_estimators=200,
             max_depth=5,
             learning_rate=0.1,
             objective="reg:squarederror",
@@ -503,7 +488,7 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
         )
         model.fit(data_xgb[feature_cols], data_xgb["y"])
 
-        # Forecasting with unique feature maintenance
+        # 5. Forecast generation with November alignment
         last_row = data_xgb.iloc[-1].copy()
         last_date = train["ds"].iloc[-1]
         preds = []
@@ -511,27 +496,36 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
         for i in range(forecast_period):
             future_date = last_date + pd.DateOffset(months=i+1)
             
-            future = {col: last_row[col] for col in feature_cols}
+            future = {
+                col: last_row[col] 
+                for col in feature_cols
+                if not col.startswith(("month", "sin", "cos", "days"))
+            }
+            
+            # Update November-aware features
             future.update({
                 "month": future_date.month,
-                "quarter": future_date.quarter,
-                "year": future_date.year,
-                "sin_month": np.sin(2*np.pi*future_date.month/12),
-                "cos_month": np.cos(2*np.pi*future_date.month/12),
-                "days_from_peak": (future_date.month - peak_month) % 12
+                "is_november": int(future_date.month == 11),
+                "days_from_nov": (future_date.month - 11) % 12,
+                "sin_month": np.sin(2 * np.pi * future_date.month / 12),
+                "cos_month": np.cos(2 * np.pi * future_date.month / 12)
             })
 
-            # Original lag updates
-            for lag in range(max_lag, 1, -1):
-                last_row[f"lag_{lag}"] = last_row[f"lag_{lag-1}"]
-            last_row["lag_1"] = preds[-1] if preds else data_xgb["y"].iloc[-1]
+            # Yearly pattern enforcement
+            if "lag_12" in feature_cols:
+                future["lag_12"] = last_row["lag_1"] if i < 11 else preds[i-11]
 
             pred = model.predict(pd.DataFrame([future]))[0]
             preds.append(pred)
+            
+            # Update lag features
+            for lag in [12, 2, 1]:
+                if f"lag_{lag}" in feature_cols:
+                    last_row[f"lag_{lag}"] = future[f"lag_{lag}"]
 
         forecast_df = pd.DataFrame({
-            "ds": pd.date_range(start=last_date + pd.DateOffset(months=1), 
-                              periods=forecast_period, 
+            "ds": pd.date_range(start=last_date + pd.DateOffset(months=1),
+                              periods=forecast_period,
                               freq="MS"),
             "yhat": preds
         })
@@ -548,9 +542,11 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
 
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
 
-        # Diagnostic output
-        st.write(f"🏔️ Historical peaks in {calendar.month_abbr[peak_month]}")
-        st.write(f"📈 Forecast peaks in {forecast_df['ds'][forecast_df['yhat'].idxmax()].strftime('%B')}")
+        # Peak alignment diagnostics
+        hist_peak = train.groupby(train["ds"].dt.month)["y"].mean().idxmax()
+        fcst_peak = forecast_df["ds"][forecast_df["yhat"].idxmax()].month
+        st.write(f"📅 Historical Peak: {calendar.month_abbr[hist_peak]}")
+        st.write(f"🔮 Forecasted Peak: {calendar.month_abbr[fcst_peak]}")
 
     except Exception as e:
         st.warning(f"XGBoost Model failed: {e}")
