@@ -755,16 +755,13 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
                         base_val = last_row["y_log"] if apply_log else last_row["y"]
                     future_row[f"rolling_mean_{window}"] = float(base_val) + delta
                 else:
-                    # Fallback if the lag for the window doesn't exist
                     base_val = last_row.get(f"rolling_mean_{window}")
                     if base_val is None:
                         base_val = last_row["y_log"] if apply_log else last_row["y"]
                     future_row[f"rolling_mean_{window}"] = float(base_val)
-                # For rolling_std, use a fallback of 0 if missing
                 std_val = last_row.get(f"rolling_std_{window}")
                 future_row[f"rolling_std_{window}"] = float(std_val) if std_val is not None else 0.0
 
-            # Other features (ensure numeric conversion when possible)
             future_row["yoy_growth"] = float(last_row.get("yoy_growth", 0))
             future_row["y_diff"] = float(last_row.get("y_diff", 0))
             future_row["rolling_mean_growth"] = float(last_row.get("rolling_mean_growth", 0))
@@ -781,14 +778,13 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             
             future_features.append(future_row)
             
-            # Update last_row with the new future_row values for iterative forecasting
+            # Update last_row with future_row values for iterative forecasting
             last_row = last_row.copy()
             for key, value in future_row.items():
                 last_row[key] = value
 
         # Create future DataFrame ensuring all required columns are present
         future_df = pd.DataFrame(future_features)
-        # Fill any remaining missing values with 0
         future_df.fillna(0, inplace=True)
         for col in X_train.columns:
             if col not in future_df.columns:
@@ -797,8 +793,12 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
 
         # Generate forecasts
         automl_forecast = automl_model.predict(future_df)
+        # Fallback: if predict returns None, use a naive forecast (repeat last value)
         if automl_forecast is None:
-            raise ValueError("AutoML prediction returned None.")
+            st.error("FLAML did not produce a valid model. Falling back to a naive forecast.")
+            last_value = last_row["y_log"] if apply_log else last_row["y"]
+            automl_forecast = np.full(forecast_period, float(last_value))
+
         if apply_log:
             automl_forecast = np.expm1(automl_forecast)
 
