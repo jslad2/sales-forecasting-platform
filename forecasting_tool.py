@@ -513,33 +513,32 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
         else:
             dynamic_boost = 1.25
         
-        # Optionally, you may clamp the base boost to a reasonable range, e.g.:
+        # Optionally, clamp the base boost factor to a reasonable range
         dynamic_boost = max(min(dynamic_boost, 1.5), 1.0)
         
-        # 6. Compute year-over-year (YOY) growth for peak multipliers from historical data.
-        unique_years = sorted(train["ds"].dt.year.unique())
-        yearly_multipliers = {}
-        for year in unique_years:
-            data_year = train[train["ds"].dt.year == year]
-            overall_avg = data_year["y"].mean()
-            peak_avg = data_year[data_year["ds"].dt.month == peak_month]["y"].mean()
-            if overall_avg and not np.isnan(peak_avg):
-                yearly_multipliers[year] = peak_avg / overall_avg
+        # 6. Compute YOY growth for peak values using the actual peak month values per year
+        yearly_peaks = {}
+        for year in sorted(train["ds"].dt.year.unique()):
+            year_data = train[(train["ds"].dt.year == year) & (train["ds"].dt.month == peak_month)]
+            if not year_data.empty:
+                yearly_peaks[year] = year_data["y"].mean()  # or .max() if you prefer
         
-        # Compute growth factors for consecutive years
         growth_factors = []
-        for i in range(len(unique_years)-1):
+        unique_years = sorted(yearly_peaks.keys())
+        for i in range(len(unique_years) - 1):
             y1 = unique_years[i]
             y2 = unique_years[i+1]
-            if y1 in yearly_multipliers and y2 in yearly_multipliers and yearly_multipliers[y1] != 0:
-                growth = yearly_multipliers[y2] / yearly_multipliers[y1]
-                growth_factors.append(growth)
+            if yearly_peaks[y1] > 0:
+                growth_factors.append(yearly_peaks[y2] / yearly_peaks[y1])
         if growth_factors:
             yoy_growth = np.mean(growth_factors)
         else:
             yoy_growth = 1.0
+
+        # Impose a floor to ensure peaks do not decrease (if your data supports growth)
+        yoy_growth = max(yoy_growth, 1.0)
         
-        # Remember the last training year for forecasting compounding.
+        # Remember the last training year for compounding
         last_training_year = unique_years[-1]
         
         # 7. Forecasting with dynamic, compounding peak adjustment
@@ -554,10 +553,8 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
             
             # Compute compounded boost for future year:
             years_ahead = future_year - last_training_year
-            # Compounded boost: if years_ahead==0, it's just the base dynamic_boost.
             compounded_boost = dynamic_boost * (yoy_growth ** years_ahead)
-            # Optionally, you could clamp compounded_boost to avoid unrealistic multipliers.
-            compounded_boost = max(compounded_boost, 1.0)
+            compounded_boost = max(compounded_boost, 1.0)  # ensure it doesn't fall below 1.0
             
             # Initialize features for the future date
             features = {col: last_row[col] for col in feature_cols}
