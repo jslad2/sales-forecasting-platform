@@ -514,7 +514,7 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
             dynamic_boost = 1.25
         
         # Optionally, clamp the base boost factor to a reasonable range
-        dynamic_boost = max(min(dynamic_boost, 1.5), 1.0)
+        dynamic_boost = max(min(dynamic_boost, 1.2), 1.0)
         
         # 6. Compute YOY growth for peak values using the actual peak month values per year
         yearly_peaks = {}
