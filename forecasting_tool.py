@@ -452,6 +452,10 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
                     demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
+        # If category adjustments are used, aggregate training data by date.
+        if category_scenarios:
+            train = train.groupby("ds", as_index=False).agg({"y": "sum"})
+        
         # 1. Detect historical patterns
         monthly_avg = train.groupby(train["ds"].dt.month)["y"].mean()
         peak_month = monthly_avg.idxmax()
@@ -633,7 +637,6 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
         result = {"error": str(e)}
     
     return "XGBoost", result
-
 
 def train_automl_model(train, test, forecast_period, last_historical_value, is_diff, 
                        demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, time_budget=None):
@@ -1009,7 +1012,7 @@ def main():
                 st.success("✅ Data Preprocessed Successfully!")
 
                 last_historical_date = y_original["ds"].max()
-                overall_status.info(f"🔍 Last Historical Date: {last_historical_date}")
+                # overall_status.info(f"🔍 Last Historical Date: {last_historical_date}")
                 progress_bar.progress(int((step / total_steps) * 100))
                 time.sleep(0.5)
 
