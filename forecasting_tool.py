@@ -507,11 +507,14 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
         recent_years = sorted(train["ds"].dt.year.unique())[-3:]
         recent_data = train[train["ds"].dt.year.isin(recent_years)]
         recent_monthly_avg = recent_data.groupby(recent_data["ds"].dt.month)["y"].mean()
-        # Avoid division by zero; if overall recent average is zero, fallback to fixed boost
+        
         if recent_monthly_avg.mean() != 0:
             dynamic_boost = recent_monthly_avg.get(peak_month, peak_value) / recent_monthly_avg.mean()
         else:
             dynamic_boost = 1.25
+        
+        # Clamp the dynamic boost factor to a reasonable range, e.g., between 1.0 and 1.5
+        dynamic_boost = max(min(dynamic_boost, 1.5), 1.0)
         
         # 5. Forecasting with dynamic peak adjustment
         last_row = data_xgb[feature_cols].iloc[-1].copy()
@@ -600,6 +603,7 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
         result = {"error": str(e)}
     
     return "XGBoost", result
+
 
 def train_automl_model(train, test, forecast_period, last_historical_value, is_diff, 
                        demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, time_budget=None):
