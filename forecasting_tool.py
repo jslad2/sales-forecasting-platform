@@ -353,8 +353,14 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         if category_scenarios:
             train = train.groupby("ds", as_index=False).agg({"y": "sum"})
         
-        # Initialize Prophet with tuned parameters.
+        # Set logistic growth parameters: 
+        # "cap" is set to 20% above the max observed value and "floor" to 0.
+        train["cap"] = 1.2 * train["y"].max()
+        train["floor"] = 0
+        
+        # Initialize Prophet with tuned parameters and logistic growth.
         model = Prophet(
+            growth="logistic",  # enforce nonnegative forecasts
             seasonality_mode=best_params["seasonality_mode"],
             changepoint_prior_scale=best_params["changepoint_prior_scale"]
         )
@@ -362,33 +368,38 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
             model = detect_and_add_seasonalities(model, train)
         except Exception as e:
             st.warning(f"Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
-
+        
         # Fit the model.
         model.fit(train)
         
         # Create a future dataframe.
         future = model.make_future_dataframe(periods=forecast_period, freq="MS", include_history=False)
+        # Add cap and floor to the future dataframe (using the same cap as training or adjust as needed)
+        future["cap"] = train["cap"].max()
+        future["floor"] = 0
+        
         forecast = model.predict(future)
         forecast = forecast[forecast["ds"] > train["ds"].max()]
-
+        
         # Apply scenario adjustments.
         forecast = adjust_forecast(forecast, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
-
+        
         # Inverse differencing if needed.
         if is_diff and last_historical_value is not None:
             forecast = inverse_difference(forecast, last_historical_value)
-
+        
         # Evaluate on the overlapping period.
         match_len = min(len(test["y"]), len(forecast))
         rmse = mean_squared_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len], squared=False)
         mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len])
-
+        
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast}
-
+    
     except Exception as e:
         st.warning(f"Prophet Model failed: {e}")
-
+    
     return "Prophet", result
+
 
 def train_arima_model(train, test, forecast_period, last_historical_value, is_diff,
                       demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
