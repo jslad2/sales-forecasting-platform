@@ -989,8 +989,6 @@ def main():
                             demand_shock, seasonality_adjustment, external_shock, category_scenarios
                         )
                         time.sleep(1)
-                    # if is_diff and prophet_res.get("Forecast") is not None:
-                    #     prophet_res["Forecast"] = inverse_difference(prophet_res["Forecast"], last_historical_value)
                     st.success("✅ Prophet Model Training Complete!")
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
@@ -1005,8 +1003,6 @@ def main():
                     #         demand_shock, seasonality_adjustment, external_shock, category_scenarios
                     #     )
                     #     time.sleep(1)
-                    # if is_diff and arima_res.get("Forecast") is not None:
-                    #     arima_res["Forecast"] = inverse_difference(arima_res["Forecast"], last_historical_value)
                     # st.success("✅ ARIMA Model Training Complete!")
                     # progress_bar.progress(int((step / total_steps) * 100))
                     # time.sleep(1)
@@ -1021,8 +1017,6 @@ def main():
                             demand_shock, seasonality_adjustment, external_shock, category_scenarios
                         )
                         time.sleep(1)
-                    # if is_diff and xgb_res.get("Forecast") is not None:
-                    #     xgb_res["Forecast"] = inverse_difference(xgb_res["Forecast"], last_historical_value)
                     st.success("✅ XGBoost Model Training Complete!")
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
