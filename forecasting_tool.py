@@ -707,7 +707,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             time_budget = min(600, max(60, n * 0.1 + len(feature_cols) * 2))  # 60s to 600s
             st.info(f"Dynamic time budget set to {time_budget} seconds based on dataset size and complexity.")
 
-        # Decide on evaluation method based on number of samples
+        # Decide on evaluation method based on number of samples:
         # Use holdout if we have too few samples for 5-fold CV.
         eval_method = "cv" if len(X_train) >= 5 else "holdout"
 
@@ -727,44 +727,69 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
 
         # Generate future features for forecasting
         future_features = []
-        # Save the last date separately for computing future dates
         last_date = data_automl["ds"].iloc[-1]
         last_row = data_automl.iloc[-1].copy()
+
         for i in range(forecast_period):
             future_row = {}
             # Update lag features based on available max_lag
             for lag in range(1, max_lag + 1):
                 if lag == 1:
-                    future_row[f"lag_{lag}"] = last_row["y_log"] if apply_log else last_row["y"]
+                    value = last_row["y_log"] if apply_log else last_row["y"]
+                    future_row[f"lag_{lag}"] = float(value)
                 else:
-                    future_row[f"lag_{lag}"] = last_row.get(f"lag_{lag - 1}", last_row["y_log"] if apply_log else last_row["y"])
+                    prev_value = last_row.get(f"lag_{lag - 1}")
+                    if prev_value is None:
+                        prev_value = last_row["y_log"] if apply_log else last_row["y"]
+                    future_row[f"lag_{lag}"] = float(prev_value)
             # Update rolling statistics for each window
             for window in [3, 6, 12]:
-                if f"lag_{window}" in last_row and last_row[f"lag_{window}"] is not None:
+                lag_val = last_row.get(f"lag_{window}")
+                if lag_val is not None:
                     if apply_log:
-                        delta = (last_row["y_log"] - last_row[f"lag_{window}"]) / window
+                        delta = (float(last_row["y_log"]) - float(lag_val)) / window
                     else:
-                        delta = (last_row["y"] - last_row[f"lag_{window}"]) / window
-                    future_row[f"rolling_mean_{window}"] = last_row.get(f"rolling_mean_{window}", 0) + delta
+                        delta = (float(last_row["y"]) - float(lag_val)) / window
+                    base_val = last_row.get(f"rolling_mean_{window}")
+                    if base_val is None:
+                        base_val = last_row["y_log"] if apply_log else last_row["y"]
+                    future_row[f"rolling_mean_{window}"] = float(base_val) + delta
                 else:
                     # Fallback if the lag for the window doesn't exist
-                    future_row[f"rolling_mean_{window}"] = last_row.get(f"rolling_mean_{window}", last_row["y_log"] if apply_log else last_row["y"])
-                future_row[f"rolling_std_{window}"] = last_row.get(f"rolling_std_{window}", 0)
-            future_row["yoy_growth"] = last_row.get("yoy_growth", 0)
-            future_row["y_diff"] = last_row.get("y_diff", 0)
-            future_row["rolling_mean_growth"] = last_row.get("rolling_mean_growth", 0)
+                    base_val = last_row.get(f"rolling_mean_{window}")
+                    if base_val is None:
+                        base_val = last_row["y_log"] if apply_log else last_row["y"]
+                    future_row[f"rolling_mean_{window}"] = float(base_val)
+                # For rolling_std, use a fallback of 0 if missing
+                std_val = last_row.get(f"rolling_std_{window}")
+                future_row[f"rolling_std_{window}"] = float(std_val) if std_val is not None else 0.0
+
+            # Other features (ensure numeric conversion when possible)
+            future_row["yoy_growth"] = float(last_row.get("yoy_growth", 0))
+            future_row["y_diff"] = float(last_row.get("y_diff", 0))
+            future_row["rolling_mean_growth"] = float(last_row.get("rolling_mean_growth", 0))
+            
             # Update trigonometric features based on the future month
             future_month = (last_date.month + i) % 12 or 12
             future_row["sin_month"] = np.sin(2 * np.pi * future_month / 12)
             future_row["cos_month"] = np.cos(2 * np.pi * future_month / 12)
+            
+            # Ensure no None values remain in future_row
+            for key, value in future_row.items():
+                if value is None:
+                    future_row[key] = 0.0
+            
             future_features.append(future_row)
-            # Update last_row with future_row values for iterative forecasting
+            
+            # Update last_row with the new future_row values for iterative forecasting
             last_row = last_row.copy()
             for key, value in future_row.items():
                 last_row[key] = value
 
         # Create future DataFrame ensuring all required columns are present
         future_df = pd.DataFrame(future_features)
+        # Fill any remaining missing values with 0
+        future_df.fillna(0, inplace=True)
         for col in X_train.columns:
             if col not in future_df.columns:
                 future_df[col] = 0
@@ -772,6 +797,8 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
 
         # Generate forecasts
         automl_forecast = automl_model.predict(future_df)
+        if automl_forecast is None:
+            raise ValueError("AutoML prediction returned None.")
         if apply_log:
             automl_forecast = np.expm1(automl_forecast)
 
@@ -802,6 +829,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
     except Exception as e:
         st.error(f"AutoML Model failed: {e}")
     return ("AutoML", result)
+
 
 def shape_score(actual, forecast):
     if len(actual) != len(forecast):
