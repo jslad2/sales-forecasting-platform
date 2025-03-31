@@ -349,6 +349,11 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
                         is_diff, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
+        # If category adjustments are used, aggregate training data by date.
+        if category_scenarios:
+            train = train.groupby("ds", as_index=False).agg({"y": "sum"})
+        
+        # Initialize Prophet with tuned parameters.
         model = Prophet(
             seasonality_mode=best_params["seasonality_mode"],
             changepoint_prior_scale=best_params["changepoint_prior_scale"]
@@ -358,14 +363,22 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         except Exception as e:
             st.warning(f"Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
 
+        # Fit the model.
         model.fit(train)
+        
+        # Create a future dataframe.
         future = model.make_future_dataframe(periods=forecast_period, freq="MS", include_history=False)
         forecast = model.predict(future)
         forecast = forecast[forecast["ds"] > train["ds"].max()]
 
-        # Apply only future adjustments
+        # Apply scenario adjustments.
         forecast = adjust_forecast(forecast, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
+        # Inverse differencing if needed.
+        if is_diff and last_historical_value is not None:
+            forecast = inverse_difference(forecast, last_historical_value)
+
+        # Evaluate on the overlapping period.
         match_len = min(len(test["y"]), len(forecast))
         rmse = mean_squared_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len], squared=False)
         mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len])
@@ -976,8 +989,8 @@ def main():
                             demand_shock, seasonality_adjustment, external_shock, category_scenarios
                         )
                         time.sleep(1)
-                    if is_diff and prophet_res.get("Forecast") is not None:
-                        prophet_res["Forecast"] = inverse_difference(prophet_res["Forecast"], last_historical_value)
+                    # if is_diff and prophet_res.get("Forecast") is not None:
+                    #     prophet_res["Forecast"] = inverse_difference(prophet_res["Forecast"], last_historical_value)
                     st.success("✅ Prophet Model Training Complete!")
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
@@ -1008,8 +1021,8 @@ def main():
                             demand_shock, seasonality_adjustment, external_shock, category_scenarios
                         )
                         time.sleep(1)
-                    if is_diff and xgb_res.get("Forecast") is not None:
-                        xgb_res["Forecast"] = inverse_difference(xgb_res["Forecast"], last_historical_value)
+                    # if is_diff and xgb_res.get("Forecast") is not None:
+                    #     xgb_res["Forecast"] = inverse_difference(xgb_res["Forecast"], last_historical_value)
                     st.success("✅ XGBoost Model Training Complete!")
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
