@@ -263,9 +263,19 @@ def evaluate_prophet_params(params, train, initial, horizon, period):
 def find_best_prophet_params(train):
     dataset_length = len(train)
     if dataset_length < 100:
-        param_grid = {"changepoint_prior_scale": [0.01, 0.1], "seasonality_mode": ["additive"]}
+        param_grid = {
+            "changepoint_prior_scale": [0.01, 0.1],
+            "seasonality_mode": ["additive"],
+            "seasonality_prior_scale": [10.0]  # for smaller datasets, maybe less sensitivity
+        }
     else:
-        param_grid = {"changepoint_prior_scale": [0.01, 0.05, 0.1, 0.2, 0.3], "seasonality_mode": ["additive", "multiplicative"]}
+        param_grid = {
+            "changepoint_prior_scale": [0.01, 0.05, 0.1, 0.2, 0.3],
+            "seasonality_mode": ["additive", "multiplicative"],
+            "seasonality_prior_scale": [1.0, 5.0, 10.0]  # wider range for larger datasets
+        }
+        
+    # Adjust forecasting horizons based on dataset size
     if dataset_length < 100:
         horizon_days = min(7, max(3, dataset_length // 5))
         initial_days = max(30, dataset_length // 2)
@@ -275,9 +285,12 @@ def find_best_prophet_params(train):
     horizon = f"{horizon_days} days"
     initial = f"{initial_days} days"
     period = f"{horizon_days // 2} days"
+    
     best_params = None
     best_rmse = float("inf")
     grid = list(ParameterGrid(param_grid))
+    
+    import concurrent.futures
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = {executor.submit(evaluate_prophet_params, params, train, initial, horizon, period): params for params in grid}
         for future in concurrent.futures.as_completed(futures):
@@ -285,6 +298,7 @@ def find_best_prophet_params(train):
             if rmse < best_rmse:
                 best_rmse = rmse
                 best_params = params
+                
     return best_params, best_rmse
 
 def adjust_forecast_by_category(forecast_df, category_scenarios):
