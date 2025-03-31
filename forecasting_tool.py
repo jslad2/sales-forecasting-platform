@@ -530,8 +530,8 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
             # Apply boosts
             if is_peak:
                 pred = base_pred * 1.25  # Base 25% peak boost
-                if is_first_year:
-                    pred *= 1.4  # Extra 40% boost for first-year peak
+                # if is_first_year:
+                #     pred *= 1.4  # Extra 40% boost for first-year peak
             else:
                 pred = base_pred
                 
