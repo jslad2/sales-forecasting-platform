@@ -367,17 +367,22 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         if category_scenarios:
             train = train.groupby("ds", as_index=False).agg({"y": "sum"})
         
-        # Set logistic growth parameters: 
-        # "cap" is set to 20% above the max observed value and "floor" to 0.
-        train["cap"] = 1.2 * train["y"].max()
+        # Set logistic growth parameters:
+        # Use a cap that is 5% above the maximum observed value and a floor of 0.
+        cap_value = train["y"].max() * 1.05
+        train["cap"] = cap_value
         train["floor"] = 0
-        
-        # Initialize Prophet with tuned parameters and logistic growth.
+
+        # Create a Prophet model with logistic growth, limited changepoints, and lower seasonal flexibility.
         model = Prophet(
-            growth="logistic",  # enforce nonnegative forecasts
-            seasonality_mode=best_params["seasonality_mode"],
-            changepoint_prior_scale=best_params["changepoint_prior_scale"]
+            growth="logistic",
+            seasonality_mode=best_params.get("seasonality_mode", "additive"),
+            changepoint_prior_scale=best_params.get("changepoint_prior_scale", 0.1),
+            seasonality_prior_scale=1.0,  # Lower prior to dampen seasonal swings
+            n_changepoints=3             # Limit the number of trend changes
         )
+
+        # Optionally, detect and add additional seasonalities.
         try:
             model = detect_and_add_seasonalities(model, train)
         except Exception as e:
@@ -386,19 +391,19 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         # Fit the model.
         model.fit(train)
         
-        # Create a future dataframe.
+        # Create a future dataframe with the same cap and floor.
         future = model.make_future_dataframe(periods=forecast_period, freq="MS", include_history=False)
-        # Add cap and floor to the future dataframe (using the same cap as training or adjust as needed)
-        future["cap"] = train["cap"].max()
+        future["cap"] = cap_value
         future["floor"] = 0
         
         forecast = model.predict(future)
+        # Only take forecasted periods beyond the last training date.
         forecast = forecast[forecast["ds"] > train["ds"].max()]
         
-        # Apply scenario adjustments.
+        # Apply any scenario adjustments.
         forecast = adjust_forecast(forecast, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
         
-        # Inverse differencing if needed.
+        # Inverse differencing if necessary.
         if is_diff and last_historical_value is not None:
             forecast = inverse_difference(forecast, last_historical_value)
         
@@ -413,7 +418,6 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         st.warning(f"Prophet Model failed: {e}")
     
     return "Prophet", result
-
 
 def train_arima_model(train, test, forecast_period, last_historical_value, is_diff,
                       demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
