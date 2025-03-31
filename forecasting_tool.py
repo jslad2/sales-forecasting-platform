@@ -634,26 +634,11 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
     
     return "XGBoost", result
 
-
 def train_automl_model(train, test, forecast_period, last_historical_value, is_diff, 
                        demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, time_budget=None):
     """
     Train an AutoML model using FLAML for time series forecasting.
-
-    Args:
-        train (pd.DataFrame): Training data with columns "ds" (date) and "y" (target).
-        test (pd.DataFrame): Test data for evaluation.
-        forecast_period (int): Number of periods to forecast.
-        last_historical_value (float): Last observed value before differencing (if applied).
-        is_diff (bool): Indicates whether differencing was applied.
-        demand_shock (float): Global demand shock adjustment percentage.
-        seasonality_adjustment (float): Seasonality adjustment percentage.
-        external_shock (bool): Whether to apply an external shock adjustment.
-        category_scenarios (dict, optional): Category-specific forecast adjustments.
-        time_budget (int or None): Time budget in seconds for AutoML training. If None, it is dynamically calculated.
-
-    Returns:
-        tuple: Model name ("AutoML") and a dictionary containing RMSE, MAPE, and forecast DataFrame.
+    ...
     """
     result = {}
     try:
@@ -722,6 +707,10 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             time_budget = min(600, max(60, n * 0.1 + len(feature_cols) * 2))  # 60s to 600s
             st.info(f"Dynamic time budget set to {time_budget} seconds based on dataset size and complexity.")
 
+        # Decide on evaluation method based on number of samples
+        # Use holdout if we have too few samples for 5-fold CV.
+        eval_method = "cv" if len(X_train) >= 5 else "holdout"
+
         # Train AutoML model using FLAML
         automl_model = AutoML()
         automl_model.fit(
@@ -729,7 +718,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             y_train=y_train,
             task="regression",
             time_budget=time_budget,
-            eval_method="cv",
+            eval_method=eval_method,
             estimator_list=["xgboost", "lgbm", "rf", "catboost"],
             metric="r2",
             early_stop=True,
