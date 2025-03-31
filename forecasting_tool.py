@@ -634,11 +634,11 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
     
     return "XGBoost", result
 
+
 def train_automl_model(train, test, forecast_period, last_historical_value, is_diff, 
                        demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, time_budget=None):
     """
     Train an AutoML model using FLAML for time series forecasting.
-    ...
     """
     result = {}
     try:
@@ -730,28 +730,37 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         last_row = data_automl.iloc[-1].copy()
         for i in range(forecast_period):
             future_row = {}
+            # Update lag features based on available max_lag
             for lag in range(1, max_lag + 1):
                 if lag == 1:
                     future_row[f"lag_{lag}"] = last_row["y_log"] if apply_log else last_row["y"]
                 else:
-                    future_row[f"lag_{lag}"] = last_row[f"lag_{lag - 1}"]
+                    future_row[f"lag_{lag}"] = last_row.get(f"lag_{lag - 1}", last_row["y_log"] if apply_log else last_row["y"])
+            # For rolling windows, check if the corresponding lag exists before using it.
             for window in [3, 6, 12]:
-                if apply_log:
-                    future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y_log"] - last_row[f"lag_{window}"]) / window
+                if f"lag_{window}" in last_row:
+                    if apply_log:
+                        future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y_log"] - last_row[f"lag_{window}"]) / window
+                    else:
+                        future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y"] - last_row[f"lag_{window}"]) / window
                 else:
-                    future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y"] - last_row[f"lag_{window}"]) / window
-                future_row[f"rolling_std_{window}"] = last_row[f"rolling_std_{window}"]
-            future_row["yoy_growth"] = last_row["yoy_growth"]
-            future_row["y_diff"] = last_row["y_diff"]
-            future_row["rolling_mean_growth"] = last_row["rolling_mean_growth"]
-            future_row["sin_month"] = np.sin(2 * np.pi * (last_row["ds"].month + i) / 12)
-            future_row["cos_month"] = np.cos(2 * np.pi * (last_row["ds"].month + i) / 12)
+                    # Fallback: use the existing rolling_mean value unchanged.
+                    future_row[f"rolling_mean_{window}"] = last_row.get(f"rolling_mean_{window}", last_row["y_log"] if apply_log else last_row["y"])
+                future_row[f"rolling_std_{window}"] = last_row.get(f"rolling_std_{window}", 0)
+            future_row["yoy_growth"] = last_row.get("yoy_growth", 0)
+            future_row["y_diff"] = last_row.get("y_diff", 0)
+            future_row["rolling_mean_growth"] = last_row.get("rolling_mean_growth", 0)
+            # Update trigonometric features based on the future date
+            future_month = (last_row["ds"].month + i) % 12 or 12
+            future_row["sin_month"] = np.sin(2 * np.pi * future_month / 12)
+            future_row["cos_month"] = np.cos(2 * np.pi * future_month / 12)
             future_features.append(future_row)
+            # Update last_row with the new future_row values for iterative forecasting
             last_row = last_row.copy()
             for key, value in future_row.items():
                 last_row[key] = value
 
-        # Create future DataFrame
+        # Create future DataFrame ensuring all required columns are present
         future_df = pd.DataFrame(future_features)
         for col in X_train.columns:
             if col not in future_df.columns:
@@ -790,6 +799,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
     except Exception as e:
         st.error(f"AutoML Model failed: {e}")
     return ("AutoML", result)
+
 
 def shape_score(actual, forecast):
     if len(actual) != len(forecast):
