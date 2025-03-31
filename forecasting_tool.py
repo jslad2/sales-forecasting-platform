@@ -727,6 +727,8 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
 
         # Generate future features for forecasting
         future_features = []
+        # Save the last date separately for computing future dates
+        last_date = data_automl["ds"].iloc[-1]
         last_row = data_automl.iloc[-1].copy()
         for i in range(forecast_period):
             future_row = {}
@@ -736,26 +738,27 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
                     future_row[f"lag_{lag}"] = last_row["y_log"] if apply_log else last_row["y"]
                 else:
                     future_row[f"lag_{lag}"] = last_row.get(f"lag_{lag - 1}", last_row["y_log"] if apply_log else last_row["y"])
-            # For rolling windows, check if the corresponding lag exists before using it.
+            # Update rolling statistics for each window
             for window in [3, 6, 12]:
-                if f"lag_{window}" in last_row:
+                if f"lag_{window}" in last_row and last_row[f"lag_{window}"] is not None:
                     if apply_log:
-                        future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y_log"] - last_row[f"lag_{window}"]) / window
+                        delta = (last_row["y_log"] - last_row[f"lag_{window}"]) / window
                     else:
-                        future_row[f"rolling_mean_{window}"] = last_row[f"rolling_mean_{window}"] + (last_row["y"] - last_row[f"lag_{window}"]) / window
+                        delta = (last_row["y"] - last_row[f"lag_{window}"]) / window
+                    future_row[f"rolling_mean_{window}"] = last_row.get(f"rolling_mean_{window}", 0) + delta
                 else:
-                    # Fallback: use the existing rolling_mean value unchanged.
+                    # Fallback if the lag for the window doesn't exist
                     future_row[f"rolling_mean_{window}"] = last_row.get(f"rolling_mean_{window}", last_row["y_log"] if apply_log else last_row["y"])
                 future_row[f"rolling_std_{window}"] = last_row.get(f"rolling_std_{window}", 0)
             future_row["yoy_growth"] = last_row.get("yoy_growth", 0)
             future_row["y_diff"] = last_row.get("y_diff", 0)
             future_row["rolling_mean_growth"] = last_row.get("rolling_mean_growth", 0)
-            # Update trigonometric features based on the future date
-            future_month = (last_row["ds"].month + i) % 12 or 12
+            # Update trigonometric features based on the future month
+            future_month = (last_date.month + i) % 12 or 12
             future_row["sin_month"] = np.sin(2 * np.pi * future_month / 12)
             future_row["cos_month"] = np.cos(2 * np.pi * future_month / 12)
             future_features.append(future_row)
-            # Update last_row with the new future_row values for iterative forecasting
+            # Update last_row with future_row values for iterative forecasting
             last_row = last_row.copy()
             for key, value in future_row.items():
                 last_row[key] = value
@@ -774,7 +777,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
 
         # Create forecast DataFrame
         forecast_df = pd.DataFrame({
-            "ds": pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1),
+            "ds": pd.date_range(start=last_date + pd.DateOffset(months=1),
                                  periods=forecast_period, freq="MS"),
             "yhat": automl_forecast,
             "yhat_lower": automl_forecast * 0.9,
@@ -799,7 +802,6 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
     except Exception as e:
         st.error(f"AutoML Model failed: {e}")
     return ("AutoML", result)
-
 
 def shape_score(actual, forecast):
     if len(actual) != len(forecast):
