@@ -667,18 +667,25 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
                        demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, time_budget=None):
     """
     Train an AutoML model using FLAML for time series forecasting.
+    Incorporates additional seasonal features and tweaks to better capture monthly dips/peaks.
     """
     result = {}
     try:
         # Feature Engineering: work on a copy of the training data.
         data_automl = train.copy()
 
+        # Ensure ds is datetime and sort by ds.
+        data_automl["ds"] = pd.to_datetime(data_automl["ds"])
+        data_automl = data_automl.sort_values("ds").reset_index(drop=True)
+
         # If category adjustments are used, aggregate the data by date (summing up "y")
         if category_scenarios:
             data_automl = data_automl.groupby("ds", as_index=False).agg({"y": "sum"})
 
-        # Use the aggregated dataset's length for subsequent calculations.
+        # Issue a warning if the dataset is very short (may not capture seasonality reliably)
         n = len(data_automl)
+        if n < 24:
+            st.warning("Dataset has less than 24 records; seasonality patterns may not be reliably learned.")
 
         # Determine maximum lag based on aggregated dataset size
         max_lag = min(24, n - 1)
@@ -693,8 +700,8 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         for lag in range(1, max_lag + 1):
             data_automl[f"lag_{lag}"] = data_automl["y"].shift(lag)
 
-        # Add rolling statistics
-        for window in [3, 6, 12]:
+        # Add rolling statistics using only 3- and 6-month windows (to capture shorter-term seasonality)
+        for window in [3, 6]:
             data_automl[f"rolling_mean_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).mean()
             data_automl[f"rolling_std_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).std()
 
@@ -707,12 +714,18 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         # Add differenced values
         data_automl["y_diff"] = data_automl["y"].diff().fillna(0)
 
-        # Add rolling mean growth
+        # Add rolling mean growth (using a 3-month window)
         data_automl["rolling_mean_growth"] = data_automl["y"].rolling(window=3).mean().diff().fillna(0)
 
-        # Add trigonometric features for seasonality
+        # Add primary trigonometric features for seasonality
         data_automl["sin_month"] = np.sin(2 * np.pi * data_automl["ds"].dt.month / 12)
         data_automl["cos_month"] = np.cos(2 * np.pi * data_automl["ds"].dt.month / 12)
+        # Add second-harmonic Fourier terms for more nuanced seasonality
+        data_automl["sin2_month"] = np.sin(4 * np.pi * data_automl["ds"].dt.month / 12)
+        data_automl["cos2_month"] = np.cos(4 * np.pi * data_automl["ds"].dt.month / 12)
+        # Add month dummies to capture discrete monthly effects
+        month_dummies = pd.get_dummies(data_automl["ds"].dt.month, prefix="month", drop_first=True)
+        data_automl = pd.concat([data_automl, month_dummies], axis=1)
 
         # Log-transform if the target variable has a large range
         if data_automl["y"].max() / data_automl["y"].min() > 5:
@@ -726,20 +739,21 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         data_automl.dropna(inplace=True)
 
         # Prepare features and target
-        feature_cols = [col for col in data_automl.columns if col not in ["y", "ds", "y_log"]]
+        ignore_cols = ["y", "ds", "y_log"]
+        feature_cols = [col for col in data_automl.columns if col not in ignore_cols]
         y_train = data_automl["y_log"] if apply_log else data_automl["y"]
         X_train = data_automl[feature_cols]
 
         # Dynamic time budget calculation using the aggregated data length
         if time_budget is None:
-            time_budget = min(600, max(60, n * 0.1 + len(feature_cols) * 2))  # 60s to 600s
+            # Increase time budget slightly to allow FLAML to search for seasonal patterns
+            time_budget = min(600, max(90, n * 0.15 + len(feature_cols) * 2))
             st.info(f"Dynamic time budget set to {time_budget} seconds based on dataset size and complexity.")
 
         # Decide on evaluation method based on number of samples:
-        # Use holdout if we have too few samples for 5-fold CV.
         eval_method = "cv" if len(X_train) >= 5 else "holdout"
 
-        # Train AutoML model using FLAML
+        # Train AutoML model using FLAML; change metric to "rmse" to better capture seasonal errors
         automl_model = AutoML()
         automl_model.fit(
             X_train=X_train,
@@ -748,7 +762,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             time_budget=time_budget,
             eval_method=eval_method,
             estimator_list=["xgboost", "lgbm", "rf", "catboost"],
-            metric="r2",
+            metric="rmse",
             early_stop=True,
             verbose=1
         )
@@ -770,8 +784,8 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
                     if prev_value is None:
                         prev_value = last_row["y_log"] if apply_log else last_row["y"]
                     future_row[f"lag_{lag}"] = float(prev_value)
-            # Update rolling statistics for each window
-            for window in [3, 6, 12]:
+            # Update rolling statistics for each window (only for windows 3 and 6)
+            for window in [3, 6]:
                 lag_val = last_row.get(f"lag_{window}")
                 if lag_val is not None:
                     if apply_log:
@@ -794,10 +808,16 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             future_row["y_diff"] = float(last_row.get("y_diff", 0))
             future_row["rolling_mean_growth"] = float(last_row.get("rolling_mean_growth", 0))
             
-            # Update trigonometric features based on the future month
+            # Update trigonometric features for seasonality (for the future month)
             future_month = (last_date.month + i) % 12 or 12
             future_row["sin_month"] = np.sin(2 * np.pi * future_month / 12)
             future_row["cos_month"] = np.cos(2 * np.pi * future_month / 12)
+            # Also add second harmonic terms for the future month
+            future_row["sin2_month"] = np.sin(4 * np.pi * future_month / 12)
+            future_row["cos2_month"] = np.cos(4 * np.pi * future_month / 12)
+            # For month dummies, create them as well (one-hot encoded for months 2-12)
+            month_dummies_future = {f"month_{m}": 1.0 if future_month == m else 0.0 for m in range(2, 13)}
+            future_row.update(month_dummies_future)
             
             # Ensure no None values remain in future_row
             for key, value in future_row.items():
@@ -845,7 +865,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             forecast_df["yhat_lower"] = inverse_difference(forecast_df["yhat_lower"], last_historical_value)
             forecast_df["yhat_upper"] = inverse_difference(forecast_df["yhat_upper"], last_historical_value)
 
-        # Apply forecast adjustments
+        # Apply forecast adjustments (e.g., demand shocks, seasonality tweaks)
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
         # Evaluate model performance: use the minimum length from test and forecast
@@ -857,7 +877,6 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
     except Exception as e:
         st.error(f"AutoML Model failed: {e}")
     return ("AutoML", result)
-
 
 def shape_score(actual, forecast):
     if len(actual) != len(forecast):
