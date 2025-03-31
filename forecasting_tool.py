@@ -503,7 +503,7 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
         )
         model.fit(data_xgb[feature_cols], data_xgb["y"])
         
-        # Compute dynamic boost factor based on recent peaks (using the last 3 years)
+        # 5. Compute base dynamic boost factor based on recent peaks (using the last 3 years)
         recent_years = sorted(train["ds"].dt.year.unique())[-3:]
         recent_data = train[train["ds"].dt.year.isin(recent_years)]
         recent_monthly_avg = recent_data.groupby(recent_data["ds"].dt.month)["y"].mean()
@@ -513,10 +513,36 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
         else:
             dynamic_boost = 1.25
         
-        # Clamp the dynamic boost factor to a reasonable range, e.g., between 1.0 and 1.5
+        # Optionally, you may clamp the base boost to a reasonable range, e.g.:
         dynamic_boost = max(min(dynamic_boost, 1.5), 1.0)
         
-        # 5. Forecasting with dynamic peak adjustment
+        # 6. Compute year-over-year (YOY) growth for peak multipliers from historical data.
+        unique_years = sorted(train["ds"].dt.year.unique())
+        yearly_multipliers = {}
+        for year in unique_years:
+            data_year = train[train["ds"].dt.year == year]
+            overall_avg = data_year["y"].mean()
+            peak_avg = data_year[data_year["ds"].dt.month == peak_month]["y"].mean()
+            if overall_avg and not np.isnan(peak_avg):
+                yearly_multipliers[year] = peak_avg / overall_avg
+        
+        # Compute growth factors for consecutive years
+        growth_factors = []
+        for i in range(len(unique_years)-1):
+            y1 = unique_years[i]
+            y2 = unique_years[i+1]
+            if y1 in yearly_multipliers and y2 in yearly_multipliers and yearly_multipliers[y1] != 0:
+                growth = yearly_multipliers[y2] / yearly_multipliers[y1]
+                growth_factors.append(growth)
+        if growth_factors:
+            yoy_growth = np.mean(growth_factors)
+        else:
+            yoy_growth = 1.0
+        
+        # Remember the last training year for forecasting compounding.
+        last_training_year = unique_years[-1]
+        
+        # 7. Forecasting with dynamic, compounding peak adjustment
         last_row = data_xgb[feature_cols].iloc[-1].copy()
         last_date = data_xgb["ds"].iloc[-1]
         preds = []
@@ -525,6 +551,13 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
             future_date = last_date + pd.DateOffset(months=i+1)
             is_peak = int(future_date.month == peak_month)
             future_year = future_date.year
+            
+            # Compute compounded boost for future year:
+            years_ahead = future_year - last_training_year
+            # Compounded boost: if years_ahead==0, it's just the base dynamic_boost.
+            compounded_boost = dynamic_boost * (yoy_growth ** years_ahead)
+            # Optionally, you could clamp compounded_boost to avoid unrealistic multipliers.
+            compounded_boost = max(compounded_boost, 1.0)
             
             # Initialize features for the future date
             features = {col: last_row[col] for col in feature_cols}
@@ -543,9 +576,9 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
             # Predict with the XGBoost model
             base_pred = model.predict(pd.DataFrame([features]))[0]
             
-            # Apply dynamic boost for the peak month
+            # Apply the compounded boost for the peak month
             if is_peak:
-                pred = base_pred * dynamic_boost
+                pred = base_pred * compounded_boost
             else:
                 pred = base_pred
                 
@@ -559,7 +592,7 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
                     else:
                         last_row[f'lag_{lag}'] = last_row.get(f'lag_{lag-1}', pred)
         
-        # 6. Create forecast dataframe
+        # 8. Create forecast dataframe
         forecast_df = pd.DataFrame({
             "ds": pd.date_range(
                 start=last_date + pd.DateOffset(months=1),
@@ -569,13 +602,13 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
             "yhat": preds
         })
     
-        # 7. Post-processing
+        # 9. Post-processing
         if is_diff and last_historical_value is not None:
             forecast_df["yhat"] = last_historical_value + forecast_df["yhat"].cumsum()
             
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
     
-        # 8. Validation
+        # 10. Validation
         match_len = min(len(test), len(forecast_df))
         if match_len > 0:
             rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
@@ -583,7 +616,7 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
         else:
             rmse, mape = np.nan, np.nan
     
-        # 9. Robust diagnostics
+        # 11. Robust diagnostics
         st.write(f"📅 Historical Peak: {calendar.month_abbr[peak_month]}")
         if not forecast_df.empty:
             try:
