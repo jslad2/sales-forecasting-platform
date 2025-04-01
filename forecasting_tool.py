@@ -666,244 +666,105 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
 def train_automl_model(train, test, forecast_period, last_historical_value, is_diff, 
                        demand_shock, seasonality_adjustment, external_shock, 
                        category_scenarios=None, time_budget=None):
-    """
-    Train an AutoML model using FLAML for time series forecasting with enhanced peak prediction.
-    This version oversamples peak months and focuses on boosting estimators.
-    """
-    result = {}
+    st.write("Training AutoML Model (Simplified Version)...")
     try:
-        # 1. Preprocessing: copy, ensure datetime, and sort.
-        data_automl = train.copy()
-        data_automl["ds"] = pd.to_datetime(data_automl["ds"])
-        data_automl = data_automl.sort_values("ds").reset_index(drop=True)
-
+        # 1. Preprocessing: copy, ensure datetime, sort by ds.
+        data = train.copy()
+        data["ds"] = pd.to_datetime(data["ds"])
+        data = data.sort_values("ds").reset_index(drop=True)
+        
         # 2. Aggregate by date if category adjustments are enabled.
         if category_scenarios:
-            data_automl = data_automl.groupby("ds", as_index=False).agg({"y": "sum"})
-
-        n = len(data_automl)
-        if n < 24:
-            st.warning("Dataset has less than 24 records; seasonality patterns may not be reliably learned.")
-
-        # 3. Determine maximum lag based on dataset size.
-        max_lag = min(24, n - 1)
-        if n <= 6:
-            max_lag = min(3, n - 1)
-        elif n <= 12:
-            max_lag = min(6, n - 1)
-        elif n <= 24:
-            max_lag = min(12, n - 1)
-
-        # 4. Add lag features.
+            data = data.groupby("ds", as_index=False).agg({"y": "sum"})
+        
+        # 3. Set maximum lag (limited to 12).
+        max_lag = min(12, len(data) - 1)
+        st.write(f"Using maximum lag: {max_lag}")
+        
+        # 4. Create lag features.
         for lag in range(1, max_lag + 1):
-            data_automl[f"lag_{lag}"] = data_automl["y"].shift(lag)
-
-        # 5. Add rolling statistics (using 3- and 6-month windows).
-        for window in [3, 6]:
-            data_automl[f"rolling_mean_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).mean()
-            data_automl[f"rolling_std_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).std()
-
-        # 6. Add year-over-year growth.
-        if n > 12:
-            data_automl["yoy_growth"] = (data_automl["y"] / data_automl["y"].shift(12)) - 1
-        else:
-            data_automl["yoy_growth"] = 0
-
-        # 7. Add differenced values and rolling mean growth.
-        data_automl["y_diff"] = data_automl["y"].diff().fillna(0)
-        data_automl["rolling_mean_growth"] = data_automl["y"].rolling(window=3).mean().diff().fillna(0)
-
-        # 8. Add seasonal features: primary and higher-order Fourier terms.
-        data_automl["sin_month"] = np.sin(2 * np.pi * data_automl["ds"].dt.month / 12)
-        data_automl["cos_month"] = np.cos(2 * np.pi * data_automl["ds"].dt.month / 12)
-        data_automl["sin2_month"] = np.sin(4 * np.pi * data_automl["ds"].dt.month / 12)
-        data_automl["cos2_month"] = np.cos(4 * np.pi * data_automl["ds"].dt.month / 12)
-        data_automl["sin3_month"] = np.sin(6 * np.pi * data_automl["ds"].dt.month / 12)
-        data_automl["cos3_month"] = np.cos(6 * np.pi * data_automl["ds"].dt.month / 12)
-        month_dummies = pd.get_dummies(data_automl["ds"].dt.month, prefix="month", drop_first=True)
-        data_automl = pd.concat([data_automl, month_dummies], axis=1)
-
-        # 9. Dynamic peak detection using recent 3 years.
-        current_year = data_automl["ds"].dt.year.max()
-        recent_years = 3
-        recent_data = data_automl[data_automl["ds"].dt.year >= (current_year - recent_years + 1)]
-        if recent_data.empty:
-            recent_data = data_automl
-        recent_monthly_avg = recent_data.groupby(recent_data["ds"].dt.month)["y"].mean()
-        peak_month = recent_monthly_avg.idxmax()
-        data_automl["is_peak_month"] = (data_automl["ds"].dt.month == peak_month).astype(int)
-        data_automl["days_from_peak"] = (data_automl["ds"].dt.month - peak_month).apply(lambda x: x if x >= 0 else x + 12)
-
-        # 10. Peak interaction features.
-        data_automl["peak_sin"] = data_automl["is_peak_month"] * data_automl["sin_month"]
-        data_automl["peak_cos"] = data_automl["is_peak_month"] * data_automl["cos_month"]
-        if "lag_1" in data_automl.columns:
-            data_automl["peak_lag1"] = data_automl["is_peak_month"] * data_automl["lag_1"]
-
-        # 11. (Optional) Sample weights for peak months.
-        data_automl["weight"] = data_automl["is_peak_month"].apply(lambda x: 2.0 if x else 1.0)
-
-        # 11.1 Oversample peak rows to emphasize them.
-        peak_rows = data_automl[data_automl["is_peak_month"] == 1]
-        if not peak_rows.empty:
-            data_automl = pd.concat([data_automl, peak_rows, peak_rows]).sort_values("ds").reset_index(drop=True)
-
-        # 12. Log transformation if necessary.
-        if data_automl["y"].max() / data_automl["y"].min() > 5:
-            data_automl["y_log"] = np.log1p(data_automl["y"])
-            apply_log = True
-        else:
-            data_automl["y_log"] = data_automl["y"]
-            apply_log = False
-
-        data_automl.dropna(inplace=True)
-
-        # 13. Prepare features and target.
-        ignore_cols = ["y", "ds", "y_log", "weight"]
-        feature_cols = [col for col in data_automl.columns if col not in ignore_cols]
-        y_train = data_automl["y_log"] if apply_log else data_automl["y"]
-        X_train = data_automl[feature_cols]
-
-        # Preserve the last historical value.
-        historical_last_value = data_automl.iloc[-1]["y_log"] if apply_log else data_automl.iloc[-1]["y"]
-
-        # 14. Dynamic FLAML tuning.
-        if n < 50:
-            dynamic_metric = "mae"
-            dynamic_estimators = ["xgboost", "lgbm", "catboost"]
-            dynamic_time_budget = min(300, max(60, n * 0.2 + len(feature_cols) * 2))
-        elif n < 200:
-            dynamic_metric = "rmse"
-            dynamic_estimators = ["xgboost", "lgbm", "catboost"]
-            dynamic_time_budget = min(600, max(90, n * 0.15 + len(feature_cols) * 2))
-        else:
-            dynamic_metric = "rmse"
-            dynamic_estimators = ["xgboost", "lgbm", "catboost"]
-            dynamic_time_budget = min(600, max(120, n * 0.15 + len(feature_cols) * 2))
-        if time_budget is not None:
-            dynamic_time_budget = time_budget
-
-        st.info(f"Dynamic settings: {dynamic_time_budget}s, metric: {dynamic_metric}, estimators: {dynamic_estimators}")
-        eval_method = "cv" if len(X_train) >= 5 else "holdout"
-
-        # 15. Train the FLAML AutoML model (without sample weights).
+            data[f"lag_{lag}"] = data["y"].shift(lag)
+        
+        # 5. Create 3-month rolling statistics (mean and std), if enough data exists.
+        if len(data) > max_lag + 3:
+            data["rolling_mean_3"] = data["y"].rolling(window=3).mean()
+            data["rolling_std_3"] = data["y"].rolling(window=3).std()
+        
+        # 6. Create seasonal features using month sine and cosine.
+        data["sin_month"] = np.sin(2 * np.pi * data["ds"].dt.month / 12)
+        data["cos_month"] = np.cos(2 * np.pi * data["ds"].dt.month / 12)
+        
+        # 7. Apply log transformation (log1p) to stabilize variance.
+        data["y_log"] = np.log1p(data["y"])
+        data.dropna(inplace=True)
+        
+        # 8. Prepare training data.
+        X_train = data.drop(columns=["y", "y_log", "ds"])
+        y_train = data["y_log"]
+        
+        # 9. Check for insufficient data.
+        if len(X_train) <= 1:
+            st.error("Insufficient data to train AutoML. Please provide more samples.")
+            return ("AutoML", {"error": "Insufficient data"})
+        
+        # 10. Dynamically choose evaluation method.
+        eval_method = "cv" if len(X_train) > 5 else "holdout"
+        
+        # 11. Train AutoML Model with a fixed 300-second time budget.
         automl_model = AutoML()
         automl_model.fit(
             X_train=X_train,
             y_train=y_train,
             task="regression",
-            time_budget=dynamic_time_budget,
+            time_budget=300,  # 300 seconds for training
             eval_method=eval_method,
-            estimator_list=dynamic_estimators,
-            metric=dynamic_metric,
-            verbose=1
+            estimator_list=["xgboost", "lgbm", "rf"]
         )
-
-        # 16. Future feature generation (including seasonal and peak features).
-        future_features = []
-        last_date = data_automl["ds"].iloc[-1]
-        last_row = data_automl.iloc[-1].copy()
-
-        for i in range(forecast_period):
-            future_row = {}
-            # Lag features.
-            for lag in range(1, max_lag + 1):
-                if lag == 1:
-                    value = last_row.get("y_log", historical_last_value) if apply_log else last_row.get("y", historical_last_value)
-                    future_row[f"lag_{lag}"] = float(value)
-                else:
-                    prev_value = last_row.get(f"lag_{lag - 1}")
-                    if prev_value is None:
-                        prev_value = last_row.get("y_log", historical_last_value) if apply_log else last_row.get("y", historical_last_value)
-                    future_row[f"lag_{lag}"] = float(prev_value)
-            # Rolling statistics (windows 3 and 6).
-            for window in [3, 6]:
-                lag_val = last_row.get(f"lag_{window}")
-                if lag_val is not None:
-                    if apply_log:
-                        delta = (float(last_row.get("y_log", historical_last_value)) - float(lag_val)) / window
-                    else:
-                        delta = (float(last_row.get("y", historical_last_value)) - float(lag_val)) / window
-                    base_val = last_row.get(f"rolling_mean_{window}")
-                    if base_val is None:
-                        base_val = float(last_row.get("y_log", historical_last_value) if apply_log else last_row.get("y", historical_last_value))
-                    future_row[f"rolling_mean_{window}"] = float(base_val) + delta
-                else:
-                    base_val = last_row.get(f"rolling_mean_{window}")
-                    if base_val is None:
-                        base_val = float(last_row.get("y_log", historical_last_value) if apply_log else last_row.get("y", historical_last_value))
-                    future_row[f"rolling_mean_{window}"] = float(base_val)
-                std_val = last_row.get(f"rolling_std_{window}")
-                future_row[f"rolling_std_{window}"] = float(std_val) if std_val is not None else 0.0
-
-            # Growth features.
-            future_row["yoy_growth"] = float(last_row.get("yoy_growth", 0))
-            future_row["y_diff"] = float(last_row.get("y_diff", 0))
-            future_row["rolling_mean_growth"] = float(last_row.get("rolling_mean_growth", 0))
-            
-            # Seasonal features.
-            future_month = (last_date.month + i) % 12 or 12
-            future_row["sin_month"] = np.sin(2 * np.pi * future_month / 12)
-            future_row["cos_month"] = np.cos(2 * np.pi * future_month / 12)
-            future_row["sin2_month"] = np.sin(4 * np.pi * future_month / 12)
-            future_row["cos2_month"] = np.cos(4 * np.pi * future_month / 12)
-            future_row["sin3_month"] = np.sin(6 * np.pi * future_month / 12)
-            future_row["cos3_month"] = np.cos(6 * np.pi * future_month / 12)
-            month_dummies_future = {f"month_{m}": 1.0 if future_month == m else 0.0 for m in range(2, 13)}
-            future_row.update(month_dummies_future)
-            
-            # Peak-related features.
-            future_row["is_peak_month"] = 1.0 if future_month == peak_month else 0.0
-            future_row["days_from_peak"] = (future_month - peak_month) if (future_month - peak_month) >= 0 else (future_month - peak_month + 12)
-            future_row["peak_sin"] = future_row["is_peak_month"] * future_row["sin_month"]
-            future_row["peak_cos"] = future_row["is_peak_month"] * future_row["cos_month"]
-            if "lag_1" in feature_cols:
-                future_row["peak_lag1"] = future_row["is_peak_month"] * future_row.get("lag_1", 0)
-            
-            # Ensure no None values.
-            for key, value in future_row.items():
-                if value is None:
-                    future_row[key] = 0.0
-            
-            future_features.append(future_row)
-            last_row = future_row.copy()
-
-        future_df = pd.DataFrame(future_features).fillna(0)
-        for col in X_train.columns:
-            if col not in future_df.columns:
-                future_df[col] = 0
-        future_df = future_df[X_train.columns]
-
-        # 17. Forecast generation.
-        automl_forecast = automl_model.predict(future_df)
-        if automl_forecast is None:
-            st.error("FLAML did not produce a valid model. Falling back to a naive forecast.")
-            automl_forecast = np.full(forecast_period, float(historical_last_value))
-        if apply_log:
-            automl_forecast = np.expm1(automl_forecast)
-
-        forecast_df = pd.DataFrame({
-            "ds": pd.date_range(start=last_date + pd.DateOffset(months=1),
-                                 periods=forecast_period, freq="MS"),
-            "yhat": automl_forecast
-        })
-
-        # 18. Inverse differencing if applicable.
-        if isinstance(last_historical_value, (int, float)):
-            forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
+        st.write(f"AutoML Training Completed: Best Estimator - {automl_model.best_estimator}")
         
-        # 19. Apply forecast adjustments.
-        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
-
-        # 20. Evaluate performance.
+        # 12. Iterative Forecast Generation.
+        st.write("Generating forecasts with AutoML...")
+        # Start by constructing future lag features from the last observed record.
+        test_lags = {f"lag_{lag}": [data["y"].iloc[-lag]] for lag in range(1, max_lag + 1)}
+        test_lags["rolling_mean_3"] = data["y"].rolling(window=3).mean().iloc[-1]
+        test_lags["rolling_std_3"] = data["y"].rolling(window=3).std().iloc[-1]
+        test_lags["sin_month"] = np.sin(2 * np.pi * data["ds"].iloc[-1].month / 12)
+        test_lags["cos_month"] = np.cos(2 * np.pi * data["ds"].iloc[-1].month / 12)
+        future_df = pd.DataFrame(test_lags)
+        
+        automl_forecast = []
+        for _ in range(forecast_period):
+            # Predict log-transformed target.
+            next_forecast_log = automl_model.predict(future_df)[0]
+            next_forecast = np.expm1(next_forecast_log)  # Inverse log transformation.
+            automl_forecast.append(next_forecast)
+            
+            # Update lag features iteratively.
+            for lag in range(max_lag, 1, -1):
+                future_df[f"lag_{lag}"] = future_df[f"lag_{lag-1}"]
+            future_df["lag_1"] = next_forecast
+            
+            # Update rolling statistics.
+            automl_forecast_recent = automl_forecast[-3:] if len(automl_forecast) >= 3 else automl_forecast
+            future_df["rolling_mean_3"] = np.mean(automl_forecast_recent)
+            future_df["rolling_std_3"] = np.std(automl_forecast_recent)
+        
+        forecast_dates = pd.date_range(start=data["ds"].iloc[-1] + pd.DateOffset(months=1),
+                                       periods=forecast_period, freq="M")
+        forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": automl_forecast})
+        
+        # 13. Evaluate performance.
         match_len = min(len(test["y"]), len(forecast_df))
-        rmse = np.sqrt(mean_squared_error(test["y"].values[:match_len], forecast_df["yhat"].iloc[:match_len]))
+        rmse = mean_squared_error(test["y"].values[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
         mape = mean_absolute_percentage_error(test["y"].values[:match_len], forecast_df["yhat"].iloc[:match_len])
-        result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
-
+        st.write(f"AutoML RMSE: {rmse}")
+        st.write(f"AutoML MAPE: {mape}")
+        
+        return ("AutoML", {"RMSE": rmse, "MAPE": mape, "Forecast": forecast_df})
+        
     except Exception as e:
         st.error(f"AutoML Model failed: {e}")
-    return ("AutoML", result)
+        return ("AutoML", {"error": str(e)})
 
 
 
