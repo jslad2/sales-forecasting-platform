@@ -368,9 +368,9 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
             train = train.groupby("ds", as_index=False).agg({"y": "sum"})
         
         # Set logistic growth parameters: 
-        # "cap" is set to 20% above the max observed value and "floor" to 0.
+        # "cap" is set to 20% above the max observed value and "floor" is set to 1 (instead of 0)
         train["cap"] = 1.2 * train["y"].max()
-        train["floor"] = 0
+        train["floor"] = 1  # Setting a minimal positive floor to avoid negatives
         
         # Initialize Prophet with tuned parameters and logistic growth.
         model = Prophet(
@@ -388,12 +388,15 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         
         # Create a future dataframe.
         future = model.make_future_dataframe(periods=forecast_period, freq="MS", include_history=False)
-        # Add cap and floor to the future dataframe (using the same cap as training or adjust as needed)
+        # Add cap and floor to the future dataframe.
         future["cap"] = train["cap"].max()
-        future["floor"] = 0
+        future["floor"] = 1
         
         forecast = model.predict(future)
         forecast = forecast[forecast["ds"] > train["ds"].max()]
+        
+        # Clamp forecasts to be nonnegative (if any negatives remain).
+        forecast["yhat"] = forecast["yhat"].clip(lower=0)
         
         # Apply scenario adjustments.
         forecast = adjust_forecast(forecast, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
@@ -413,6 +416,7 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
         st.warning(f"Prophet Model failed: {e}")
     
     return "Prophet", result
+
 
 def train_arima_model(train, test, forecast_period, last_historical_value, is_diff,
                       demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
