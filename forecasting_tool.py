@@ -664,10 +664,11 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
     return "XGBoost", result
 
 def train_automl_model(train, test, forecast_period, last_historical_value, is_diff, 
-                       demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, time_budget=None):
+                       demand_shock, seasonality_adjustment, external_shock, 
+                       category_scenarios=None, time_budget=None):
     """
     Train an AutoML model using FLAML for time series forecasting.
-    Incorporates additional seasonal features and tweaks to better capture monthly dips/peaks.
+    This version dynamically tunes FLAML settings based on dataset size.
     """
     result = {}
     try:
@@ -682,7 +683,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         if category_scenarios:
             data_automl = data_automl.groupby("ds", as_index=False).agg({"y": "sum"})
 
-        # Issue a warning if the dataset is very short (may not capture seasonality reliably)
+        # Use the aggregated dataset's length for subsequent calculations.
         n = len(data_automl)
         if n < 24:
             st.warning("Dataset has less than 24 records; seasonality patterns may not be reliably learned.")
@@ -700,7 +701,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         for lag in range(1, max_lag + 1):
             data_automl[f"lag_{lag}"] = data_automl["y"].shift(lag)
 
-        # Add rolling statistics using only 3- and 6-month windows (to capture shorter-term seasonality)
+        # Add rolling statistics using 3- and 6-month windows (to preserve short-term seasonality)
         for window in [3, 6]:
             data_automl[f"rolling_mean_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).mean()
             data_automl[f"rolling_std_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).std()
@@ -744,25 +745,39 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         y_train = data_automl["y_log"] if apply_log else data_automl["y"]
         X_train = data_automl[feature_cols]
 
-        # Dynamic time budget calculation using the aggregated data length
-        if time_budget is None:
-            # Increase time budget slightly to allow FLAML to search for seasonal patterns
-            time_budget = min(600, max(90, n * 0.15 + len(feature_cols) * 2))
-            st.info(f"Dynamic time budget set to {time_budget} seconds based on dataset size and complexity.")
+        # Dynamic FLAML tuning: choose time_budget, metric, and estimator_list based on dataset size.
+        if n < 50:
+            dynamic_metric = "mae"
+            dynamic_estimators = ["xgboost", "rf"]
+            dynamic_time_budget = min(300, max(60, n * 0.2 + len(feature_cols) * 2))
+        elif n < 200:
+            dynamic_metric = "rmse"
+            dynamic_estimators = ["xgboost", "lgbm", "rf"]
+            dynamic_time_budget = min(600, max(90, n * 0.15 + len(feature_cols) * 2))
+        else:
+            dynamic_metric = "rmse"
+            dynamic_estimators = ["xgboost", "lgbm", "rf", "catboost"]
+            dynamic_time_budget = min(600, max(120, n * 0.15 + len(feature_cols) * 2))
+        
+        # Allow override of time_budget if provided
+        if time_budget is not None:
+            dynamic_time_budget = time_budget
+
+        st.info(f"Dynamic time budget set to {dynamic_time_budget} seconds, metric: {dynamic_metric}, estimators: {dynamic_estimators}")
 
         # Decide on evaluation method based on number of samples:
         eval_method = "cv" if len(X_train) >= 5 else "holdout"
 
-        # Train AutoML model using FLAML; change metric to "rmse" to better capture seasonal errors
+        # Train AutoML model using FLAML with dynamic settings
         automl_model = AutoML()
         automl_model.fit(
             X_train=X_train,
             y_train=y_train,
             task="regression",
-            time_budget=time_budget,
+            time_budget=dynamic_time_budget,
             eval_method=eval_method,
-            estimator_list=["xgboost", "lgbm", "rf", "catboost"],
-            metric="rmse",
+            estimator_list=dynamic_estimators,
+            metric=dynamic_metric,
             early_stop=True,
             verbose=1
         )
@@ -815,7 +830,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             # Also add second harmonic terms for the future month
             future_row["sin2_month"] = np.sin(4 * np.pi * future_month / 12)
             future_row["cos2_month"] = np.cos(4 * np.pi * future_month / 12)
-            # For month dummies, create them as well (one-hot encoded for months 2-12)
+            # Add month dummies (for months 2-12) for the future month
             month_dummies_future = {f"month_{m}": 1.0 if future_month == m else 0.0 for m in range(2, 13)}
             future_row.update(month_dummies_future)
             
@@ -865,7 +880,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             forecast_df["yhat_lower"] = inverse_difference(forecast_df["yhat_lower"], last_historical_value)
             forecast_df["yhat_upper"] = inverse_difference(forecast_df["yhat_upper"], last_historical_value)
 
-        # Apply forecast adjustments (e.g., demand shocks, seasonality tweaks)
+        # Apply forecast adjustments (demand shock, seasonality tweaks, etc.)
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
         # Evaluate model performance: use the minimum length from test and forecast
