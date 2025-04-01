@@ -671,7 +671,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
     """
     result = {}
     try:
-        # 1. Preprocessing: copy, ensure datetime, sort
+        # 1. Preprocessing: copy, ensure datetime, and sort
         data_automl = train.copy()
         data_automl["ds"] = pd.to_datetime(data_automl["ds"])
         data_automl = data_automl.sort_values("ds").reset_index(drop=True)
@@ -684,7 +684,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         if n < 24:
             st.warning("Dataset has less than 24 records; seasonality patterns may not be reliably learned.")
 
-        # 3. Determine maximum lag.
+        # 3. Determine maximum lag based on dataset size.
         max_lag = min(24, n - 1)
         if n <= 6:
             max_lag = min(3, n - 1)
@@ -702,7 +702,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             data_automl[f"rolling_mean_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).mean()
             data_automl[f"rolling_std_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).std()
 
-        # 6. Year-over-year growth.
+        # 6. Add year-over-year growth.
         if n > 12:
             data_automl["yoy_growth"] = (data_automl["y"] / data_automl["y"].shift(12)) - 1
         else:
@@ -712,7 +712,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         data_automl["y_diff"] = data_automl["y"].diff().fillna(0)
         data_automl["rolling_mean_growth"] = data_automl["y"].rolling(window=3).mean().diff().fillna(0)
 
-        # 8. Seasonal features: primary and higher-order Fourier terms.
+        # 8. Add seasonal features: primary, second, and third harmonics.
         data_automl["sin_month"] = np.sin(2 * np.pi * data_automl["ds"].dt.month / 12)
         data_automl["cos_month"] = np.cos(2 * np.pi * data_automl["ds"].dt.month / 12)
         data_automl["sin2_month"] = np.sin(4 * np.pi * data_automl["ds"].dt.month / 12)
@@ -733,16 +733,16 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         data_automl["is_peak_month"] = (data_automl["ds"].dt.month == peak_month).astype(int)
         data_automl["days_from_peak"] = (data_automl["ds"].dt.month - peak_month).apply(lambda x: x if x >= 0 else x + 12)
 
-        # 10. Interaction features for peaks.
+        # 10. Peak interaction features.
         data_automl["peak_sin"] = data_automl["is_peak_month"] * data_automl["sin_month"]
         data_automl["peak_cos"] = data_automl["is_peak_month"] * data_automl["cos_month"]
         if "lag_1" in data_automl.columns:
             data_automl["peak_lag1"] = data_automl["is_peak_month"] * data_automl["lag_1"]
 
-        # 11. Sample weights for peak months (if desired, but FLAML doesn't support weights in fit).
+        # 11. Sample weights for peak months (not used in FLAML fit).
         data_automl["weight"] = data_automl["is_peak_month"].apply(lambda x: 2.0 if x else 1.0)
 
-        # 12. Log transformation if needed.
+        # 12. Log transformation if necessary.
         if data_automl["y"].max() / data_automl["y"].min() > 5:
             data_automl["y_log"] = np.log1p(data_automl["y"])
             apply_log = True
@@ -757,6 +757,9 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         feature_cols = [col for col in data_automl.columns if col not in ignore_cols]
         y_train = data_automl["y_log"] if apply_log else data_automl["y"]
         X_train = data_automl[feature_cols]
+
+        # Preserve last historical value for fallback.
+        historical_last_value = data_automl.iloc[-1]["y_log"] if apply_log else data_automl.iloc[-1]["y"]
 
         # 14. Dynamic FLAML tuning.
         if n < 50:
@@ -777,7 +780,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         st.info(f"Dynamic settings: {dynamic_time_budget}s, metric: {dynamic_metric}, estimators: {dynamic_estimators}")
         eval_method = "cv" if len(X_train) >= 5 else "holdout"
 
-        # 15. Train the FLAML AutoML model (without sample weights, since FLAML doesn't support it).
+        # 15. Train the FLAML AutoML model (without sample weights).
         automl_model = AutoML()
         automl_model.fit(
             X_train=X_train,
@@ -808,7 +811,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
                     if prev_value is None:
                         prev_value = last_row["y_log"] if apply_log else last_row["y"]
                     future_row[f"lag_{lag}"] = float(prev_value)
-            # Rolling stats (windows 3 and 6).
+            # Rolling statistics (windows 3 and 6).
             for window in [3, 6]:
                 lag_val = last_row.get(f"lag_{window}")
                 if lag_val is not None:
@@ -833,7 +836,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             future_row["y_diff"] = float(last_row.get("y_diff", 0))
             future_row["rolling_mean_growth"] = float(last_row.get("rolling_mean_growth", 0))
             
-            # Seasonal features (Fourier terms for primary, 2nd and 3rd harmonics).
+            # Seasonal features (Fourier terms and month dummies).
             future_month = (last_date.month + i) % 12 or 12
             future_row["sin_month"] = np.sin(2 * np.pi * future_month / 12)
             future_row["cos_month"] = np.cos(2 * np.pi * future_month / 12)
@@ -841,7 +844,6 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             future_row["cos2_month"] = np.cos(4 * np.pi * future_month / 12)
             future_row["sin3_month"] = np.sin(6 * np.pi * future_month / 12)
             future_row["cos3_month"] = np.cos(6 * np.pi * future_month / 12)
-            # Month dummies.
             month_dummies_future = {f"month_{m}": 1.0 if future_month == m else 0.0 for m in range(2, 13)}
             future_row.update(month_dummies_future)
             
@@ -853,13 +855,13 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             if "lag_1" in feature_cols:
                 future_row["peak_lag1"] = future_row["is_peak_month"] * future_row.get("lag_1", 0)
             
-            # Ensure no None values remain.
+            # Ensure no None values.
             for key, value in future_row.items():
                 if value is None:
                     future_row[key] = 0.0
             
             future_features.append(future_row)
-            last_row = future_row.copy()
+            last_row = future_row.copy()  # Update last_row iteratively.
 
         future_df = pd.DataFrame(future_features).fillna(0)
         for col in X_train.columns:
@@ -871,8 +873,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         automl_forecast = automl_model.predict(future_df)
         if automl_forecast is None:
             st.error("FLAML did not produce a valid model. Falling back to a naive forecast.")
-            last_value = last_row["y_log"] if apply_log else last_row["y"]
-            automl_forecast = np.full(forecast_period, float(last_value))
+            automl_forecast = np.full(forecast_period, float(historical_last_value))
         if apply_log:
             automl_forecast = np.expm1(automl_forecast)
 
