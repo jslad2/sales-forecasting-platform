@@ -668,6 +668,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
                        category_scenarios=None, time_budget=None):
     """
     Train an AutoML model using FLAML for time series forecasting with enhanced peak prediction.
+    This version oversamples peak months and focuses on boosting estimators.
     """
     result = {}
     try:
@@ -697,7 +698,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         for lag in range(1, max_lag + 1):
             data_automl[f"lag_{lag}"] = data_automl["y"].shift(lag)
 
-        # 5. Add rolling statistics (3- and 6-month windows).
+        # 5. Add rolling statistics (using 3- and 6-month windows).
         for window in [3, 6]:
             data_automl[f"rolling_mean_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).mean()
             data_automl[f"rolling_std_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).std()
@@ -739,8 +740,13 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         if "lag_1" in data_automl.columns:
             data_automl["peak_lag1"] = data_automl["is_peak_month"] * data_automl["lag_1"]
 
-        # 11. Sample weights for peak months (for info; not used in FLAML fit).
+        # 11. (Optional) Sample weights for peak months.
         data_automl["weight"] = data_automl["is_peak_month"].apply(lambda x: 2.0 if x else 1.0)
+
+        # 11.1 Oversample peak rows to emphasize them.
+        peak_rows = data_automl[data_automl["is_peak_month"] == 1]
+        if not peak_rows.empty:
+            data_automl = pd.concat([data_automl, peak_rows, peak_rows]).sort_values("ds").reset_index(drop=True)
 
         # 12. Log transformation if necessary.
         if data_automl["y"].max() / data_automl["y"].min() > 5:
@@ -764,15 +770,15 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         # 14. Dynamic FLAML tuning.
         if n < 50:
             dynamic_metric = "mae"
-            dynamic_estimators = ["xgboost", "rf"]
+            dynamic_estimators = ["xgboost", "lgbm", "catboost"]
             dynamic_time_budget = min(300, max(60, n * 0.2 + len(feature_cols) * 2))
         elif n < 200:
             dynamic_metric = "rmse"
-            dynamic_estimators = ["xgboost", "lgbm", "rf"]
+            dynamic_estimators = ["xgboost", "lgbm", "catboost"]
             dynamic_time_budget = min(600, max(90, n * 0.15 + len(feature_cols) * 2))
         else:
             dynamic_metric = "rmse"
-            dynamic_estimators = ["xgboost", "lgbm", "rf", "catboost"]
+            dynamic_estimators = ["xgboost", "lgbm", "catboost"]
             dynamic_time_budget = min(600, max(120, n * 0.15 + len(feature_cols) * 2))
         if time_budget is not None:
             dynamic_time_budget = time_budget
@@ -793,7 +799,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             verbose=1
         )
 
-        # 16. Future feature generation.
+        # 16. Future feature generation (including seasonal and peak features).
         future_features = []
         last_date = data_automl["ds"].iloc[-1]
         last_row = data_automl.iloc[-1].copy()
@@ -803,11 +809,10 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             # Lag features.
             for lag in range(1, max_lag + 1):
                 if lag == 1:
-                    # Use .get() with default historical_last_value.
                     value = last_row.get("y_log", historical_last_value) if apply_log else last_row.get("y", historical_last_value)
                     future_row[f"lag_{lag}"] = float(value)
                 else:
-                    prev_value = last_row.get(f"lag_{lag - 1}", None)
+                    prev_value = last_row.get(f"lag_{lag - 1}")
                     if prev_value is None:
                         prev_value = last_row.get("y_log", historical_last_value) if apply_log else last_row.get("y", historical_last_value)
                     future_row[f"lag_{lag}"] = float(prev_value)
