@@ -708,7 +708,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         else:
             data_automl["yoy_growth"] = 0
 
-        # 7. Differenced values and rolling mean growth.
+        # 7. Add differenced values and rolling mean growth.
         data_automl["y_diff"] = data_automl["y"].diff().fillna(0)
         data_automl["rolling_mean_growth"] = data_automl["y"].rolling(window=3).mean().diff().fillna(0)
 
@@ -739,7 +739,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         if "lag_1" in data_automl.columns:
             data_automl["peak_lag1"] = data_automl["is_peak_month"] * data_automl["lag_1"]
 
-        # 11. Sample weights for peak months (not used in FLAML fit).
+        # 11. Sample weights for peak months (for info; not used in FLAML fit).
         data_automl["weight"] = data_automl["is_peak_month"].apply(lambda x: 2.0 if x else 1.0)
 
         # 12. Log transformation if necessary.
@@ -758,7 +758,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         y_train = data_automl["y_log"] if apply_log else data_automl["y"]
         X_train = data_automl[feature_cols]
 
-        # Preserve last historical value for fallback.
+        # Preserve the last historical value before future feature generation.
         historical_last_value = data_automl.iloc[-1]["y_log"] if apply_log else data_automl.iloc[-1]["y"]
 
         # 14. Dynamic FLAML tuning.
@@ -780,7 +780,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
         st.info(f"Dynamic settings: {dynamic_time_budget}s, metric: {dynamic_metric}, estimators: {dynamic_estimators}")
         eval_method = "cv" if len(X_train) >= 5 else "holdout"
 
-        # 15. Train the FLAML AutoML model (without sample weights).
+        # 15. Train the FLAML AutoML model (without sample weights, as FLAML doesn't support them).
         automl_model = AutoML()
         automl_model.fit(
             X_train=X_train,
@@ -790,11 +790,10 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             eval_method=eval_method,
             estimator_list=dynamic_estimators,
             metric=dynamic_metric,
-            early_stop=True,
             verbose=1
         )
 
-        # 16. Future feature generation (including seasonal and peak features)
+        # 16. Future feature generation (including seasonal and peak features).
         future_features = []
         last_date = data_automl["ds"].iloc[-1]
         last_row = data_automl.iloc[-1].copy()
@@ -836,7 +835,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             future_row["y_diff"] = float(last_row.get("y_diff", 0))
             future_row["rolling_mean_growth"] = float(last_row.get("rolling_mean_growth", 0))
             
-            # Seasonal features (Fourier terms and month dummies).
+            # Seasonal features: Fourier terms and month dummies.
             future_month = (last_date.month + i) % 12 or 12
             future_row["sin_month"] = np.sin(2 * np.pi * future_month / 12)
             future_row["cos_month"] = np.cos(2 * np.pi * future_month / 12)
