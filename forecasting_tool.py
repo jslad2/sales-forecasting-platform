@@ -29,7 +29,6 @@ import concurrent.futures
 from scipy.stats import pearsonr
 import calendar
 from sklearn.metrics import mean_absolute_error, r2_score
-from bayes_opt import BayesianOptimization
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 from scipy.signal import periodogram
