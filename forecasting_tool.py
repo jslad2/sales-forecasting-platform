@@ -28,7 +28,6 @@ from tqdm import tqdm
 import concurrent.futures
 from scipy.stats import pearsonr
 import calendar
-from statsmodels.tools.eval_measures import mase
 from sklearn.metrics import mean_absolute_error, r2_score
 from bayes_opt import BayesianOptimization
 from plotly.subplots import make_subplots
@@ -706,6 +705,12 @@ def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment,
     return forecast_df
 
 # ====================== ENHANCED METRICS & VISUALIZATION ======================
+def mase(y_true, y_pred, seasonal_period=1):
+    """Mean Absolute Scaled Error"""
+    naive_error = np.mean(np.abs(np.diff(y_true, seasonal_period)))
+    forecast_error = np.mean(np.abs(y_true - y_pred))
+    return forecast_error / naive_error
+
 def comprehensive_metrics(y_true, y_pred):
     """Enhanced evaluation metrics with proper imports"""
     metrics = {
