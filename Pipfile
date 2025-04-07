@@ -4,42 +4,48 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-streamlit = "==1.26.0"   # Pinned to a stable version
-pandas = "==2.0.3"       # Pinned to a stable version
-numpy = "==1.24.3"       # Updated for FLAML compatibility
-prophet = "==1.1.4"      # Pinned to a stable version
-pmdarima = "==2.0.3"     # Pinned to a stable version
-xgboost = "==2.0.3"      # Updated for better FLAML support
-matplotlib = "==3.7.1"   # Pinned to a stable version
-plotly = "==5.15.0"      # Pinned to a stable version
-statsmodels = "==0.14.0" # Pinned to a stable version
-optuna = "==3.4.0"       # Updated for FLAML's tuning compatibility
-flaml = "==2.3.2"        # Ensures correct FLAML version for Streamlit use
-scikit-learn = "==1.2.2"
-cmdstanpy = "*"
-joblib = "*"
-threadpoolctl = "*"
-pytz = "*"
-tzdata = "*"
-pymeeus = "*"
-convertdate = "*"
-holidays = "*"
-patsy = "*"
-tqdm = "*"
-tenacity = "*"
-cycler = "*"
-kiwisolver = "*"
-pyparsing = "*"
-fonttools = "*"
-pydeck = "*"
-lightgbm = "==3.3.5"
-supabase = "*"
-python-dotenv = "*"
-catboost = "*"
-shap = "*"
-fpdf = "*"
+streamlit = "==1.26.0"
+pandas = "==2.1.0"        # Updated for better null handling
+numpy = "==1.24.4"        # Security updates
+prophet = "==1.1.5"       # New bug fixes
+pmdarima = "==2.0.4"      # Enhanced ARIMA performance
+xgboost = "==2.0.3"       # Maintain for FLAML compatibility
+matplotlib = "==3.8.0"    # Updated visualization features
+plotly = "==5.18.0"       # Latest stable with 3D fixes
+statsmodels = "==0.14.1"  # Critical security update
+optuna = "==3.5.0"        # Better hyperparameter tuning
+flaml = "==2.4.0"         # New AutoML features
+scikit-learn = "==1.3.2"  # Updated for security patches
+cmdstanpy = "==1.2.0"     # Required for Prophet compatibility
+holidays = "==0.42"       # Updated holiday calendars
+lightgbm = "==4.1.0"      # Better GPU support
+catboost = "==1.2.4"      # Updated categorical handling
+shap = "==0.44.1"         # Explainability improvements
+
+# Maintain compatibility layer
+joblib = "==1.3.2"
+threadpoolctl = "==3.2.0"
+pytz = "==2023.3.post1"
+tzdata = "==2023.3"
+pymeeus = "==0.5.12"
+convertdate = "==2.4.0"
+patsy = "==0.5.4"
+tqdm = "==4.66.1"
+tenacity = "==8.2.3"
+python-dotenv = "==1.0.0"
+fpdf = "==1.7.2"
+
+# Visualization stack
+pydeck = "==0.8.1b0"
+cycler = "==0.12.1"
+kiwisolver = "==1.4.5"
+pyparsing = "==3.1.1"
+fonttools = "==4.43.1"
 
 [dev-packages]
+pytest = "==7.4.2"
+ipython = "==8.17.2"
+jupyter = "==1.0.0"
 
 [requires]
 python_version = "3.9"
