@@ -38,6 +38,9 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 import warnings
 from statsmodels.tsa.stattools import pacf
 from sklearn.model_selection import TimeSeriesSplit
+from optuna.samplers import TPESampler  # Add this import
+from optuna.pruners import MedianPruner
+from optuna import trial
 
 # Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
 st.set_page_config(layout="wide", page_title="Time Series Forecasting", page_icon="📈")
@@ -212,75 +215,76 @@ def detect_and_add_seasonalities(model, data):
     
     return model
 
-def find_best_prophet_params(train):
-    """Bayesian optimization for Prophet parameters"""
-    
-    def prophet_crossval(changepoint_prior_scale, seasonality_prior_scale):
-        model = Prophet(
-            changepoint_prior_scale=changepoint_prior_scale,
-            seasonality_prior_scale=seasonality_prior_scale,
-            yearly_seasonality='auto',
-            weekly_seasonality='auto',
-            daily_seasonality=False
+def tune_prophet(train_data, n_trials=50, timeout=3600):
+    """Optuna-based hyperparameter optimization for Prophet with enhanced features"""
+    def objective(trial):
+        # Suggest parameters with logarithmic scaling
+        changepoint_prior_scale = trial.suggest_float(
+            'changepoint_prior_scale', 1e-3, 0.5, log=True
         )
-        model.fit(train)
-        df_cv = cross_validation(model, initial='730 days', period='180 days', horizon='90 days')
-        return -performance_metrics(df_cv)['rmse'].mean()
-    
-    optimizer = BayesianOptimization(
-        f=prophet_crossval,
-        pbounds={
-            'changepoint_prior_scale': (0.001, 0.5),
-            'seasonality_prior_scale': (0.1, 50)
-        },
-        random_state=42
-    )
-    optimizer.maximize(n_iter=10)
-    return optimizer.max['params']
-
-def tune_prophet(train_data, init_points=5, n_iter=25):
-    """Bayesian optimization for Prophet parameters with enhanced stability"""
-    def prophet_crossval(changepoint_prior_scale, seasonality_prior_scale):
+        seasonality_prior_scale = trial.suggest_float(
+            'seasonality_prior_scale', 0.1, 50, log=True
+        )
+        
         try:
             model = Prophet(
-                changepoint_prior_scale=max(changepoint_prior_scale, 1e-6),
-                seasonality_prior_scale=max(seasonality_prior_scale, 1e-6),
+                changepoint_prior_scale=changepoint_prior_scale,
+                seasonality_prior_scale=seasonality_prior_scale,
                 yearly_seasonality='auto',
                 weekly_seasonality='auto',
                 daily_seasonality=False,
-                uncertainty_samples=0  # Faster validation
+                uncertainty_samples=0  # Disable uncertainty for faster CV
             )
             model.fit(train_data)
+            
+            # Cross-validation with parallel processing
             df_cv = cross_validation(
-                model, 
-                initial='730 days', 
-                period='180 days', 
+                model,
+                initial='730 days',
+                period='180 days',
                 horizon='90 days',
                 parallel="processes"
             )
-            return -performance_metrics(df_cv)['rmse'].values[0]
+            
+            # Calculate weighted metric
+            metrics = performance_metrics(df_cv)
+            weighted_rmse = np.average(
+                metrics['rmse'],
+                weights=1/(metrics['horizon']/pd.Timedelta(days=1))
+            )
+            return weighted_rmse
+            
         except Exception as e:
-            print(f"Optimization failed: {str(e)}")
-            return -np.inf
+            trial.set_user_attr('error', str(e))
+            return float('inf')  # Penalize failed trials
 
-    optimizer = BayesianOptimization(
-        f=prophet_crossval,
-        pbounds={
-            'changepoint_prior_scale': (0.001, 0.5),
-            'seasonality_prior_scale': (0.1, 50)
-        },
-        random_state=42,
-        allow_duplicate_points=True
+    # Create study with efficient sampler and early stopping
+    sampler = TPESampler(seed=42, n_startup_trials=10)
+    study = optuna.create_study(
+        direction='minimize',
+        sampler=sampler,
+        pruner=optuna.pruners.MedianPruner(n_warmup_steps=5)
     )
-
-    optimizer.maximize(
-        init_points=init_points,
-        n_iter=n_iter,
+    
+    # Optimize with timeout and parallel jobs
+    study.optimize(
+        objective,
+        n_trials=n_trials,
+        timeout=timeout,
+        n_jobs=-1,  # Use all available cores
+        show_progress_bar=True
     )
-
+    
+    # Add optimization analytics
+    best_trial = study.best_trial
     return {
-        'params': optimizer.max['params'],
-        'metrics': optimizer.max['target']
+        'params': best_trial.params,
+        'metrics': {
+            'best_rmse': best_trial.value,
+            'completed_trials': len(study.trials),
+            'failed_trials': len([t for t in study.trials if t.state == optuna.trial.TrialState.FAIL])
+        },
+        'study': study  # Return full study object for visualization
     }
 
 class EnhancedProphet(Prophet):
@@ -1267,19 +1271,30 @@ def main():
 
                 if subscription_level == "premium":
                     # PREMIUM PIPELINE
-                    # STEP 4: Tune Prophet Model
+                    # STEP 4: Tune Prophet Model with Optuna
                     step += 1
-                    step_message.text(f"Step {step} of {total_steps}: Tuning Prophet model...")
-                    with st.spinner("🚀 Tuning Prophet model..."):
-                        best_params, best_rmse = find_best_prophet_params(train)
-                        time.sleep(1)
-                    if best_params is None:
-                        st.error("No valid Prophet parameters were found.")
-                        return
+                    step_message.text(f"Step {step} of {total_steps}: Tuning Prophet model with Optuna...")
+                    with st.spinner("🚀 Running advanced hyperparameter optimization..."):
+                        try:
+                            tune_result = tune_prophet(train, n_trials=50)
+                            best_params = tune_result['params']
+                            best_rmse = tune_result['metrics']['best_rmse']
+                            time.sleep(1)
+                        except Exception as e:
+                            st.error(f"Hyperparameter tuning failed: {str(e)}")
+                            return
+                    
                     st.success(f"✅ Best Prophet Params: {best_params}")
                     overall_status.write(f"📉 Best RMSE (CV): {best_rmse:.2f}")
-                    progress_bar.progress(int((step / total_steps) * 100))
-                    time.sleep(1)
+
+                        # Add optimization visualization
+                    with st.expander("🔍 View Hyperparameter Optimization Results"):
+                        try:
+                            from optuna.visualization import plot_optimization_history
+                            fig = plot_optimization_history(tune_result['study'])
+                            st.plotly_chart(fig)
+                        except Exception as e:
+                            st.warning(f"Could not display optimization details: {str(e)}")
 
                     # STEP 5: Train Prophet Model
                     step += 1
@@ -1361,31 +1376,107 @@ def main():
                     step += 1
                     step_message.text(f"Step {step} of {total_steps}: Displaying model performance comparison...")
                     comparison_data = []
-                    for model, res in st.session_state.model_results.items():
-                        forecast_df = res["Forecast"]
-                        match_len = min(len(test["y"]), len(forecast_df))
-                        actual = test["y"].iloc[:match_len].values
-                        pred = forecast_df["yhat"].iloc[:match_len].values
-                        corr = shape_score(actual, pred)
-                        res["Shape (corr)"] = corr
-                        comparison_data.append({
-                            "Model": model,
-                            "RMSE": res["RMSE"],
-                            "MAPE": res["MAPE"],
-                            "Shape (corr)": res["Shape (corr)"]
-                        })
-                    if comparison_data:
-                        max_rmse = max(res["RMSE"] for res in st.session_state.model_results.values())
-                        for model, res in st.session_state.model_results.items():
-                            res["Combined Score"] = combined_score(res["RMSE"], res["Shape (corr)"], max_rmse, 0.5, 1.0)
-                        for item in comparison_data:
-                            item["Combined Score"] = combined_score(item["RMSE"], item["Shape (corr)"], max_rmse, 0.5, 1.0)
-                        comparison_df = pd.DataFrame(comparison_data).sort_values(by="Combined Score")
-                        st.dataframe(comparison_df.style.highlight_min(subset=["Combined Score"], color="lightgreen"))
-                        best_model = comparison_df.iloc[0]["Model"]
-                        st.success(f"✨ **AI-Selected Best Model (Combined):** {best_model}")
-                    else:
-                        st.warning("No model results found. Please train the models first.")
+
+                    with st.expander("📊 Model Performance Metrics", expanded=True):
+                        if not st.session_state.model_results:
+                            st.warning("No model results found. Please train the models first.")
+                        else:
+                            # Calculate metrics with error handling
+                            valid_rmses = []
+                            for model, res in st.session_state.model_results.items():
+                                try:
+                                    forecast_df = res["Forecast"]
+                                    match_len = min(len(test["y"]), len(forecast_df))
+                                    actual = test["y"].iloc[:match_len].values
+                                    pred = forecast_df["yhat"].iloc[:match_len].values
+                                    
+                                    # Calculate metrics with NaN protection
+                                    rmse = np.nan
+                                    mape = np.nan
+                                    corr = np.nan
+                                    
+                                    if len(actual) > 0 and len(pred) > 0:
+                                        with warnings.catch_warnings():
+                                            warnings.simplefilter("ignore")
+                                            rmse = np.sqrt(mean_squared_error(actual, pred))
+                                            mape = np.mean(np.abs((actual - pred)/np.maximum(actual, 1e-8))) * 100
+                                            corr = pearsonr(actual, pred)[0] if np.std(actual) > 0 and np.std(pred) > 0 else np.nan
+                                    
+                                    res.update({
+                                        "RMSE": rmse,
+                                        "MAPE": mape,
+                                        "Shape (corr)": corr
+                                    })
+                                    valid_rmses.append(rmse) if not np.isnan(rmse) else None
+                                    
+                                    comparison_data.append({
+                                        "Model": model,
+                                        "RMSE": rmse,
+                                        "MAPE": mape,
+                                        "Shape (corr)": corr
+                                    })
+                                    
+                                except Exception as e:
+                                    st.error(f"Error evaluating {model}: {str(e)}")
+                                    comparison_data.append({
+                                        "Model": model,
+                                        "RMSE": np.nan,
+                                        "MAPE": np.nan,
+                                        "Shape (corr)": np.nan
+                                    })
+
+                            # Calculate combined scores
+                            max_rmse = max(valid_rmses) if valid_rmses else 1.0
+                            for item in comparison_data:
+                                item["Combined Score"] = combined_score(
+                                    item["RMSE"], 
+                                    item["Shape (corr)"], 
+                                    max_rmse,
+                                    alpha=0.5,
+                                    beta=1.0
+                                )
+
+                            # Create styled dataframe
+                            display_df = pd.DataFrame(comparison_data)
+                            
+                            # Format numbers and handle NaNs
+                            styled_df = display_df.style \
+                                .format({
+                                    "RMSE": "{:.2f}",
+                                    "MAPE": "{:.1%}",
+                                    "Shape (corr)": "{:.2f}",
+                                    "Combined Score": "{:.3f}"
+                                }, na_rep="N/A") \
+                                .background_gradient(
+                                    subset=["Combined Score"], 
+                                    cmap="YlGn",
+                                    vmin=display_df["Combined Score"].min(),
+                                    vmax=display_df["Combined Score"].max()
+                                ) \
+                                .set_caption(
+                                    "Model Performance Comparison (Lower Combined Score is Better)\n"
+                                    "Combined Score = 50% Normalized RMSE + 50% (1 - Correlation)"
+                                )
+
+                            # Display results
+                            st.dataframe(styled_df, use_container_width=True)
+                            
+                            # Find and display best model
+                            if not display_df.empty:
+                                best_model = display_df.loc[display_df["Combined Score"].idxmin(), "Model"]
+                                st.success(f"✨ **AI-Recommended Model:** `{best_model}`")
+                                st.markdown(f"**Rationale:** Selected based on optimal balance between error minimization (RMSE) "
+                                            f"and pattern matching (Correlation) metrics")
+                                
+                                # Show metric definitions
+                                with st.expander("📖 Metric Explanations"):
+                                    st.markdown("""
+                                    - **RMSE (Root Mean Squared Error):** Measures average error magnitude
+                                    - **MAPE (Mean Absolute Percentage Error):** Shows average percentage error
+                                    - **Shape Correlation:** Measures pattern matching (1 = perfect match)
+                                    - **Combined Score:** Balanced metric (50% RMSE, 50% pattern matching)
+                                    """)
+
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
