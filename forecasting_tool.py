@@ -499,141 +499,168 @@ class TemporalXGBoost:
         self.max_lags = max_lags
         self.fourier_terms = fourier_terms
         self.feature_columns = []
-        self.last_state = None
+        self.last_state = {}
+        self.freq = None  # Track data frequency
         
-    def create_temporal_features(self, df):
-        """Enhanced feature engineering for time series"""
+    def create_features(self, df):
+        """Enhanced feature engineering with automatic frequency detection"""
         df = df.copy()
         
-        # 1. Lag features using PACF
+        # 1. Determine data frequency
+        self.freq = pd.infer_freq(df['ds']) or 'MS'
+        
+        # 2. Lag features using PACF
         pacf_vals = pacf(df['y'], nlags=self.max_lags, method='ywm')
         significant_lags = np.where(np.abs(pacf_vals) > 1.96/np.sqrt(len(df)))[0]
         for lag in significant_lags:
             if lag > 0:
                 df[f'lag_{lag}'] = df['y'].shift(lag)
         
-        # 2. Rolling statistics
+        # 3. Rolling statistics
         for window in [3, 6, 12]:
             df[f'rolling_mean_{window}'] = df['y'].rolling(window).mean()
             df[f'rolling_std_{window}'] = df['y'].rolling(window).std()
         
-        # 3. Date-based features
-        df['month'] = df['ds'].dt.month
-        df['quarter'] = df['ds'].dt.quarter
-        df['year'] = df['ds'].dt.year
+        # 4. Date features based on detected frequency
+        dt = df['ds'].dt
+        if self.freq == 'D':
+            df['dayofweek'] = dt.dayofweek
+            df['dayofyear'] = dt.dayofyear
+        elif self.freq in ['MS', 'M']:
+            df['month'] = dt.month
+            df['quarter'] = dt.quarter
         
-        # 4. Fourier terms for seasonality
-        for k in range(1, self.fourier_terms+1):
-            df[f'sin_{k}'] = np.sin(2 * np.pi * k * df['month']/12)
-            df[f'cos_{k}'] = np.cos(2 * np.pi * k * df['month']/12)
+        # 5. Fourier terms
+        if self.freq in ['MS', 'M']:
+            for k in range(1, self.fourier_terms+1):
+                df[f'sin_{k}'] = np.sin(2 * np.pi * k * dt.month/12)
+                df[f'cos_{k}'] = np.cos(2 * np.pi * k * dt.month/12)
         
-        # 5. Trend features
+        # 6. Trend features
         df['trend'] = np.arange(len(df))
-        df['year_trend'] = df['year'] * df['trend']
         
-        # Store feature columns
         self.feature_columns = [col for col in df.columns if col not in ['ds', 'y']]
-        
         return df.dropna()
 
     def fit(self, train_data):
-        """Time-series aware training with validation"""
-        df = self.create_temporal_features(train_data)
-        X = df[self.feature_columns]
-        y = df['y']
-        
-        # Time-series cross-validation
-        tscv = TimeSeriesSplit(n_splits=3)
-        self.model = xgb.XGBRegressor(
-            n_estimators=1000,
-            learning_rate=0.05,
-            max_depth=5,
-            subsample=0.8,
-            colsample_bytree=0.8,
-            objective='reg:squarederror',
-            early_stopping_rounds=50,
-            n_jobs=-1
-        )
-        
-        # Store last state for forecasting
-        self.last_state = {
-            'lags': {col: X[col].iloc[-1] for col in X.columns if 'lag_' in col},
-            'rolling_stats': {col: X[col].iloc[-1] for col in X.columns if 'rolling_' in col}
-        }
-        
-        # Fit with early stopping
-        for train_idx, val_idx in tscv.split(X):
-            X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
-            y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+        """Enhanced training with automatic feature creation"""
+        try:
+            df = self.create_features(train_data)
+            X = df[self.feature_columns]
+            y = df['y']
             
-            self.model.fit(
-                X_train, y_train,
-                eval_set=[(X_val, y_val)],
-                verbose=False
+            # Store last state for forecasting
+            self.last_state = {
+                'lags': X.filter(regex='lag_').iloc[-1].to_dict(),
+                'rolling_stats': X.filter(regex='rolling_').iloc[-1].to_dict(),
+                'trend': X['trend'].iloc[-1]
+            }
+            
+            # Train model with cross-validation
+            tscv = TimeSeriesSplit(n_splits=3)
+            self.model = xgb.XGBRegressor(
+                n_estimators=1000,
+                learning_rate=0.05,
+                max_depth=5,
+                subsample=0.8,
+                colsample_bytree=0.8,
+                objective='reg:squarederror',
+                early_stopping_rounds=50,
+                n_jobs=-1
             )
             
-        return self
-    
+            for train_idx, val_idx in tscv.split(X):
+                X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
+                y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+                
+                self.model.fit(
+                    X_train, y_train,
+                    eval_set=[(X_val, y_val)],
+                    verbose=False
+                )
+                
+            return self
+            
+        except Exception as e:
+            raise RuntimeError(f"Training failed: {str(e)}")
+
     def predict(self, start_date, periods=None):
-        """Recursive multi-step forecasting"""
+        """Robust recursive forecasting"""
         if periods is None:
             periods = self.horizon
-        
+            
         forecasts = []
-        current_features = self.last_state.copy()
+        current_state = self.last_state.copy()
         
         for _ in range(periods):
-            # Update date features
-            current_date = start_date + pd.DateOffset(months=len(forecasts)+1)
-            month = current_date.month
-            year = current_date.year
+            # Generate features for next step
+            features = self._generate_next_features(current_state, start_date)
             
-            # Update features
-            features = {}
-            features.update(current_features['lags'])
-            features.update(current_features['rolling_stats'])
-            
-            # Date-based features
-            features.update({
-                'month': month,
-                'quarter': (month-1)//3 + 1,
-                'year': year,
-                'trend': current_features['trend'] + 1,
-                'year_trend': year * (current_features['trend'] + 1)
-            })
-            
-            # Fourier terms
-            for k in range(1, self.fourier_terms+1):
-                features[f'sin_{k}'] = np.sin(2 * np.pi * k * month/12)
-                features[f'cos_{k}'] = np.cos(2 * np.pi * k * month/12)
-            
-            # Make prediction
+            # Predict and update state
             pred = self.model.predict(pd.DataFrame([features]))[0]
             forecasts.append(pred)
+            self._update_state(current_state, pred, start_date)
             
-            # Update state
-            self._update_state(current_features, pred)
+            # Increment date
+            start_date += pd.DateOffset(months=1)
             
         return pd.DataFrame({
-            'ds': pd.date_range(start=start_date, periods=periods, freq='MS'),
+            'ds': pd.date_range(
+                start=self.last_state['date'] + pd.DateOffset(months=1),
+                periods=periods,
+                freq=self.freq
+            ),
             'yhat': forecasts
         })
-    
-    def _update_state(self, current_state, new_value):
-        """Update lag and rolling features recursively"""
-        # Update lags
-        for lag in sorted([int(col.split('_')[1]) for col in current_state['lags'].keys()], reverse=True):
-            if lag == 1:
-                current_state['lags']['lag_1'] = new_value
-            else:
-                current_state['lags'][f'lag_{lag}'] = current_state['lags'].get(f'lag_{lag-1}', new_value)
+
+    def _generate_next_features(self, state, current_date):
+        """Create feature vector for prediction"""
+        features = {}
+        features.update(state['lags'])
+        features.update(state['rolling_stats'])
         
-        # Update rolling stats (simplified)
+        # Date-based features
+        dt = current_date
+        if self.freq == 'D':
+            features.update({
+                'dayofweek': dt.dayofweek,
+                'dayofyear': dt.dayofyear
+            })
+        elif self.freq in ['MS', 'M']:
+            features.update({
+                'month': dt.month,
+                'quarter': (dt.month-1)//3 + 1
+            })
+        
+        # Fourier terms
+        if self.freq in ['MS', 'M']:
+            for k in range(1, self.fourier_terms+1):
+                features[f'sin_{k}'] = np.sin(2 * np.pi * k * dt.month/12)
+                features[f'cos_{k}'] = np.cos(2 * np.pi * k * dt.month/12)
+        
+        # Trend features
+        features['trend'] = state['trend'] + 1
+        
+        return features
+
+    def _update_state(self, state, new_value, current_date):
+        """Update state for next prediction"""
+        # Update lags
+        for lag in sorted([int(k.split('_')[1]) for k in state['lags'].keys()], reverse=True):
+            if lag == 1:
+                state['lags'][f'lag_1'] = new_value
+            else:
+                state['lags'][f'lag_{lag}'] = state['lags'].get(f'lag_{lag-1}', new_value)
+        
+        # Update rolling stats
         for window in [3, 6, 12]:
-            current_state['rolling_stats'][f'rolling_mean_{window}'] = \
-                (current_state['rolling_stats'][f'rolling_mean_{window}'] * (window-1) + new_value) / window
-            
-        current_state['trend'] += 1
+            state['rolling_stats'][f'rolling_mean_{window}'] = (
+                state['rolling_stats'][f'rolling_mean_{window}'] * (window-1) + new_value
+            ) / window
+        
+        # Update trend
+        state['trend'] += 1
+        state['date'] = current_date
 
 class AutoTS:
     def __init__(self, time_budget=600, ensemble_size=4):
@@ -1082,59 +1109,51 @@ def train_xgb_model(train, test, forecast_period, last_historical_value,
         if category_scenarios:
             train = train.groupby("ds", as_index=False).agg({"y": "sum"})
 
-        # Initialize enhanced XGBoost
+        # Initialize and train model
         model = TemporalXGBoost(horizon=forecast_period)
+        model.fit(train)
         
-        # Create features and train
-        df_features = model.create_features(train)
-        model.fit(df_features)
+        # Generate forecasts
+        start_date = train["ds"].iloc[-1]
+        forecast_df = model.predict(start_date, forecast_period)
         
-        # Generate recursive forecasts
-        forecasts = []
-        current_features = df_features.drop(["ds", "y"], axis=1).iloc[-1]
+        # Apply scenario adjustments
+        forecast_df = adjust_forecast(
+            forecast_df, 
+            demand_shock,
+            seasonality_adjustment,
+            external_shock,
+            category_scenarios
+        )
         
-        for _ in range(forecast_period):
-            # Update temporal features
-            current_features = model.update_features(current_features)
-            
-            # Predict next step
-            pred = model.model.predict(current_features.values.reshape(1, -1))[0]
-            forecasts.append(pred)
-            
-            # Update feature state
-            current_features = model.shift_features(current_features, pred)
-        
-        # Create forecast dataframe
-        forecast_df = pd.DataFrame({
-            "ds": pd.date_range(
-                start=train["ds"].iloc[-1] + pd.DateOffset(months=1),
-                periods=forecast_period,
-                freq="MS"
-            ),
-            "yhat": forecasts
-        })
-        
-        # Apply scenarios and differencing reversal
-        forecast_df = adjust_forecast(forecast_df, demand_shock,
-                                    seasonality_adjustment, external_shock,
-                                    category_scenarios)
-        
+        # Handle differencing
         if is_diff and last_historical_value is not None:
             forecast_df["yhat"] = inverse_difference(
                 forecast_df["yhat"], 
                 last_historical_value
             )
         
-        # Enhanced evaluation
-        metrics = comprehensive_metrics(
-            test["y"].iloc[:len(forecast_df)],
-            forecast_df["yhat"]
-        )
+        # Calculate metrics
+        match_len = min(len(test["y"]), len(forecast_df))
+        metrics = {
+            "RMSE": mean_squared_error(
+                test["y"].iloc[:match_len], 
+                forecast_df["yhat"].iloc[:match_len], 
+                squared=False
+            ),
+            "MAPE": mean_absolute_percentage_error(
+                test["y"].iloc[:match_len],
+                forecast_df["yhat"].iloc[:match_len]
+            ),
+            "FeatureImportances": dict(zip(
+                model.feature_columns,
+                model.model.feature_importances_
+            ))
+        }
         
         result = {
             **metrics,
             "Forecast": forecast_df,
-            "FeatureImportances": model.feature_importances_,
             "Model": model
         }
 
