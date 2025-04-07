@@ -808,74 +808,70 @@ def combined_score(rmse, corr, max_rmse, alpha=0.5, beta=1.0):
         return np.nan
 
 # ====================== PROPHET MODEL ======================
-def train_prophet_model(train, test, forecast_period, last_historical_value,
-                        is_diff, demand_shock, seasonality_adjustment, 
-                        external_shock, category_scenarios=None):
+def train_prophet_model(train, test, forecast_period, best_params, last_historical_value,
+                        is_diff, demand_shock, seasonality_adjustment, external_shock, 
+                        category_scenarios=None):
+    """Updated function signature with proper parameters"""
     result = {}
     try:
-        # Handle category aggregation
+        # If category adjustments are used, aggregate training data by date
         if category_scenarios:
             train = train.groupby("ds", as_index=False).agg({"y": "sum"})
-
-        # Dynamic cap calculation
-        train["cap"] = train["y"].max() * (1 + 0.05 * np.sqrt(len(train)/12))
-        train["floor"] = train["y"].min() * 0.95
-
-        # Bayesian parameter tuning
-        prophet_params = tune_prophet(train)
         
-        # Initialize enhanced Prophet
-        model = EnhancedProphet(
+        # Set logistic growth parameters
+        train["cap"] = 1.2 * train["y"].max()
+        train["floor"] = 1  # Minimal positive floor
+        
+        # Initialize Prophet with tuned parameters
+        model = Prophet(
             growth="logistic",
-            **prophet_params
+            seasonality_mode=best_params["seasonality_mode"],
+            changepoint_prior_scale=best_params["changepoint_prior_scale"]
         )
         
-        # Advanced seasonality detection
-        model.detect_seasonalities(train)
-        
-        # Add custom regressors if needed
-        if category_scenarios:
-            for col in category_scenarios.keys():
-                model.add_regressor(col)
-        
+        # Add detected seasonalities
+        try:
+            model = detect_and_add_seasonalities(model, train)
+        except Exception as e:
+            st.warning(f"Seasonality detection failed: {e}")
+
         model.fit(train)
         
-        # Create future dataframe with dynamic cap
-        future = model.make_future_dataframe(
-            periods=forecast_period, 
-            freq="MS",
-            include_history=False
-        )
-        future["cap"] = train["cap"].max() * (1 + 0.05 * np.sqrt(forecast_period/12))
-        future["floor"] = train["floor"].min()
+        # Create future dataframe
+        future = model.make_future_dataframe(periods=forecast_period, freq="MS", include_history=False)
+        future["cap"] = train["cap"].max()
+        future["floor"] = 1
         
         # Generate predictions
         forecast = model.predict(future)
-        forecast = forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]]
+        forecast = forecast[forecast["ds"] > train["ds"].max()]
         
         # Apply scenario adjustments
-        forecast = adjust_forecast(forecast, demand_shock, seasonality_adjustment,
-                                 external_shock, category_scenarios)
+        forecast = adjust_forecast(
+            forecast, 
+            demand_shock, 
+            seasonality_adjustment, 
+            external_shock, 
+            category_scenarios
+        )
         
-        # Differencing reversal
+        # Inverse differencing if needed
         if is_diff and last_historical_value is not None:
             forecast = inverse_difference(forecast, last_historical_value)
         
-        # Enhanced evaluation
-        metrics = comprehensive_metrics(
-            test["y"].iloc[:len(forecast)], 
-            forecast["yhat"]
-        )
+        # Evaluate performance
+        match_len = min(len(test["y"]), len(forecast))
+        rmse = mean_squared_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len], squared=False)
+        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len])
         
         result = {
-            **metrics,
-            "Forecast": forecast,
-            "Model": model,
-            "Parameters": prophet_params
+            "RMSE": float(rmse),
+            "MAPE": float(mape),
+            "Forecast": forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]]
         }
-        
+    
     except Exception as e:
-        st.error(f"Prophet Error: {str(e)}")
+        st.error(f"Prophet model failed: {str(e)}")
         result = {"error": str(e)}
     
     return "Prophet", result
