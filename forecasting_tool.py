@@ -217,26 +217,42 @@ def detect_and_add_seasonalities(model, data):
 def tune_prophet(train_data, n_trials=50, timeout=3600):
     """Optuna-based hyperparameter optimization for Prophet with enhanced features"""
     def objective(trial):
-        # Suggest parameters with logarithmic scaling
-        changepoint_prior_scale = trial.suggest_float(
-            'changepoint_prior_scale', 1e-3, 0.5, log=True
-        )
-        seasonality_prior_scale = trial.suggest_float(
-            'seasonality_prior_scale', 0.1, 50, log=True
-        )
-        
+        # Suggest parameters with intelligent ranges
+        params = {
+            'changepoint_prior_scale': trial.suggest_float(
+                'changepoint_prior_scale', 1e-3, 0.5, log=True),
+            'seasonality_prior_scale': trial.suggest_float(
+                'seasonality_prior_scale', 0.1, 50, log=True),
+            'seasonality_mode': trial.suggest_categorical(
+                'seasonality_mode', ['additive', 'multiplicative']),
+            'growth': trial.suggest_categorical(
+                'growth', ['logistic', 'linear'])  # Optional: Tune growth mode
+        }
+
+        # Add logistic growth requirements if needed
+        if params['growth'] == 'logistic':
+            if 'cap' not in train_data.columns:
+                trial.set_user_attr('error', 'Missing cap for logistic growth')
+                return float('inf')
+            if 'floor' not in train_data.columns:
+                trial.set_user_attr('error', 'Missing floor for logistic growth')
+                return float('inf')
+
         try:
             model = Prophet(
-                changepoint_prior_scale=changepoint_prior_scale,
-                seasonality_prior_scale=seasonality_prior_scale,
+                **params,
                 yearly_seasonality='auto',
                 weekly_seasonality='auto',
                 daily_seasonality=False,
-                uncertainty_samples=0  # Disable uncertainty for faster CV
+                uncertainty_samples=0  # Disable for faster CV
             )
-            model.fit(train_data)
             
-            # Cross-validation with parallel processing
+            # Add custom seasonalities from EnhancedProphet
+            model = EnhancedProphet(**params).detect_seasonalities(train_data)
+            
+            model.fit(train_data)
+
+            # Smart cross-validation configuration
             df_cv = cross_validation(
                 model,
                 initial='730 days',
@@ -244,46 +260,54 @@ def tune_prophet(train_data, n_trials=50, timeout=3600):
                 horizon='90 days',
                 parallel="processes"
             )
-            
-            # Calculate weighted metric
+
+            # Time-aware weighted RMSE
             metrics = performance_metrics(df_cv)
-            weighted_rmse = np.average(
-                metrics['rmse'],
-                weights=1/(metrics['horizon']/pd.Timedelta(days=1))
-            )
-            return weighted_rmse
+            weights = 1 / (metrics['horizon'] / pd.Timedelta(days=1) + 1e-6)
+            weighted_rmse = np.average(metrics['rmse'], weights=weights)
             
+            return weighted_rmse
+
         except Exception as e:
             trial.set_user_attr('error', str(e))
-            return float('inf')  # Penalize failed trials
+            return float('inf')
 
-    # Create study with efficient sampler and early stopping
+    # Configure study with enhanced settings
     sampler = TPESampler(seed=42, n_startup_trials=10)
     study = optuna.create_study(
         direction='minimize',
         sampler=sampler,
-        pruner=optuna.pruners.MedianPruner(n_warmup_steps=5)
+        pruner=optuna.pruners.HyperbandPruner(
+            min_resource=1,
+            reduction_factor=3
+        )
     )
-    
-    # Optimize with timeout and parallel jobs
+
+    # Optimize with intelligent resource allocation
     study.optimize(
         objective,
         n_trials=n_trials,
         timeout=timeout,
-        n_jobs=-1,  # Use all available cores
+        n_jobs=-1,
+        gc_after_trial=True,
         show_progress_bar=True
     )
-    
-    # Add optimization analytics
+
+    # Generate optimization report
     best_trial = study.best_trial
     return {
-        'params': best_trial.params,
+        'params': {
+            **best_trial.params,
+            'custom_seasonalities': best_trial.user_attrs.get(
+                'custom_seasonalities', [])
+        },
         'metrics': {
             'best_rmse': best_trial.value,
             'completed_trials': len(study.trials),
-            'failed_trials': len([t for t in study.trials if t.state == optuna.trial.TrialState.FAIL])
+            'pruned_trials': len([t for t in study.trials 
+                                if t.state == optuna.trial.TrialState.PRUNED])
         },
-        'study': study  # Return full study object for visualization
+        'study': study
     }
 
 class EnhancedProphet(Prophet):
@@ -292,40 +316,46 @@ class EnhancedProphet(Prophet):
         self.custom_seasonalities = []
         
     def detect_seasonalities(self, data, threshold_percentile=95):
-        """FFT-based seasonality detection with error handling"""
+        """Enhanced FFT-based seasonality detection with error handling"""
         try:
-            # Remove zeros to avoid FFT issues
             y = data['y'].replace(0, np.nan).dropna()
-            
-            # Calculate sampling frequency (assuming daily data)
+            if len(y) < 365:
+                return self  # Skip detection for short series
+                
+            # Dynamic frequency detection
             freq = pd.infer_freq(data['ds'])
-            days_per_year = 365.25
-            if freq == 'D':
-                fs = 1.0  # Daily frequency
-            elif freq == 'M':
-                fs = days_per_year/12
-            else:
-                fs = days_per_year  # Default to yearly
+            fs_map = {
+                'D': 1.0,
+                'MS': 12/365.25,
+                'M': 12/365.25,
+                'H': 24,
+                'Q': 4/365.25
+            }
+            fs = fs_map.get(freq, 365.25)
             
+            # Power spectral analysis
             f, Pxx = periodogram(y, fs=fs)
             significant = Pxx > np.percentile(Pxx, threshold_percentile)
             
+            # Add validated seasonalities
             for freq, power in zip(f[significant], Pxx[significant]):
-                if freq <= 0:  # Skip DC component
+                if freq <= 0 or power < 0.1:
                     continue
                     
                 period_days = 1/freq
-                if 7 <= period_days <= 365:  # Valid seasonal periods
+                if 3 <= period_days <= 365:
                     name = f'custom_{int(period_days)}d'
                     if name not in self.custom_seasonalities:
-                        fourier_order = max(3, int(period_days/30))
+                        fourier_order = min(10, max(3, int(period_days/7)))
                         self.add_seasonality(
                             name=name,
                             period=period_days,
                             fourier_order=fourier_order
                         )
                         self.custom_seasonalities.append(name)
-                        
+            
+            self.user_attrs['custom_seasonalities'] = self.custom_seasonalities
+            
         except Exception as e:
             print(f"Seasonality detection failed: {str(e)}")
             
@@ -811,41 +841,43 @@ def combined_score(rmse, corr, max_rmse, alpha=0.5, beta=1.0):
 def train_prophet_model(train, test, forecast_period, best_params, last_historical_value,
                         is_diff, demand_shock, seasonality_adjustment, external_shock, 
                         category_scenarios=None):
-    """Updated function signature with proper parameters"""
+    """Updated function with EnhancedProphet integration and dynamic growth handling"""
     result = {}
     try:
-        # If category adjustments are used, aggregate training data by date
+        # Aggregate data if using category scenarios
         if category_scenarios:
             train = train.groupby("ds", as_index=False).agg({"y": "sum"})
-        
-        # Set logistic growth parameters
-        train["cap"] = 1.2 * train["y"].max()
-        train["floor"] = 1  # Minimal positive floor
-        
-        # Initialize Prophet with tuned parameters
-        model = Prophet(
-            growth="logistic",
-            seasonality_mode=best_params["seasonality_mode"],
-            changepoint_prior_scale=best_params["changepoint_prior_scale"]
-        )
-        
-        # Add detected seasonalities
-        try:
-            model = detect_and_add_seasonalities(model, train)
-        except Exception as e:
-            st.warning(f"Seasonality detection failed: {e}")
 
+        # Handle growth mode requirements
+        growth_mode = best_params.get('growth', 'logistic')
+        if growth_mode == 'logistic':
+            train["cap"] = 1.2 * train["y"].max()
+            train["floor"] = 1  # Minimal positive floor
+
+        # Initialize EnhancedProphet with all tuned parameters
+        model = EnhancedProphet(**best_params)
+        
+        # Automatic seasonality detection
+        model.detect_seasonalities(train)
+        
+        # Fit model with error tracking
         model.fit(train)
         
-        # Create future dataframe
-        future = model.make_future_dataframe(periods=forecast_period, freq="MS", include_history=False)
-        future["cap"] = train["cap"].max()
-        future["floor"] = 1
+        # Create future dataframe with growth mode awareness
+        future = model.make_future_dataframe(
+            periods=forecast_period, 
+            freq="MS", 
+            include_history=False
+        )
         
-        # Generate predictions
+        if growth_mode == 'logistic':
+            future["cap"] = train["cap"].max()
+            future["floor"] = 1
+
+        # Generate predictions with uncertainty
         forecast = model.predict(future)
         forecast = forecast[forecast["ds"] > train["ds"].max()]
-        
+
         # Apply scenario adjustments
         forecast = adjust_forecast(
             forecast, 
@@ -854,26 +886,37 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
             external_shock, 
             category_scenarios
         )
-        
-        # Inverse differencing if needed
+
+        # Handle differencing reversal
         if is_diff and last_historical_value is not None:
             forecast = inverse_difference(forecast, last_historical_value)
-        
-        # Evaluate performance
+
+        # Calculate metrics with alignment check
         match_len = min(len(test["y"]), len(forecast))
-        rmse = mean_squared_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len], squared=False)
-        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len])
-        
+        if match_len > 0:
+            rmse = mean_squared_error(
+                test["y"].iloc[:match_len], 
+                forecast["yhat"].iloc[:match_len], 
+                squared=False
+            )
+            mape = mean_absolute_percentage_error(
+                test["y"].iloc[:match_len],
+                forecast["yhat"].iloc[:match_len]
+            )
+        else:
+            rmse, mape = float('nan'), float('nan')
+
         result = {
             "RMSE": float(rmse),
             "MAPE": float(mape),
-            "Forecast": forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]]
+            "Forecast": forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]],
+            "Seasonalities": model.custom_seasonalities,
+            "GrowthMode": growth_mode
         }
-    
+
     except Exception as e:
         st.error(f"Prophet model failed: {str(e)}")
-        result = {"error": str(e)}
-    
+
     return "Prophet", result
 
 # ====================== ARIMA MODEL ======================
