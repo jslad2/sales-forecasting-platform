@@ -296,70 +296,132 @@ def tune_prophet(train_data, n_trials=50, timeout=3600):
     # Generate optimization report
     best_trial = study.best_trial
     return {
-        'params': {
-            **best_trial.params,
-            'custom_seasonalities': best_trial.user_attrs.get(
-                'custom_seasonalities', [])
-        },
-        'metrics': {
-            'best_rmse': best_trial.value,
-            'completed_trials': len(study.trials),
-            'pruned_trials': len([t for t in study.trials 
-                                if t.state == optuna.trial.TrialState.PRUNED])
-        },
-        'study': study
-    }
+    'params': best_trial.params,  # Remove custom_seasonalities from here
+    'custom_seasonalities': best_trial.user_attrs.get('custom_seasonalities', []),
+    'metrics': {
+        'best_rmse': best_trial.value,
+        'completed_trials': len(study.trials),
+        'pruned_trials': len([t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED])
+    },
+    'study': study
+}
 
 class EnhancedProphet(Prophet):
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.custom_seasonalities = []
+        """Enhanced Prophet subclass with custom seasonality management"""
+        # Remove custom parameters before parent initialization
+        self.custom_seasonalities = kwargs.pop('custom_seasonalities', [])
+        self.detected_seasonalities = []
         
-    def detect_seasonalities(self, data, threshold_percentile=95):
-        """Enhanced FFT-based seasonality detection with error handling"""
+        # Filter valid Prophet parameters
+        valid_params = Prophet().__dict__.keys()
+        prophet_kwargs = {k: v for k, v in kwargs.items() if k in valid_params}
+        
+        super().__init__(**prophet_kwargs)
+        
+        # Add predefined custom seasonalities
+        for season in self.custom_seasonalities:
+            self._safe_add_seasonality(season)
+
+    def _safe_add_seasonality(self, season_config):
+        """Add seasonality with error handling"""
+        try:
+            self.add_seasonality(
+                name=season_config['name'],
+                period=season_config['period'],
+                fourier_order=season_config['fourier_order']
+            )
+            if season_config['name'] not in self.custom_seasonalities:
+                self.custom_seasonalities.append(season_config['name'])
+        except Exception as e:
+            print(f"Failed to add {season_config['name']}: {str(e)}")
+
+    def detect_seasonalities(self, data, threshold_percentile=95, min_period=7, max_period=365):
+        """FFT-based seasonality detection with enhanced safeguards"""
         try:
             y = data['y'].replace(0, np.nan).dropna()
-            if len(y) < 365:
-                return self  # Skip detection for short series
-                
-            # Dynamic frequency detection
+            if len(y) < 2 * max_period:
+                print("Insufficient data for reliable seasonality detection")
+                return self
+
+            # Calculate sampling frequency
             freq = pd.infer_freq(data['ds'])
-            fs_map = {
-                'D': 1.0,
-                'MS': 12/365.25,
-                'M': 12/365.25,
-                'H': 24,
-                'Q': 4/365.25
-            }
-            fs = fs_map.get(freq, 365.25)
+            fs = self._get_sampling_rate(freq)
             
-            # Power spectral analysis
-            f, Pxx = periodogram(y, fs=fs)
+            # Compute periodogram
+            f, Pxx = periodogram(y - y.mean(), fs=fs)
             significant = Pxx > np.percentile(Pxx, threshold_percentile)
             
             # Add validated seasonalities
-            for freq, power in zip(f[significant], Pxx[significant]):
-                if freq <= 0 or power < 0.1:
+            for freq_hz, power in zip(f[significant], Pxx[significant]):
+                if freq_hz <= 0:
                     continue
                     
-                period_days = 1/freq
-                if 3 <= period_days <= 365:
-                    name = f'custom_{int(period_days)}d'
-                    if name not in self.custom_seasonalities:
-                        fourier_order = min(10, max(3, int(period_days/7)))
-                        self.add_seasonality(
-                            name=name,
-                            period=period_days,
-                            fourier_order=fourier_order
-                        )
-                        self.custom_seasonalities.append(name)
-            
-            self.user_attrs['custom_seasonalities'] = self.custom_seasonalities
-            
+                period_days = 1 / freq_hz
+                if min_period <= period_days <= max_period:
+                    self._add_detected_seasonality(period_days, power)
+                    
         except Exception as e:
             print(f"Seasonality detection failed: {str(e)}")
             
         return self
+
+    def _get_sampling_rate(self, freq):
+        """Convert pandas frequency to sampling rate"""
+        freq_map = {
+            'D': 1.0,      # Daily
+            'MS': 12/365.25,  # Monthly start
+            'M': 12/365.25,   # Monthly end
+            'H': 24,       # Hourly
+            'Q': 4/365.25   # Quarterly
+        }
+        return freq_map.get(freq, 365.25)  # Default to yearly
+
+    def _add_detected_seasonality(self, period_days, power):
+        """Add validated seasonality to model"""
+        name = f'custom_{int(period_days)}d'
+        fourier_order = self._calculate_fourier_order(period_days)
+        
+        if name not in self.custom_seasonalities + self.detected_seasonalities:
+            try:
+                self.add_seasonality(
+                    name=name,
+                    period=period_days,
+                    fourier_order=fourier_order
+                )
+                self.detected_seasonalities.append({
+                    'name': name,
+                    'period': period_days,
+                    'fourier_order': fourier_order,
+                    'power': power
+                })
+            except ValueError as e:
+                print(f"Skipping {name}: {str(e)}")
+
+    def _calculate_fourier_order(self, period_days):
+        """Dynamic Fourier order calculation"""
+        return min(11, max(3, int(period_days / 7)))
+
+    def get_seasonality_report(self):
+        """Return formatted seasonality information"""
+        report = {
+            'builtin': [],
+            'custom': [],
+            'detected': []
+        }
+        
+        # Built-in seasonalities
+        for seas in self.seasonalities:
+            if seas not in self.custom_seasonalities + [s['name'] for s in self.detected_seasonalities]:
+                report['builtin'].append(seas)
+        
+        # Custom seasonalities
+        report['custom'] = self.custom_seasonalities
+        
+        # Detected seasonalities
+        report['detected'] = [s['name'] for s in self.detected_seasonalities]
+        
+        return report
 
 def auto_arima_enhanced(data, seasonal_period=12, enforce_stationarity=True, explain=True):
     """
@@ -841,29 +903,54 @@ def combined_score(rmse, corr, max_rmse, alpha=0.5, beta=1.0):
 def train_prophet_model(train, test, forecast_period, best_params, last_historical_value,
                         is_diff, demand_shock, seasonality_adjustment, external_shock, 
                         category_scenarios=None):
-    """Updated function with EnhancedProphet integration and dynamic growth handling"""
+    """Updated Prophet training with enhanced parameter filtering and custom seasonality handling"""
     result = {}
     try:
-        # Aggregate data if using category scenarios
-        if category_scenarios:
-            train = train.groupby("ds", as_index=False).agg({"y": "sum"})
+        # 1. Filter valid Prophet parameters
+        valid_prophet_params = [
+            'growth', 'changepoint_prior_scale', 'seasonality_prior_scale',
+            'seasonality_mode', 'yearly_seasonality', 'weekly_seasonality',
+            'daily_seasonality', 'holidays', 'holidays_prior_scale',
+            'changepoint_range', 'mcmc_samples', 'uncertainty_samples'
+        ]
+        
+        prophet_params = {
+            k: v for k, v in best_params.items() 
+            if k in valid_prophet_params
+        }
 
-        # Handle growth mode requirements
-        growth_mode = best_params.get('growth', 'logistic')
+        # 2. Handle custom seasonalities separately
+        custom_seasons = best_params.get('custom_seasonalities', [])
+        
+        # 3. Initialize model with valid parameters
+        model = EnhancedProphet(**prophet_params)
+        
+        # 4. Add custom seasonalities before detection
+        if custom_seasons:
+            for season in custom_seasons:
+                try:
+                    model.add_seasonality(
+                        name=season['name'],
+                        period=season['period'],
+                        fourier_order=season['fourier_order']
+                    )
+                except Exception as e:
+                    st.warning(f"Couldn't add {season['name']}: {str(e)}")
+
+        # 5. Automatic seasonality detection
+        model.detect_seasonalities(train)
+
+        # 6. Handle growth requirements
+        growth_mode = prophet_params.get('growth', 'linear')
         if growth_mode == 'logistic':
             train["cap"] = 1.2 * train["y"].max()
-            train["floor"] = 1  # Minimal positive floor
+            train["floor"] = 1
 
-        # Initialize EnhancedProphet with all tuned parameters
-        model = EnhancedProphet(**best_params)
-        
-        # Automatic seasonality detection
-        model.detect_seasonalities(train)
-        
-        # Fit model with error tracking
-        model.fit(train)
-        
-        # Create future dataframe with growth mode awareness
+        # 7. Fit model with progress tracking
+        with st.spinner("🔮 Training Prophet model..."):
+            model.fit(train)
+
+        # 8. Create future dataframe
         future = model.make_future_dataframe(
             periods=forecast_period, 
             freq="MS", 
@@ -874,11 +961,11 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
             future["cap"] = train["cap"].max()
             future["floor"] = 1
 
-        # Generate predictions with uncertainty
+        # 9. Generate predictions
         forecast = model.predict(future)
         forecast = forecast[forecast["ds"] > train["ds"].max()]
 
-        # Apply scenario adjustments
+        # 10. Apply scenario adjustments
         forecast = adjust_forecast(
             forecast, 
             demand_shock, 
@@ -887,11 +974,11 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
             category_scenarios
         )
 
-        # Handle differencing reversal
+        # 11. Handle differencing
         if is_diff and last_historical_value is not None:
             forecast = inverse_difference(forecast, last_historical_value)
 
-        # Calculate metrics with alignment check
+        # 12. Calculate metrics with alignment check
         match_len = min(len(test["y"]), len(forecast))
         if match_len > 0:
             rmse = mean_squared_error(
@@ -911,6 +998,7 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
             "MAPE": float(mape),
             "Forecast": forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]],
             "Seasonalities": model.custom_seasonalities,
+            "ModelParams": prophet_params,
             "GrowthMode": growth_mode
         }
 
@@ -1315,7 +1403,10 @@ def main():
                     with st.spinner("🚀 Running advanced hyperparameter optimization..."):
                         try:
                             tune_result = tune_prophet(train, n_trials=50)
-                            best_params = tune_result['params']
+                            best_params = {
+                                **tune_result['params'],
+                                'custom_seasonalities': tune_result['custom_seasonalities']
+                            }
                             best_rmse = tune_result['metrics']['best_rmse']
                             time.sleep(1)
                         except Exception as e:
