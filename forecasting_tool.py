@@ -1681,13 +1681,15 @@ def main():
                                             f"and pattern matching (Correlation) metrics")
                                 
                                 # Show metric definitions
-                                with st.expander("📖 Metric Explanations"):
-                                    st.markdown("""
-                                    - **RMSE (Root Mean Squared Error):** Measures average error magnitude
-                                    - **MAPE (Mean Absolute Percentage Error):** Shows average percentage error
-                                    - **Shape Correlation:** Measures pattern matching (1 = perfect match)
-                                    - **Combined Score:** Balanced metric (50% RMSE, 50% pattern matching)
-                                    """)
+                            show_explanations = st.checkbox("ℹ️ Show Metric Explanations")
+                            if show_explanations:
+                                st.markdown("### 📖 Metric Explanations")
+                                st.markdown("""
+                                - **RMSE (Root Mean Squared Error):** Measures average error magnitude
+                                - **MAPE (Mean Absolute Percentage Error):** Shows average percentage error
+                                - **Shape Correlation:** Measures pattern matching (1 = perfect match)
+                                - **Combined Score:** Balanced metric (50% RMSE, 50% pattern matching)
+                                """)
 
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
