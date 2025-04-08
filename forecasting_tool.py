@@ -28,8 +28,8 @@ import concurrent.futures
 from scipy.stats import pearsonr
 import calendar
 
-# # Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
-# st.set_page_config(layout="wide", page_title="Time Series Forecasting", page_icon="📈")
+# Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
+st.set_page_config(layout="wide", page_title="Time Series Forecasting", page_icon="📈")
 
 # Configuration Constants
 DEFAULT_MODELS = ["Prophet", "ARIMA", "XGBoost", "AutoML"]
@@ -878,7 +878,7 @@ def combined_score(rmse, corr, max_rmse, alpha, beta):
 
 def main():
 
-    st.set_page_config(layout="wide", page_title="Time Series Forecasting", page_icon="📈")
+    # st.set_page_config(layout="wide", page_title="Time Series Forecasting", page_icon="📈")
     
     # Theme selector
     st.session_state.theme = st.radio(
