@@ -31,39 +31,42 @@ import calendar
 # Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
 st.set_page_config(layout="wide", page_title="Time Series Forecasting", page_icon="📈")
 
-# Add dark mode toggle
+# Configuration Constants
+DEFAULT_MODELS = ["Prophet", "ARIMA", "XGBoost", "AutoML"]
+THEME_CONFIG = {
+    "light": {
+        "background": "white",
+        "text": "black",
+        "secondary": "#f0f2f6",
+        "highlight": "#56BBAF"
+    },
+    "dark": {
+        "background": "#1E1E1E",
+        "text": "white",
+        "secondary": "#2E2E2E",
+        "highlight": "#2B3A42"
+    }
+}
+
+# Initialize session state
 if "theme" not in st.session_state:
     st.session_state.theme = "light"
+if "preprocessed" not in st.session_state:
+    st.session_state.preprocessed = None
 
-theme = st.radio("🌙 Theme Mode:", ["Light", "Dark"], index=0 if st.session_state.theme=="light" else 1)
-st.session_state.theme = theme
-
-if st.session_state.theme=="dark":
-    st.markdown(
-        """
+def apply_theme():
+    """Apply selected theme using CSS"""
+    theme = THEME_CONFIG[st.session_state.theme.lower()]
+    st.markdown(f"""
         <style>
-            body { background-color: #1E1E1E; color: white; }
-            .stButton button { background-color: #56BBAF !important; }
-            .stDataFrame { background-color: #2E2E2E; color: white; }
-            .stTextInput input { background-color: #2E2E2E; color: white; }
-            .stSelectbox select { background-color: #2E2E2E; color: white; }
-            .stRadio div { color: white; }
-            .stMarkdown { color: white; }
+            body {{ background-color: {theme['background']}; color: {theme['text']}; }}
+            .stButton>button {{ background-color: {theme['highlight']}!important; }}
+            .stDataFrame {{ background-color: {theme['secondary']}; color: {theme['text']}; }}
+            .stTextInput input {{ background-color: {theme['secondary']}; color: {theme['text']}; }}
+            .stSelectbox select {{ background-color: {theme['secondary']}; color: {theme['text']}; }}
+            .stRadio div {{ color: {theme['text']}; }}
         </style>
-        """, unsafe_allow_html=True)
-else:
-    st.markdown(
-        """
-        <style>
-            body { background-color: white; color: black; }
-            .stButton button { background-color: #56BBAF !important; }
-            .stDataFrame { background-color: white; color: black; }
-            .stTextInput input { background-color: white; color: black; }
-            .stSelectbox select { background-color: white; color: black; }
-            .stRadio div { color: black; }
-            .stMarkdown { color: black; }
-        </style>
-        """, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
 def check_stationarity(series):
     adf_result = adfuller(series, autolag="AIC")
@@ -874,6 +877,16 @@ def combined_score(rmse, corr, max_rmse, alpha, beta):
     return alpha * norm_rmse + beta * (1 - corr)
 
 def main():
+
+    st.set_page_config(layout="wide", page_title="Time Series Forecasting", page_icon="📈")
+    
+    # Theme selector
+    st.session_state.theme = st.radio(
+        "🌙 Theme Mode:", ["Light", "Dark"], 
+        horizontal=True,
+        index=0 if st.session_state.theme == "light" else 1
+    )
+    apply_theme()
     # Set subscription level: "free" for basic features, "premium" for full access
     user_id = "user123"
     subscription_level = "premium"  # Change to "premium" to enable advanced features
