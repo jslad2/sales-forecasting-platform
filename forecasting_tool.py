@@ -493,6 +493,11 @@ def auto_arima_enhanced(data, seasonal_period=12, enforce_stationarity=True, exp
     
     return result
 
+class XGBRegressorWrapper(xgb.XGBRegressor):
+    def __init__(self, **kwargs):
+        kwargs.pop('mss', None)  # remove "mss" if present
+        super().__init__(**kwargs)
+
 class TemporalXGBoost:
     def __init__(self, horizon=12, max_lags=24, fourier_terms=3):
         self.model = None
@@ -510,7 +515,6 @@ class TemporalXGBoost:
         df = df.copy().sort_values('ds')
         n_samples = len(df)
         
-        # Validate dataset size
         if n_samples < self.min_samples:
             raise ValueError(f"Minimum {self.min_samples} samples required. Got {n_samples}")
         
@@ -528,32 +532,26 @@ class TemporalXGBoost:
                 significant_lags = np.where(np.abs(pacf_vals) > 1.96/np.sqrt(n_samples))[0]
         except Exception as e:
             try:
-                # Fallback to simple ACF
                 acf_vals = acf(df['y'], nlags=self.actual_max_lags, fft=True)
                 significant_lags = np.where(np.abs(acf_vals) > 1.96/np.sqrt(n_samples))[0]
             except:
-                # Ultimate fallback to default lags
                 significant_lags = list(range(1, min(5, self.actual_max_lags)+1))
 
-        # 3. Ensure minimum lag features
         significant_lags = [int(lag) for lag in significant_lags if lag > 0]
         if not significant_lags:
             significant_lags = list(range(1, min(5, self.actual_max_lags)+1))
 
-        # 4. Create lag features with NaN handling
         for lag in significant_lags:
             col_name = f'lag_{lag}'
             df[col_name] = df['y'].shift(lag)
-            # Fill remaining NaNs at start of series
             df[col_name] = df[col_name].ffill().bfill()
 
-        # 5. Rolling statistics with adaptive windows
-        valid_windows = [w for w in [3, 6, 12] if w < n_samples]
-        for window in valid_windows:
-            df[f'rolling_mean_{window}'] = df['y'].rolling(window, min_periods=1).mean()
-            df[f'rolling_std_{window}'] = df['y'].rolling(window, min_periods=1).std()
+        # 3. Rolling statistics
+        for window in [3, 6, 12]:
+            df[f'rolling_mean_{window}'] = df['y'].rolling(window=window, min_periods=1).mean()
+            df[f'rolling_std_{window}'] = df['y'].rolling(window=window, min_periods=1).std()
 
-        # 6. Date features based on detected frequency
+        # 4. Date features
         self.freq = pd.infer_freq(df['ds']) or 'MS'
         dt = df['ds'].dt
         if self.freq == 'D':
@@ -563,28 +561,26 @@ class TemporalXGBoost:
             df['month'] = dt.month
             df['quarter'] = dt.quarter
 
-        # 7. Fourier terms for monthly/weekly data
+        # 5. Fourier terms for seasonality
         if self.freq in ['MS', 'M']:
-            period = 12  # Monthly seasonality
+            period = 12
             for k in range(1, self.fourier_terms+1):
-                df[f'sin_{k}'] = np.sin(2 * np.pi * k * dt.month/period)
-                df[f'cos_{k}'] = np.cos(2 * np.pi * k * dt.month/period)
+                df[f'sin_{k}'] = np.sin(2 * np.pi * (dt.month) * k/period)
+                df[f'cos_{k}'] = np.cos(2 * np.pi * (dt.month) * k/period)
         elif self.freq == 'D':
-            period = 7  # Weekly seasonality
+            period = 7
             for k in range(1, self.fourier_terms+1):
-                df[f'sin_{k}'] = np.sin(2 * np.pi * k * dt.dayofweek/period)
-                df[f'cos_{k}'] = np.cos(2 * np.pi * k * dt.dayofweek/period)
+                df[f'sin_{k}'] = np.sin(2 * np.pi * dt.dayofweek * k/period)
+                df[f'cos_{k}'] = np.cos(2 * np.pi * dt.dayofweek * k/period)
 
-        # 8. Trend features
+        # 6. Trend feature
         df['trend'] = np.arange(len(df))
         
         self.feature_columns = [col for col in df.columns if col not in ['ds', 'y']]
         return df.dropna()
 
     def fit(self, train_data):
-        """Robust training with adaptive features and validation"""
         try:
-            # Create features and validate
             df = self.create_features(train_data)
             if df.empty:
                 raise ValueError("Feature engineering produced empty dataframe")
@@ -592,7 +588,6 @@ class TemporalXGBoost:
             X = df[self.feature_columns]
             y = df['y']
             
-            # Store last state for forecasting
             self.last_state = {
                 'lags': X.filter(regex='lag_').iloc[-1].to_dict(),
                 'rolling_stats': X.filter(regex='rolling_').iloc[-1].to_dict(),
@@ -600,8 +595,7 @@ class TemporalXGBoost:
                 'date': df['ds'].iloc[-1]
             }
             
-            # Initialize model with validation
-            self.model = xgb.XGBRegressor(
+            self.model = XGBRegressorWrapper(
                 n_estimators=1000,
                 learning_rate=0.05,
                 max_depth=5,
@@ -612,38 +606,29 @@ class TemporalXGBoost:
                 n_jobs=-1
             )
             
-            # Time-series cross-validation
+            from sklearn.model_selection import TimeSeriesSplit
             tscv = TimeSeriesSplit(n_splits=min(3, len(X)//2))
             for train_idx, val_idx in tscv.split(X):
                 X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
                 y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
-                
                 self.model.fit(
                     X_train, y_train,
                     eval_set=[(X_val, y_val)],
                     verbose=False
                 )
-                
             return self
-            
         except Exception as e:
             raise RuntimeError(f"Training failed: {str(e)}")
 
     def predict(self, periods=None):
-        """Generate forecasts automatically from last training date"""
         if periods is None:
             periods = self.horizon
-            
         if not self.last_state:
             raise RuntimeError("Model not trained - call fit() first")
             
         forecasts = []
         current_state = copy.deepcopy(self.last_state)
-        
-        # Calculate first prediction date
-        start_date = current_state['date'] + pd.DateOffset(
-            **{self.freq.lower()+'s': 1}
-        )
+        start_date = current_state['date'] + pd.DateOffset(**{self.freq.lower()+'s': 1})
         
         for _ in range(periods):
             features = self._generate_features(current_state)
@@ -653,21 +638,19 @@ class TemporalXGBoost:
             start_date += pd.DateOffset(**{self.freq.lower()+'s': 1})
         
         return pd.DataFrame({
-        'ds': pd.date_range(
-            start=current_state['date'],
-            periods=periods,
-            freq=self.freq
-        ),
-        'yhat': forecasts
-    })
+            'ds': pd.date_range(
+                start=current_state['date'],
+                periods=periods,
+                freq=self.freq
+            ),
+            'yhat': forecasts
+        })
 
     def _generate_features(self, state):
-        """Feature vector generation with validation"""
         features = {}
         features.update(state['lags'])
         features.update(state['rolling_stats'])
         
-        # Date features
         dt = state['date']
         if self.freq == 'D':
             features.update({
@@ -677,46 +660,34 @@ class TemporalXGBoost:
         elif self.freq in ['MS', 'M']:
             features.update({
                 'month': dt.month,
-                'quarter': (dt.month-1)//3 + 1
+                'quarter': dt.quarter
             })
         
-        # Fourier terms
         if self.freq in ['MS', 'M']:
             for k in range(1, self.fourier_terms+1):
-                features[f'sin_{k}'] = np.sin(2 * np.pi * k * dt.month/12)
-                features[f'cos_{k}'] = np.cos(2 * np.pi * k * dt.month/12)
+                features[f'sin_{k}'] = np.sin(2 * np.pi * dt.month * k/12)
+                features[f'cos_{k}'] = np.cos(2 * np.pi * dt.month * k/12)
         elif self.freq == 'D':
             for k in range(1, self.fourier_terms+1):
-                features[f'sin_{k}'] = np.sin(2 * np.pi * k * dt.dayofweek/7)
-                features[f'cos_{k}'] = np.cos(2 * np.pi * k * dt.dayofweek/7)
+                features[f'sin_{k}'] = np.sin(2 * np.pi * dt.dayofweek * k/7)
+                features[f'cos_{k}'] = np.cos(2 * np.pi * dt.dayofweek * k/7)
         
-        # Trend
         features['trend'] = state['trend']
-        
         return features
 
     def _update_state(self, state, pred):
-        """Updated with valid frequency parameters"""
-        # Map frequency to valid DateOffset parameters
         freq_map = {
             'MS': 'months',
             'M': 'months',
             'D': 'days',
             'H': 'hours',
-            'Q': 'months'  # Quarters are 3 months
+            'Q': 'months'
         }
-        
-        # Get offset parameter with fallback
         offset_param = freq_map.get(self.freq, 'days')
-        
-        # Calculate offset duration
-        if self.freq == 'Q':
-            offset_value = 3  # Quarters are 3 months
-        else:
-            offset_value = 1
-
-        # Update date with validated offset
+        offset_value = 3 if self.freq == 'Q' else 1
         state['date'] += pd.DateOffset(**{offset_param: offset_value})
+        # Optionally update trend if needed
+        state['trend'] += 1
 
 class AutoTS:
     def __init__(self, time_budget=600, ensemble_size=4):
