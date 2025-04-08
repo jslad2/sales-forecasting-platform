@@ -1550,20 +1550,20 @@ def main():
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
-                    # STEP 9: Train AutoML Model
-                    step += 1
-                    step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
-                    with st.spinner("🚀 Training AutoML Model..."):
-                        automl_model_name, automl_res = train_automl_model(
-                            train, test, forecast_period,
-                            last_historical_value, is_diff,
-                            demand_shock, seasonality_adjustment, external_shock,
-                            category_scenarios, time_budget
-                        )
-                        time.sleep(1)
-                    st.success("✅ AutoML Model Training Complete!")
-                    progress_bar.progress(int((step / total_steps) * 100))
-                    time.sleep(1)
+                    # # STEP 9: Train AutoML Model
+                    # step += 1
+                    # step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
+                    # with st.spinner("🚀 Training AutoML Model..."):
+                    #     automl_model_name, automl_res = train_automl_model(
+                    #         train, test, forecast_period,
+                    #         last_historical_value, is_diff,
+                    #         demand_shock, seasonality_adjustment, external_shock,
+                    #         category_scenarios, time_budget
+                    #     )
+                    #     time.sleep(1)
+                    # st.success("✅ AutoML Model Training Complete!")
+                    # progress_bar.progress(int((step / total_steps) * 100))
+                    # time.sleep(1)
 
                     # STEP 9: Compile Forecast Results (Premium)
                     step += 1
@@ -1573,8 +1573,8 @@ def main():
                     results = {
                         prophet_model_name: prophet_res,
                         # arima_model_name: arima_res,
-                        xgb_model_name: xgb_res,
-                        automl_model_name: automl_res
+                        xgb_model_name: xgb_res
+                        # automl_model_name: automl_res
                     }
                     valid_results = {model: res for model, res in results.items() if res.get("Forecast") is not None}
                     if not valid_results:
