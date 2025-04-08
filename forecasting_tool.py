@@ -752,7 +752,7 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
             eval_method=eval_method,
             estimator_list=["xgboost", "lgbm", "rf", "catboost"],
             metric="r2",
-            early_stop=True,
+            early_stop=False,
             verbose=1
         )
 
