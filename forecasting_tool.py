@@ -630,7 +630,7 @@ class TemporalXGBoost:
             raise RuntimeError(f"Training failed: {str(e)}")
 
     def predict(self, periods=None):
-        """Safe recursive forecasting with state management"""
+        """Generate forecasts automatically from last training date"""
         if periods is None:
             periods = self.horizon
             
@@ -640,19 +640,21 @@ class TemporalXGBoost:
         forecasts = []
         current_state = copy.deepcopy(self.last_state)
         
+        # Calculate first prediction date
+        start_date = current_state['date'] + pd.DateOffset(
+            **{self.freq.lower()+'s': 1}
+        )
+        
         for _ in range(periods):
-            try:
-                features = self._generate_features(current_state)
-                pred = self.model.predict(pd.DataFrame([features]))[0]
-                forecasts.append(pred)
-                self._update_state(current_state, pred)
-            except Exception as e:
-                forecasts.append(np.nan)
-                print(f"Prediction failed at step {_}: {str(e)}")
-                
+            features = self._generate_features(current_state)
+            pred = self.model.predict(pd.DataFrame([features]))[0]
+            forecasts.append(pred)
+            self._update_state(current_state, pred)
+            start_date += pd.DateOffset(**{self.freq.lower()+'s': 1})
+        
         return pd.DataFrame({
             'ds': pd.date_range(
-                start=current_state['date'] + pd.DateOffset(months=1),
+                start=current_state['date'] + pd.DateOffset(**{self.freq.lower()+'s': 1}),
                 periods=periods,
                 freq=self.freq
             ),
@@ -1170,8 +1172,7 @@ def train_xgb_model(train, test, forecast_period, last_historical_value,
         model.fit(train)
         
         # Generate forecasts
-        start_date = train["ds"].iloc[-1]
-        forecast_df = model.predict(start_date, forecast_period)
+        forecast_df = model.predict(forecast_period)
         
         # Apply scenario adjustments
         forecast_df = adjust_forecast(
