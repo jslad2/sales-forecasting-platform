@@ -3,7 +3,6 @@ import streamlit as st
 from prophet import Prophet
 from pmdarima import auto_arima
 from xgboost import XGBRegressor
-import xgboost as xgb
 from flaml import AutoML
 from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
 import numpy as np
@@ -28,19 +27,6 @@ from tqdm import tqdm
 import concurrent.futures
 from scipy.stats import pearsonr
 import calendar
-from sklearn.metrics import mean_absolute_error, r2_score
-from plotly.subplots import make_subplots
-import plotly.graph_objects as go
-from scipy.signal import periodogram
-from pmdarima import auto_arima
-from statsmodels.tsa.seasonal import seasonal_decompose
-import warnings
-from statsmodels.tsa.stattools import pacf
-from sklearn.model_selection import TimeSeriesSplit
-from optuna.samplers import TPESampler  # Add this import
-from optuna.pruners import MedianPruner
-from optuna import trial
-import copy
 
 # Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
 st.set_page_config(layout="wide", page_title="Time Series Forecasting", page_icon="📈")
@@ -79,1211 +65,813 @@ else:
         </style>
         """, unsafe_allow_html=True)
 
-# ====================== ENHANCED CORE FUNCTIONS ======================
-def check_stationarity(series, categories=None):
-    """Enhanced stationarity check with hierarchical analysis"""
-    results = {}
-    
-    # Global check
-    adf = adfuller(series, autolag="AIC")
+def check_stationarity(series):
+    adf_result = adfuller(series, autolag="AIC")
+    adf_p_value = adf_result[1]
     kpss_result = kpss(series, regression="c", nlags="auto")
-    results['global'] = {
-        'adf_p': adf[1],
-        'kpss_p': kpss_result[1],
-        'stationarity': None
-    }
-    
-    # Category-level checks
-    if categories is not None:
-        for name, group in series.groupby(categories):
-            adf = adfuller(group, autolag="AIC")
-            kpss_result = kpss(group, regression="c", nlags="auto")
-            results[name] = {
-                'adf_p': adf[1],
-                'kpss_p': kpss_result[1],
-                'stationarity': None
-            }
-    
-    # Determine stationarity
-    for key in results:
-        adf_p = results[key]['adf_p']
-        kpss_p = results[key]['kpss_p']
-        if adf_p < 0.05 and kpss_p > 0.05:
-            results[key]['stationarity'] = "Stationary"
-        elif adf_p >= 0.05 and kpss_p <= 0.05:
-            results[key]['stationarity'] = "Non-Stationary"
-        else:
-            results[key]['stationarity'] = "Inconclusive"
-    
-    return results
+    kpss_p_value = kpss_result[1]
+    if adf_p_value < 0.05 and kpss_p_value > 0.05:
+        return "Stationary"
+    elif adf_p_value >= 0.05 and kpss_p_value <= 0.05:
+        return "Non-Stationary"
+    else:
+        return "Inconclusive"
 
 def preprocess_data(data, date_column, sales_column, category_columns=None):
-    """Enhanced preprocessing with dynamic differencing and category handling"""
+    """
+    Preprocess the uploaded data for Prophet.
+    Returns:
+      - data: Processed DataFrame with columns ds, y (if non-stationary, y is differenced),
+              and category columns (if provided)
+      - last_historical_value: The last y value (if differencing was applied), otherwise None
+      - y_original: A copy of the processed data for inspection
+      - is_diff: Boolean indicating whether differencing was applied
+      Also creates a re-aggregated DataFrame for a clean monthly chart.
+    """
     try:
-        # 1. Initial processing
+        # 1. Convert date column to datetime and drop missing rows
         data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
         data.dropna(subset=[date_column, sales_column], inplace=True)
+
+        # 2. Rename columns for Prophet
         data = data.rename(columns={date_column: "ds", sales_column: "y"})
-        
-        # 2. Temporal aggregation
+
+        # 3. Create monthly period column
         data["year_month"] = data["ds"].dt.to_period("M")
-        grouping_cols = ["year_month"] + (category_columns if category_columns else [])
-        data = data.groupby(grouping_cols, as_index=False)["y"].sum()
-        
-        # 3. Date conversion and deduplication
-        data["ds"] = data["year_month"].dt.to_timestamp(how="start")
-        data.drop(columns=["year_month"], inplace=True)
-        subset_cols = ["ds", "y"] + (category_columns if category_columns else [])
-        data = data.drop_duplicates(subset=subset_cols, keep="last")
 
-        # 4. Prepare original data
-        y_original = data.groupby("ds", as_index=False)["y"].sum().rename(columns={"y": "y_original"})
-        
-        # 5. Stationarity analysis
-        stationarity = check_stationarity(data["y"], data[category_columns] if category_columns else None)
-        
-        # 6. Dynamic differencing
-        diff_order = 0
-        if any(v['stationarity'] == "Non-Stationary" for v in stationarity.values()):
-            data_diff, diff_order = dynamic_differencing(data, "y", category_columns)
-            last_value = data["y"].iloc[-diff_order:] if diff_order > 0 else None
-            data = data_diff.dropna()
+        # 4. Group by year_month and category columns (if provided)
+        if category_columns:
+            if not isinstance(category_columns, list):
+                category_columns = [category_columns]
+            grouping_cols = ["year_month"] + category_columns
         else:
-            last_value = None
+            grouping_cols = ["year_month"]
 
-        # 7. Visualization
-        plot_stationarity_analysis(data, y_original, stationarity, diff_order)
-        
-        return data, last_value, y_original, diff_order > 0
+        data = data.groupby(grouping_cols, as_index=False)["y"].sum()
+
+        # 5. Convert year_month back to datetime (start-of-month)
+        data["ds"] = pd.to_datetime(
+            data["year_month"].dt.to_timestamp(how="start").dt.strftime("%Y-%m"),
+            format="%Y-%m"
+        )
+        data.drop(columns=["year_month"], inplace=True)
+
+        # 6. Remove duplicates
+        if category_columns:
+            subset_cols = ["ds", "y"] + category_columns
+        else:
+            subset_cols = ["ds", "y"]
+        if data.duplicated(subset=subset_cols).any():
+            st.warning("⚠️ Duplicate date/category combinations found. Removing duplicates...")
+            data = data.drop_duplicates(subset=subset_cols, keep="last")
+
+        # 7. Save original processed data for inspection
+        if category_columns:
+            y_original = data.copy()
+        else:
+            y_original = data[["ds", "y"]].copy().rename(columns={"y": "y_original"})
+
+        y_original = data.copy()
+        if category_columns:
+            y_original = y_original.groupby('ds', as_index=False)['y'].sum()
+        y_original = y_original.rename(columns={'y': 'y_original'})
+
+        # 8. Re-aggregate data by ds for charting (one line per month)
+        re_agg_chart = data.groupby("ds", as_index=False)["y"].sum()
+
+        # 9. Check stationarity on the aggregated series
+        stationarity_result = check_stationarity(re_agg_chart["y"])
+        st.markdown(
+            f"""
+            <div style="text-align: center;">
+                <h2 style="color: #2B3A42;">📊 Stationarity Test</h2>
+                <p style="font-size: 1.2rem;">Conclusion: The series is <strong>{stationarity_result}</strong>.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # 10. If non-stationary, apply differencing to both the aggregated chart and the model data
+        if stationarity_result == "Non-Stationary":
+            st.warning("Applying differencing to stabilize the series for charting and modeling.")
+            
+            # For charting: compute differenced aggregated series
+            re_agg_chart["y_diff"] = re_agg_chart["y"].diff()
+            last_historical_value = re_agg_chart["y"].iloc[-1]
+            is_diff = True
+
+            # For modeling: physically difference the actual data
+            data["y"] = data["y"].diff()  # This creates a differenced column
+            data = data.dropna().reset_index(drop=True)
+
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=re_agg_chart["ds"],
+                y=re_agg_chart["y"],
+                mode="lines",
+                name="Original Aggregated Series",
+                line=dict(color="blue", width=2)
+            ))
+            fig.add_trace(go.Scatter(
+                x=re_agg_chart["ds"].iloc[1:],
+                y=re_agg_chart["y_diff"].dropna(),
+                mode="lines",
+                name="Differenced Aggregated Series",
+                line=dict(color="orange", width=2, dash="dot")
+            ))
+            fig.update_layout(
+                title="Original vs Differenced Series (Monthly, Aggregated)",
+                xaxis_title="Date (YYYY-MM)",
+                yaxis_title="Sales",
+                template="plotly_white",
+                xaxis_tickformat="%Y-%m"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            return data, last_historical_value, y_original, is_diff
+        else:
+            is_diff = False
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=re_agg_chart["ds"],
+                y=re_agg_chart["y"],
+                mode="lines",
+                name="Original Series (Monthly, Aggregated)",
+                line=dict(color="blue", width=2)
+            ))
+            fig.update_layout(
+                title="Original Series (Monthly, Aggregated)",
+                xaxis_title="Date (YYYY-MM)",
+                yaxis_title="Sales",
+                template="plotly_white",
+                xaxis_tickformat="%Y-%m"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            data = data.reset_index(drop=True)
+            return data, None, y_original, is_diff
 
     except Exception as e:
-        st.error(f"Preprocessing Error: {str(e)}")
-        st.error(f"Debug Info: {data.columns if 'data' in locals() else 'No data'}")
-        return None, None, None, False
+        st.error(f"An error occurred during preprocessing: {e}")
+        st.error(f"Debug Info: Columns in data - {data.columns}, Data Shape - {data.shape}")
+        return None, None, None, None
 
-# ====================== ENHANCED UTILITIES ======================
-def dynamic_differencing(data, column, categories=None, max_order=2):
-    """Smart differencing with automatic order selection"""
-    diff_data = data.copy()
-    diff_order = 0
-    
-    while diff_order < max_order:
-        stationarity = check_stationarity(diff_data[column], categories)
-        if all([v['stationarity'] == "Stationary" for v in stationarity.values()]):
-            break
-        diff_data[column] = diff_data[column].diff().dropna()
-        diff_order += 1
-    
-    return diff_data, diff_order
-
-def inverse_difference(forecast_data, first_value, diff_order=1):
-    """Robust inverse differencing with order handling"""
-    if not isinstance(first_value, (int, float, np.ndarray)):
-        raise ValueError("first_value must be numeric or array-like")
-        
-    if isinstance(forecast_data, pd.Series):
-        forecast_data = forecast_data.to_frame(name="yhat")
-    
-    for col in ["yhat", "yhat_lower", "yhat_upper"]:
-        if col in forecast_data.columns:
-            if diff_order == 1:
-                forecast_data[col] = first_value + forecast_data[col].cumsum()
-            else:
-                # Handle higher order differencing
-                temp = np.r_[first_value, forecast_data[col]].cumsum()
-                for _ in range(diff_order-1):
-                    temp = temp.cumsum()
-                forecast_data[col] = temp[-len(forecast_data):]
-    
+def inverse_difference(forecast_data, first_value):
+    if first_value is not None:
+        if not isinstance(first_value, (int, float)):
+            raise ValueError("first_value must be numeric.")
+        if isinstance(forecast_data, pd.Series):
+            forecast_data = forecast_data.to_frame(name="yhat")
+        if "yhat" in forecast_data.columns:
+            forecast_data["yhat"] = first_value + forecast_data["yhat"].cumsum()
+        if "yhat_upper" in forecast_data.columns:
+            forecast_data["yhat_upper"] = first_value + forecast_data["yhat_upper"].cumsum()
+        if "yhat_lower" in forecast_data.columns:
+            forecast_data["yhat_lower"] = first_value + forecast_data["yhat_lower"].cumsum()
     return forecast_data
 
-# ====================== ENHANCED MODEL COMPONENTS ======================
 def detect_and_add_seasonalities(model, data):
-    """FFT-based seasonality detection with fallback"""
-    try:
-        from scipy.signal import periodogram
-        f, Pxx = periodogram(data["y"].dropna())
-        significant_periods = f[Pxx > np.quantile(Pxx, 0.95)] * 365
-        
-        for period in significant_periods:
-            if 7 <= period <= 365:
-                name = f'custom_{int(period)}'
-                fourier_order = max(3, int(period/30))
-                model.add_seasonality(name=name, period=period, fourier_order=fourier_order)
-    except Exception as e:
-        st.warning(f"Seasonality detection failed: {str(e)}")
-    
+    data_frequency = pd.infer_freq(data["ds"])
+    if data_frequency == "D":
+        model.add_seasonality(name="daily", period=1, fourier_order=3)
+    elif data_frequency == "W":
+        model.add_seasonality(name="weekly", period=7, fourier_order=3)
+    elif data_frequency == "M":
+        model.add_seasonality(name="monthly", period=30.5, fourier_order=5)
+    elif data_frequency == "Q":
+        model.add_seasonality(name="quarterly", period=91.25, fourier_order=5)
+    elif data_frequency == "Y":
+        model.add_seasonality(name="yearly", period=365.25, fourier_order=10)
     return model
 
-def tune_prophet(train_data, n_trials=50, timeout=3600):
-    """Optuna-based hyperparameter optimization for Prophet with enhanced features"""
-    def objective(trial):
-        # Suggest parameters with intelligent ranges
-        params = {
-            'changepoint_prior_scale': trial.suggest_float(
-                'changepoint_prior_scale', 1e-3, 0.5, log=True),
-            'seasonality_prior_scale': trial.suggest_float(
-                'seasonality_prior_scale', 0.1, 50, log=True),
-            'seasonality_mode': trial.suggest_categorical(
-                'seasonality_mode', ['additive', 'multiplicative']),
-            'growth': trial.suggest_categorical(
-                'growth', ['logistic', 'linear'])  # Optional: Tune growth mode
-        }
-
-        # Add logistic growth requirements if needed
-        if params['growth'] == 'logistic':
-            if 'cap' not in train_data.columns:
-                trial.set_user_attr('error', 'Missing cap for logistic growth')
-                return float('inf')
-            if 'floor' not in train_data.columns:
-                trial.set_user_attr('error', 'Missing floor for logistic growth')
-                return float('inf')
-
-        try:
-            model = Prophet(
-                **params,
-                yearly_seasonality='auto',
-                weekly_seasonality='auto',
-                daily_seasonality=False,
-                uncertainty_samples=0  # Disable for faster CV
-            )
-            
-            # Add custom seasonalities from EnhancedProphet
-            model = EnhancedProphet(**params).detect_seasonalities(train_data)
-            
-            model.fit(train_data)
-
-            # Smart cross-validation configuration
-            df_cv = cross_validation(
-                model,
-                initial='730 days',
-                period='180 days',
-                horizon='90 days',
-                parallel="processes"
-            )
-
-            # Time-aware weighted RMSE
-            metrics = performance_metrics(df_cv)
-            weights = 1 / (metrics['horizon'] / pd.Timedelta(days=1) + 1e-6)
-            weighted_rmse = np.average(metrics['rmse'], weights=weights)
-            
-            return weighted_rmse
-
-        except Exception as e:
-            trial.set_user_attr('error', str(e))
-            return float('inf')
-
-    # Configure study with enhanced settings
-    sampler = TPESampler(seed=42, n_startup_trials=10)
-    study = optuna.create_study(
-        direction='minimize',
-        sampler=sampler,
-        pruner=optuna.pruners.HyperbandPruner(
-            min_resource=1,
-            reduction_factor=3
-        )
-    )
-
-    # Optimize with intelligent resource allocation
-    study.optimize(
-        objective,
-        n_trials=n_trials,
-        timeout=timeout,
-        n_jobs=-1,
-        gc_after_trial=True,
-        show_progress_bar=True
-    )
-
-    # Generate optimization report
-    best_trial = study.best_trial
-    return {
-    'params': best_trial.params,  # Remove custom_seasonalities from here
-    'custom_seasonalities': best_trial.user_attrs.get('custom_seasonalities', []),
-    'metrics': {
-        'best_rmse': best_trial.value,
-        'completed_trials': len(study.trials),
-        'pruned_trials': len([t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED])
-    },
-    'study': study
-}
-
-class EnhancedProphet(Prophet):
-    def __init__(self, **kwargs):
-        """Enhanced Prophet subclass with custom seasonality management"""
-        # Remove custom parameters before parent initialization
-        self.custom_seasonalities = kwargs.pop('custom_seasonalities', [])
-        self.detected_seasonalities = []
-        
-        # Filter valid Prophet parameters
-        valid_params = Prophet().__dict__.keys()
-        prophet_kwargs = {k: v for k, v in kwargs.items() if k in valid_params}
-        
-        super().__init__(**prophet_kwargs)
-        
-        # Add predefined custom seasonalities
-        for season in self.custom_seasonalities:
-            self._safe_add_seasonality(season)
-
-    def _safe_add_seasonality(self, season_config):
-        """Add seasonality with error handling"""
-        try:
-            self.add_seasonality(
-                name=season_config['name'],
-                period=season_config['period'],
-                fourier_order=season_config['fourier_order']
-            )
-            if season_config['name'] not in self.custom_seasonalities:
-                self.custom_seasonalities.append(season_config['name'])
-        except Exception as e:
-            print(f"Failed to add {season_config['name']}: {str(e)}")
-
-    def detect_seasonalities(self, data, threshold_percentile=95, min_period=7, max_period=365):
-        """FFT-based seasonality detection with enhanced safeguards"""
-        try:
-            y = data['y'].replace(0, np.nan).dropna()
-            if len(y) < 2 * max_period:
-                print("Insufficient data for reliable seasonality detection")
-                return self
-
-            # Calculate sampling frequency
-            freq = pd.infer_freq(data['ds'])
-            fs = self._get_sampling_rate(freq)
-            
-            # Compute periodogram
-            f, Pxx = periodogram(y - y.mean(), fs=fs)
-            significant = Pxx > np.percentile(Pxx, threshold_percentile)
-            
-            # Add validated seasonalities
-            for freq_hz, power in zip(f[significant], Pxx[significant]):
-                if freq_hz <= 0:
-                    continue
-                    
-                period_days = 1 / freq_hz
-                if min_period <= period_days <= max_period:
-                    self._add_detected_seasonality(period_days, power)
-                    
-        except Exception as e:
-            print(f"Seasonality detection failed: {str(e)}")
-            
-        return self
-
-    def _get_sampling_rate(self, freq):
-        """Convert pandas frequency to sampling rate"""
-        freq_map = {
-            'D': 1.0,      # Daily
-            'MS': 12/365.25,  # Monthly start
-            'M': 12/365.25,   # Monthly end
-            'H': 24,       # Hourly
-            'Q': 4/365.25   # Quarterly
-        }
-        return freq_map.get(freq, 365.25)  # Default to yearly
-
-    def _add_detected_seasonality(self, period_days, power):
-        """Add validated seasonality to model"""
-        name = f'custom_{int(period_days)}d'
-        fourier_order = self._calculate_fourier_order(period_days)
-        
-        if name not in self.custom_seasonalities + self.detected_seasonalities:
-            try:
-                self.add_seasonality(
-                    name=name,
-                    period=period_days,
-                    fourier_order=fourier_order
-                )
-                self.detected_seasonalities.append({
-                    'name': name,
-                    'period': period_days,
-                    'fourier_order': fourier_order,
-                    'power': power
-                })
-            except ValueError as e:
-                print(f"Skipping {name}: {str(e)}")
-
-    def _calculate_fourier_order(self, period_days):
-        """Dynamic Fourier order calculation"""
-        return min(11, max(3, int(period_days / 7)))
-
-    def get_seasonality_report(self):
-        """Return formatted seasonality information"""
-        report = {
-            'builtin': [],
-            'custom': [],
-            'detected': []
-        }
-        
-        # Built-in seasonalities
-        for seas in self.seasonalities:
-            if seas not in self.custom_seasonalities + [s['name'] for s in self.detected_seasonalities]:
-                report['builtin'].append(seas)
-        
-        # Custom seasonalities
-        report['custom'] = self.custom_seasonalities
-        
-        # Detected seasonalities
-        report['detected'] = [s['name'] for s in self.detected_seasonalities]
-        
-        return report
-
-def auto_arima_enhanced(data, seasonal_period=12, enforce_stationarity=True, explain=True):
-    """
-    Enhanced Auto ARIMA with:
-    - Automatic seasonality detection
-    - Model explainability
-    - Enhanced error handling
-    - Stationarity enforcement
-    """
-    result = {
-        'model': None,
-        'explanation': {},
-        'warnings': []
-    }
-    
+def evaluate_prophet_params(params, train, initial, horizon, period):
     try:
-        # 1. Seasonality detection
-        decomposition = None
-        seasonal_strength = 0
-        if len(data) >= 2*seasonal_period:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                decomposition = seasonal_decompose(data, period=seasonal_period, model='additive')
-                seasonal_strength = 1 - np.nanvar(decomposition.resid)/np.nanvar(data)
-                
-        # 2. Determine seasonality
-        is_seasonal = seasonal_strength > 0.6 and len(data) >= 3*seasonal_period
-        
-        # 3. Run auto_arima with enhanced configuration
-        model = auto_arima(
-            data,
-            seasonal=is_seasonal,
-            m=seasonal_period if is_seasonal else 1,
-            d=None if enforce_stationarity else 1,
-            D=None if enforce_stationarity else 1,
-            stepwise=True,
-            suppress_warnings=True,
-            error_action="ignore",
-            trace=False,
-            max_order=10,
-            information_criterion='aic',
-            n_jobs=-1
+        model = Prophet(
+            seasonality_mode=params["seasonality_mode"],
+            changepoint_prior_scale=params["changepoint_prior_scale"],
+            yearly_seasonality=(len(train) >= 365),
+            weekly_seasonality=(len(train) >= 30),
+            daily_seasonality=False
         )
-        
-        # 4. Build explanation
-        if explain:
-            result['explanation'] = {
-                'order': model.order,
-                'seasonal_order': model.seasonal_order,
-                'aic': model.aic(),
-                'seasonal_strength': seasonal_strength,
-                'decomposition_success': decomposition is not None,
-                'used_seasonality': is_seasonal
-            }
-        
-        result['model'] = model
-        
+        model.fit(train)
+        cv_results = cross_validation(model, initial=initial, horizon=horizon, period=period)
+        metrics = performance_metrics(cv_results)
+        rmse = metrics["rmse"].mean()
+        return (params, rmse)
     except Exception as e:
-        result['warnings'].append(f"ARIMA failed: {str(e)}")
-        # Fallback to simple ARIMA
-        model = auto_arima(
-            data,
-            seasonal=False,
-            suppress_warnings=True,
-            error_action="ignore"
-        )
-        result['model'] = model
-    
-    return result
+        st.write(f"Failed with params {params}: {e}")
+        return (params, float("inf"))
 
-class TemporalXGBoost:
-    def __init__(self, horizon=12, max_lags=24, fourier_terms=3):
-        self.model = None
-        self.horizon = horizon
-        self.max_lags = max_lags
-        self.fourier_terms = fourier_terms
-        self.feature_columns = []
-        self.last_state = {}
-        self.freq = None
-        self.actual_max_lags = None
-        self.min_samples = 10
-        self.feature_order = []
-        self.freq_mapping = {
-            'MS': ('months', 1),
-            'M': ('months', 1),
-            'Q': ('months', 3),
-            'D': ('days', 1),
-            'H': ('hours', 1),
-            'W': ('weeks', 1)
+def find_best_prophet_params(train):
+    dataset_length = len(train)
+    if dataset_length < 100:
+        param_grid = {
+            "changepoint_prior_scale": [0.01, 0.1],
+            "seasonality_mode": ["additive"],
+            "seasonality_prior_scale": [10.0]  # for smaller datasets, maybe less sensitivity
         }
-
-    def create_features(self, df):
-        """Adaptive feature engineering with feature tracking"""
-        df = df.copy().sort_values('ds')
-        n_samples = len(df)
-        
-        if n_samples < self.min_samples:
-            raise ValueError(f"Need at least {self.min_samples} samples. Got {n_samples}")
-        
-        # Dynamic lag calculation
-        self.actual_max_lags = min(self.max_lags, (n_samples//2)-1)
-        self.actual_max_lags = max(1, self.actual_max_lags)
-
-        # Lag selection with fallbacks
-        significant_lags = self._get_significant_lags(df['y'], n_samples)
-        
-        # Create lag features
-        for lag in significant_lags:
-            col_name = f'lag_{lag}'
-            df[col_name] = df['y'].shift(lag).ffill().bfill()
-
-        # Rolling statistics
-        self._add_rolling_features(df, n_samples)
-
-        # Date-based features
-        self.freq = pd.infer_freq(df['ds']) or 'MS'
-        self._add_date_features(df)
-
-        # Fourier terms
-        self._add_fourier_terms(df)
-
-        # Trend
-        df['trend'] = np.arange(len(df))
-
-        # Store feature metadata
-        self.feature_columns = [col for col in df.columns if col not in ['ds', 'y']]
-        self.feature_order = self.feature_columns.copy()
-        
-        return df.dropna()
-
-    def _get_significant_lags(self, series, n_samples):
-        """Robust lag selection with multiple fallbacks"""
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                pacf_vals = pacf(series, nlags=self.actual_max_lags, method='ywadjusted')
-                lags = np.where(np.abs(pacf_vals) > 1.96/np.sqrt(n_samples))[0]
-        except:
-            try:
-                acf_vals = acf(series, nlags=self.actual_max_lags, fft=True)
-                lags = np.where(np.abs(acf_vals) > 1.96/np.sqrt(n_samples))[0]
-            except:
-                lags = list(range(1, min(5, self.actual_max_lags)+1))
-
-        lags = [int(l) for l in lags if l > 0]
-        return lags or list(range(1, min(5, self.actual_max_lags)+1))
-
-    def _add_rolling_features(self, df, n_samples):
-        """Adaptive rolling statistics"""
-        for window in [3, 6, 12]:
-            if window < n_samples:
-                df[f'rolling_mean_{window}'] = df['y'].rolling(window, min_periods=1).mean()
-                df[f'rolling_std_{window}'] = df['y'].rolling(window, min_periods=1).std()
-
-    def _add_date_features(self, df):
-        """Frequency-specific date features"""
-        dt = df['ds'].dt
-        if self.freq == 'D':
-            df['dayofweek'] = dt.dayofweek
-            df['dayofyear'] = dt.dayofyear
-        elif self.freq in ['MS', 'M']:
-            df['month'] = dt.month
-            df['quarter'] = dt.quarter
-
-    def _add_fourier_terms(self, df):
-        """Consistent Fourier term generation"""
-        dt = df['ds'].dt
-        if self.freq in ['MS', 'M']:
-            for k in range(1, self.fourier_terms+1):
-                df[f'sin_{k}'] = np.sin(2*np.pi*k*dt.month/12)
-                df[f'cos_{k}'] = np.cos(2*np.pi*k*dt.month/12)
-        elif self.freq == 'D':
-            for k in range(1, self.fourier_terms+1):
-                df[f'sin_{k}'] = np.sin(2*np.pi*k*dt.dayofweek/7)
-                df[f'cos_{k}'] = np.cos(2*np.pi*k*dt.dayofweek/7)
-
-    def fit(self, train_data):
-        """Training with feature validation"""
-        try:
-            df = self.create_features(train_data)
-            if df.empty:
-                raise ValueError("Feature engineering failed - empty dataframe")
-                
-            X = df[self.feature_order]
-            y = df['y']
-            
-            # Store initial state
-            self.last_state = {
-                'lags': X.filter(regex='lag_').iloc[-1].to_dict(),
-                'rolling_stats': X.filter(regex='rolling_').iloc[-1].to_dict(),
-                'fourier': X.filter(regex='sin_|cos_').iloc[-1].to_dict(),
-                'trend': X['trend'].iloc[-1],
-                'date': df['ds'].iloc[-1]
-            }
-            
-            # Initialize model
-            self.model = xgb.XGBRegressor(
-                n_estimators=1000,
-                learning_rate=0.05,
-                max_depth=5,
-                subsample=0.8,
-                colsample_bytree=0.8,
-                objective='reg:squarederror',
-                early_stopping_rounds=50,
-                n_jobs=-1
-            )
-            
-            # Cross-validate
-            tscv = TimeSeriesSplit(min(3, len(X)//2))
-            for train_idx, val_idx in tscv.split(X):
-                self.model.fit(
-                    X.iloc[train_idx], y.iloc[train_idx],
-                    eval_set=[(X.iloc[val_idx], y.iloc[val_idx])],
-                    verbose=False
-                )
-                
-            return self
-            
-        except Exception as e:
-            raise RuntimeError(f"Training failed: {str(e)}")
-
-    def predict(self, periods=None):
-        """Consistent feature prediction"""
-        if periods is None:
-            periods = self.horizon
-            
-        if not self.last_state:
-            raise RuntimeError("Train model first with fit()")
-            
-        forecasts = []
-        state = copy.deepcopy(self.last_state)
-        
-        # Generate dates
-        offset_param, offset_value = self.freq_mapping.get(self.freq, ('days', 1))
-        dates = pd.date_range(
-            start=state['date'] + pd.DateOffset(**{offset_param: offset_value}),
-            periods=periods,
-            freq=self.freq
-        )
-        
-        # Generate forecasts
-        for _ in range(periods):
-            features = self._generate_features(state)
-            ordered_features = pd.DataFrame([features])[self.feature_order]
-            pred = self.model.predict(ordered_features)[0]
-            forecasts.append(pred)
-            self._update_state(state, pred)
-            
-        return pd.DataFrame({'ds': dates, 'yhat': forecasts})
-
-    def _generate_features(self, state):
-        """Feature generation with validation"""
-        features = {}
-        features.update(state['lags'])
-        features.update(state['rolling_stats'])
-        features.update(state['fourier'])
-        features['trend'] = state['trend']
-        
-        # Add date features
-        dt = state['date']
-        if self.freq == 'D':
-            features.update({
-                'dayofweek': dt.dayofweek,
-                'dayofyear': dt.dayofyear
-            })
-        elif self.freq in ['MS', 'M']:
-            features.update({
-                'month': dt.month,
-                'quarter': (dt.month-1)//3 + 1
-            })
-            
-        # Ensure feature order consistency
-        return {k: features.get(k, 0) for k in self.feature_order}
-
-    def _update_state(self, state, pred):
-        """State management with feature consistency"""
-        # Update lags
-        for lag in sorted([int(k.split('_')[1]) for k in state['lags']], reverse=True):
-            if lag == 1:
-                state['lags'][f'lag_1'] = pred
-            else:
-                state['lags'][f'lag_{lag}'] = state['lags'].get(f'lag_{lag-1}', pred)
-        
-        # Update rolling stats
-        for window in [3, 6, 12]:
-            for stat in ['mean', 'std']:
-                key = f'rolling_{stat}_{window}'
-                if key in state['rolling_stats']:
-                    current = state['rolling_stats'][key]
-                    new_val = ((current * (window-1)) + pred) / window
-                    state['rolling_stats'][key] = new_val
-                    
-        # Update date
-        offset_param, offset_value = self.freq_mapping.get(self.freq, ('days', 1))
-        state['date'] += pd.DateOffset(**{offset_param: offset_value})
-        
-        # Update trend
-        state['trend'] += 1
-        
-        return state
-
-class AutoTS:
-    def __init__(self, time_budget=600, ensemble_size=4):
-        self.models = {
-            'prophet': None,
-            'arima': None,
-            'xgboost': None,
-            'automl': None
+    else:
+        param_grid = {
+            "changepoint_prior_scale": [0.01, 0.05, 0.1, 0.2, 0.3],
+            "seasonality_mode": ["additive", "multiplicative"],
+            "seasonality_prior_scale": [1.0, 5.0, 10.0]  # wider range for larger datasets
         }
-        self.ensemble_weights = {}
-        self.time_budget = time_budget
-        self.ensemble_size = ensemble_size
-        self.feature_columns = []
         
-    def train(self, train_data):
-        """Train ensemble of models with automated weighting"""
-        try:
-            # 1. Train Prophet
-            self.models['prophet'] = EnhancedProphet().fit(train_data)
-            
-            # 2. Train ARIMA
-            arima_result = auto_arima_enhanced(train_data['y'])
-            self.models['arima'] = arima_result['model']
-            
-            # 3. Train XGBoost
-            self.models['xgboost'] = TemporalXGBoost().fit(train_data)
-            
-            # 4. Train AutoML
-            automl = AutoML()
-            X = self._create_automl_features(train_data)
-            automl.fit(X, train_data['y'], task='regression', time_budget=self.time_budget)
-            self.models['automl'] = automl
-            
-            # Calculate ensemble weights
-            self._calculate_weights(train_data)
-            
-        except Exception as e:
-            print(f"Training failed: {str(e)}")
-            
-        return self
+    # Adjust forecasting horizons based on dataset size
+    if dataset_length < 100:
+        horizon_days = min(7, max(3, dataset_length // 5))
+        initial_days = max(30, dataset_length // 2)
+    else:
+        horizon_days = min(30, max(7, dataset_length // 10))
+        initial_days = max(90, dataset_length // 3)
+    horizon = f"{horizon_days} days"
+    initial = f"{initial_days} days"
+    period = f"{horizon_days // 2} days"
     
-    def _create_automl_features(self, data):
-        """Feature engineering for AutoML"""
-        df = data.copy()
-        df['month'] = df['ds'].dt.month
-        df['year'] = df['ds'].dt.year
-        df['dayofweek'] = df['ds'].dt.dayofweek
-        df['quarter'] = df['ds'].dt.quarter
-        self.feature_columns = [col for col in df.columns if col not in ['ds', 'y']]
-        return df[self.feature_columns]
+    best_params = None
+    best_rmse = float("inf")
+    grid = list(ParameterGrid(param_grid))
     
-    def _calculate_weights(self, data):
-        """Dynamic weighting based on rolling window performance"""
-        tscv = TimeSeriesSplit(n_splits=3)
-        scores = {model: [] for model in self.models.keys()}
-        
-        for train_idx, test_idx in tscv.split(data):
-            train = data.iloc[train_idx]
-            test = data.iloc[test_idx]
-            
-            for model_name in self.models.keys():
-                try:
-                    if model_name == 'prophet':
-                        m = EnhancedProphet().fit(train)
-                        future = m.make_future_dataframe(periods=len(test))
-                        forecast = m.predict(future).tail(len(test))['yhat']
-                    elif model_name == 'arima':
-                        model = auto_arima(train['y'], suppress_warnings=True)
-                        forecast = model.predict(n_periods=len(test))
-                    elif model_name == 'xgboost':
-                        model = TemporalXGBoost().fit(train)
-                        forecast = model.predict(train['ds'].iloc[-1], len(test))['yhat']
-                    elif model_name == 'automl':
-                        X_test = self._create_automl_features(test)
-                        forecast = self.models['automl'].predict(X_test)
-                        
-                    rmse = np.sqrt(mean_squared_error(test['y'], forecast))
-                    scores[model_name].append(rmse)
-                except:
-                    scores[model_name].append(np.inf)
-        
-        # Calculate weights inversely proportional to RMSE
-        avg_scores = {k: np.mean(v) for k, v in scores.items()}
-        total = sum(1/s for s in avg_scores.values() if s > 0)
-        self.ensemble_weights = {k: (1/v)/total if v > 0 else 0 for k, v in avg_scores.items()}
-        
-    def predict(self, horizon):
-        """Generate ensemble forecast"""
-        forecasts = []
-        last_date = pd.to_datetime(self.models['prophet'].history_dates[-1])
-        
-        # Generate individual forecasts
-        prophet_forecast = self.models['prophet'].make_future_dataframe(horizon)
-        arima_forecast = self.models['arima'].predict(horizon)
-        xgb_forecast = self.models['xgboost'].predict(last_date, horizon)
-        automl_forecast = self.models['automl'].predict(
-            self._create_automl_features(
-                pd.DataFrame({'ds': pd.date_range(last_date, periods=horizon)})
-            )
-        )
-        
-        # Combine forecasts
-        ensemble = (
-            prophet_forecast['yhat'] * self.ensemble_weights['prophet'] +
-            arima_forecast * self.ensemble_weights['arima'] +
-            xgb_forecast['yhat'] * self.ensemble_weights['xgboost'] +
-            automl_forecast * self.ensemble_weights['automl']
-        )
-        
-        return pd.DataFrame({
-            'ds': pd.date_range(last_date, periods=horizon),
-            'yhat': ensemble,
-            'yhat_lower': ensemble * 0.9,
-            'yhat_upper': ensemble * 1.1
-        })
-
-# ====================== ENHANCED ADJUSTMENT FUNCTIONS ======================
-def adjust_forecast_by_category(forecast_df, category_scenarios, category_columns):
-    """Enhanced category adjustment with dynamic column handling"""
-    if not category_columns or not category_scenarios:
-        return forecast_df
-
-    # Get valid category columns present in both scenarios and dataframe
-    valid_categories = [col for col in category_columns if col in forecast_df.columns]
-    
-    # Apply adjustments per category group
-    adjusted_groups = []
-    for cols, group in forecast_df.groupby(valid_categories):
-        group = group.copy()
-        for cat_col in valid_categories:
-            cat_value = cols[valid_categories.index(cat_col)] if isinstance(cols, tuple) else cols
-            scenario = category_scenarios.get(cat_col, {}).get(cat_value, {})
-            
-            if scenario:
-                adjustment = scenario.get("adjustment", 0)
-                start_date = pd.to_datetime(scenario.get("start_date"))
-                end_date = pd.to_datetime(scenario.get("end_date"))
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = {executor.submit(evaluate_prophet_params, params, train, initial, horizon, period): params for params in grid}
+        for future in concurrent.futures.as_completed(futures):
+            params, rmse = future.result()
+            if rmse < best_rmse:
+                best_rmse = rmse
+                best_params = params
                 
-                # Apply time-bound adjustments
-                mask = (group["ds"] >= start_date) & (group["ds"] <= end_date)
-                if mask.any():
-                    for col in ["yhat", "yhat_lower", "yhat_upper"]:
-                        if col in group.columns:
-                            group.loc[mask, col] *= (1 + adjustment / 100)
-        
-        adjusted_groups.append(group)
-    
-    # Re-aggregate while preserving category structure
-    return pd.concat(adjusted_groups).sort_values("ds").reset_index(drop=True)
+    return best_params, best_rmse
 
-def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, 
-                   external_shock, category_scenarios=None, category_columns=None):
-    """Updated with proper category column handling"""
-    # ... (keep existing global adjustment code) ...
+def adjust_forecast_by_category(forecast_df, category_scenarios):
+    # For each scenario in the dynamic dictionary,
+    # if the forecast date falls within the specified date range, adjust yhat.
+    for col, cat_dict in category_scenarios.items():
+        for cat_val, details in cat_dict.items():
+            adjustment = details.get("adjustment", 0)
+            start_date = pd.to_datetime(details.get("start_date"))
+            end_date = pd.to_datetime(details.get("end_date"))
+            mask = (forecast_df["ds"] >= start_date) & (forecast_df["ds"] <= end_date)
+            if mask.any():
+                # Apply category-specific adjustment
+                forecast_df.loc[mask, "yhat"] *= (1 + adjustment / 100)
+                if "yhat_lower" in forecast_df.columns:
+                    forecast_df.loc[mask, "yhat_lower"] *= (1 + adjustment / 100)
+                if "yhat_upper" in forecast_df.columns:
+                    forecast_df.loc[mask, "yhat_upper"] *= (1 + adjustment / 100)
     
-    # Modified category adjustment call
-    if category_scenarios and category_columns:
-        forecast_df = adjust_forecast_by_category(
-            forecast_df, 
-            category_scenarios,
-            category_columns
-        )
+    # Aggregate category-level forecasts to maintain temporal consistency
+    if any(col in forecast_df.columns for col in category_scenarios.keys()):
+        agg_dict = {
+            "yhat": "sum",
+            "yhat_lower": "sum",
+            "yhat_upper": "sum"
+        }
+        forecast_df = forecast_df.groupby("ds", as_index=False).agg(agg_dict)
+    
+    # Ensure temporal order and reset index
+    forecast_df = forecast_df.sort_values("ds").reset_index(drop=True)
     
     return forecast_df
 
-# ====================== ENHANCED METRICS & VISUALIZATION ======================
-def mase(y_true, y_pred, seasonal_period=1):
-    """Mean Absolute Scaled Error"""
-    naive_error = np.mean(np.abs(np.diff(y_true, seasonal_period)))
-    forecast_error = np.mean(np.abs(y_true - y_pred))
-    return forecast_error / naive_error
+def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
+    # Apply global adjustments
+    if demand_shock != 0:
+        forecast_df["yhat"] *= (1 + demand_shock / 100)
+        if "yhat_lower" in forecast_df.columns:
+            forecast_df["yhat_lower"] *= (1 + demand_shock / 100)
+        if "yhat_upper" in forecast_df.columns:
+            forecast_df["yhat_upper"] *= (1 + demand_shock / 100)
+    if seasonality_adjustment != 0:
+        forecast_df["month"] = forecast_df["ds"].dt.month
+        seasonality_multiplier = 1 + seasonality_adjustment / 100
+        forecast_df["yhat"] *= (1 + (forecast_df["month"] - 1) * (seasonality_multiplier - 1) / 12)
+        if "yhat_lower" in forecast_df.columns:
+            forecast_df["yhat_lower"] *= (1 + (forecast_df["month"] - 1) * (seasonality_multiplier - 1) / 12)
+        if "yhat_upper" in forecast_df.columns:
+            forecast_df["yhat_upper"] *= (1 + (forecast_df["month"] - 1) * (seasonality_multiplier - 1) / 12)
+    if external_shock:
+        forecast_df["yhat"] *= 0.8
+        if "yhat_lower" in forecast_df.columns:
+            forecast_df["yhat_lower"] *= 0.8
+        if "yhat_upper" in forecast_df.columns:
+            forecast_df["yhat_upper"] *= 0.8
+    # Then apply category-specific adjustments
+    if category_scenarios:
+        forecast_df = adjust_forecast_by_category(forecast_df, category_scenarios)
+    return forecast_df
 
-def comprehensive_metrics(y_true, y_pred):
-    """Enhanced evaluation metrics with proper imports"""
-    metrics = {
-        'RMSE': np.sqrt(mean_squared_error(y_true, y_pred)),
-        'MAE': mean_absolute_error(y_true, y_pred),
-        'MAPE': np.mean(np.abs((y_true - y_pred)/np.maximum(y_true, 1e-8))) * 100,  # Handle zero division
-        'R2': r2_score(y_true, y_pred)
-    }
-    
-    try:
-        metrics['MASE'] = mase(y_true, y_pred, m=12)
-    except Exception as e:
-        metrics['MASE'] = np.nan
-        st.warning(f"MASE calculation failed: {str(e)}")
-    
-    try:
-        dir_acc = np.mean(np.sign(y_true[1:]-y_true[:-1]) == np.sign(y_pred[1:]-y_pred[:-1])) * 100
-        metrics['DirectionalAccuracy'] = dir_acc
-    except:
-        metrics['DirectionalAccuracy'] = np.nan
-    
-    return metrics
-
-def plot_stationarity_analysis(data, y_original, stationarity, diff_order):
-    """Enhanced visualization of stationarity analysis"""
-    fig = make_subplots(rows=2, cols=1, subplot_titles=("Original Series", "Transformed Series"))
-    
-    # Original series
-    fig.add_trace(go.Scatter(
-        x=y_original["ds"], y=y_original["y_original"],
-        mode="lines", name="Original", line=dict(color="blue")),
-        row=1, col=1
-    )
-    
-    # Transformed series
-    if diff_order > 0:
-        fig.add_trace(go.Scatter(
-            x=data["ds"], y=data["y"],
-            mode="lines", name=f"Differenced (Order {diff_order})", line=dict(color="orange")),
-            row=2, col=1
-        )
-    else:
-        fig.add_trace(go.Scatter(
-            x=data["ds"], y=data["y"],
-            mode="lines", name="Original", line=dict(color="green")),
-            row=2, col=1
-        )
-    
-    # Annotation
-    stationarity_text = "<br>".join([f"{k}: {v['stationarity']}" for k, v in stationarity.items()])
-    fig.update_layout(
-        title=f"Stationarity Analysis (Global: {stationarity['global']['stationarity']})",
-        annotations=[
-            dict(
-                x=0.5, y=-0.2,
-                xref="paper", yref="paper",
-                text=stationarity_text,
-                showarrow=False
-            )
-        ]
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-def shape_score(actual, forecast):
-    """Calculate directional correlation with error handling"""
-    try:
-        if len(actual) != len(forecast):
-            min_len = min(len(actual), len(forecast))
-            actual = actual[:min_len]
-            forecast = forecast[:min_len]
-        
-        # Handle constant values case
-        if np.std(actual) == 0 or np.std(forecast) == 0:
-            return 0.0
-            
-        corr, _ = pearsonr(actual, forecast)
-        return corr
-    except:
-        return np.nan
-
-def combined_score(rmse, corr, max_rmse, alpha=0.5, beta=1.0):
-    """Enhanced combined metric with safety checks"""
-    try:
-        # Prevent division by zero
-        max_rmse = max(max_rmse, 1e-8)
-        # Normalize correlation to [0, 2] range
-        norm_corr = (1 - np.clip(corr, -1, 1))
-        # Normalize RMSE to [0, 1]
-        norm_rmse = rmse / max_rmse
-        return alpha * norm_rmse + beta * norm_corr
-    except:
-        return np.nan
-
-# ====================== PROPHET MODEL ======================
 def train_prophet_model(train, test, forecast_period, best_params, last_historical_value,
-                        is_diff, demand_shock, seasonality_adjustment, external_shock, 
-                        category_scenarios=None):
-    """Updated Prophet training with enhanced parameter filtering and custom seasonality handling"""
+                        is_diff, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
     try:
-        # 1. Filter valid Prophet parameters
-        valid_prophet_params = [
-            'growth', 'changepoint_prior_scale', 'seasonality_prior_scale',
-            'seasonality_mode', 'yearly_seasonality', 'weekly_seasonality',
-            'daily_seasonality', 'holidays', 'holidays_prior_scale',
-            'changepoint_range', 'mcmc_samples', 'uncertainty_samples'
-        ]
-        
-        prophet_params = {
-            k: v for k, v in best_params.items() 
-            if k in valid_prophet_params
-        }
-
-        # 2. Handle custom seasonalities separately
-        custom_seasons = best_params.get('custom_seasonalities', [])
-        
-        # 3. Initialize model with valid parameters
-        model = EnhancedProphet(**prophet_params)
-        
-        # 4. Add custom seasonalities before detection
-        if custom_seasons:
-            for season in custom_seasons:
-                try:
-                    model.add_seasonality(
-                        name=season['name'],
-                        period=season['period'],
-                        fourier_order=season['fourier_order']
-                    )
-                except Exception as e:
-                    st.warning(f"Couldn't add {season['name']}: {str(e)}")
-
-        # 5. Automatic seasonality detection
-        model.detect_seasonalities(train)
-
-        # 6. Handle growth requirements
-        growth_mode = prophet_params.get('growth', 'linear')
-        if growth_mode == 'logistic':
-            train["cap"] = 1.2 * train["y"].max()
-            train["floor"] = 1
-
-        # 7. Fit model with progress tracking
-        with st.spinner("🔮 Training Prophet model..."):
-            model.fit(train)
-
-        # 8. Create future dataframe
-        future = model.make_future_dataframe(
-            periods=forecast_period, 
-            freq="MS", 
-            include_history=False
-        )
-        
-        if growth_mode == 'logistic':
-            future["cap"] = train["cap"].max()
-            future["floor"] = 1
-
-        # 9. Generate predictions
-        forecast = model.predict(future)
-        forecast = forecast[forecast["ds"] > train["ds"].max()]
-
-        # 10. Apply scenario adjustments
-        forecast = adjust_forecast(
-            forecast, 
-            demand_shock, 
-            seasonality_adjustment, 
-            external_shock, 
-            category_scenarios
-        )
-
-        # 11. Handle differencing
-        if is_diff and last_historical_value is not None:
-            forecast = inverse_difference(forecast, last_historical_value)
-
-        # 12. Calculate metrics with alignment check
-        match_len = min(len(test["y"]), len(forecast))
-        if match_len > 0:
-            rmse = mean_squared_error(
-                test["y"].iloc[:match_len], 
-                forecast["yhat"].iloc[:match_len], 
-                squared=False
-            )
-            mape = mean_absolute_percentage_error(
-                test["y"].iloc[:match_len],
-                forecast["yhat"].iloc[:match_len]
-            )
-        else:
-            rmse, mape = float('nan'), float('nan')
-
-        result = {
-            "RMSE": float(rmse),
-            "MAPE": float(mape),
-            "Forecast": forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]],
-            "Seasonalities": model.custom_seasonalities,
-            "ModelParams": prophet_params,
-            "GrowthMode": growth_mode
-        }
-
-    except Exception as e:
-        st.error(f"Prophet model failed: {str(e)}")
-
-    return "Prophet", result
-
-# ====================== ARIMA MODEL ======================
-def train_arima_model(train, test, forecast_period, last_historical_value, 
-                      is_diff, demand_shock, seasonality_adjustment,
-                      external_shock, category_scenarios=None):
-    result = {}
-    try:
+        # If category adjustments are used, aggregate training data by date.
         if category_scenarios:
             train = train.groupby("ds", as_index=False).agg({"y": "sum"})
-
-        # Enhanced differencing handling
-        diff_order = 0
-        if is_diff:
-            train, diff_order = dynamic_differencing(train, "y")
-
-        # Train with explainability
-        model, explanation = auto_arima_enhanced(
-            train.set_index("ds")["y"],
-            diff_order=diff_order
-        )
         
-        # Generate predictions
-        preds, conf_int = model.predict(
-            n_periods=forecast_period,
-            return_conf_int=True
-        )
+        # Set logistic growth parameters: 
+        # "cap" is set to 20% above the max observed value and "floor" is set to 1 (instead of 0)
+        train["cap"] = 1.2 * train["y"].max()
+        train["floor"] = 1  # Setting a minimal positive floor to avoid negatives
         
-        # Create forecast dataframe
+        # Initialize Prophet with tuned parameters and logistic growth.
+        model = Prophet(
+            growth="logistic",  # enforce nonnegative forecasts
+            seasonality_mode=best_params["seasonality_mode"],
+            changepoint_prior_scale=best_params["changepoint_prior_scale"]
+        )
+        try:
+            model = detect_and_add_seasonalities(model, train)
+        except Exception as e:
+            st.warning(f"Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
+        
+        # Fit the model.
+        model.fit(train)
+        
+        # Create a future dataframe.
+        future = model.make_future_dataframe(periods=forecast_period, freq="MS", include_history=False)
+        # Add cap and floor to the future dataframe.
+        future["cap"] = train["cap"].max()
+        future["floor"] = 1
+        
+        forecast = model.predict(future)
+        forecast = forecast[forecast["ds"] > train["ds"].max()]
+        
+        # Clamp forecasts to be nonnegative (if any negatives remain).
+        forecast["yhat"] = forecast["yhat"].clip(lower=0)
+        
+        # Apply scenario adjustments.
+        forecast = adjust_forecast(forecast, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
+        
+        # Inverse differencing if needed.
+        if is_diff and last_historical_value is not None:
+            forecast = inverse_difference(forecast, last_historical_value)
+        
+        # Evaluate on the overlapping period.
+        match_len = min(len(test["y"]), len(forecast))
+        rmse = mean_squared_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len], squared=False)
+        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len])
+        
+        result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast}
+    
+    except Exception as e:
+        st.warning(f"Prophet Model failed: {e}")
+    
+    return "Prophet", result
+
+
+def train_arima_model(train, test, forecast_period, last_historical_value, is_diff,
+                      demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
+    result = {}
+    try:
+        # If category adjustments are used, aggregate training data by date.
+        if category_scenarios:
+            train = train.groupby("ds", as_index=False).agg({"y": "sum"})
+        
+        # Detect seasonality
+        try:
+            decomposition = seasonal_decompose(train["y"], model="additive", period=12)
+            seasonality_present = np.any(np.abs(decomposition.seasonal) > 0.01)
+            acf_values = acf(train["y"], nlags=12, fft=False)
+            seasonality_confirmed = any(np.abs(acf_values[1:]) > 0.2)
+            seasonal = seasonality_present and seasonality_confirmed
+        except Exception as e:
+            st.warning(f"Error in seasonality analysis: {e}")
+            seasonal = False
+
+        # Fit auto_arima
+        model = auto_arima(
+            train["y"],
+            seasonal=seasonal,
+            m=12 if seasonal else 1,
+            d=None,
+            D=1 if seasonal else 0,
+            start_p=0, start_q=0,
+            max_p=3, max_q=3,
+            start_P=0, start_Q=0,
+            max_P=2, max_Q=2,
+            suppress_warnings=True,
+            error_action="ignore",
+            stepwise=True
+        )
+
+        preds = model.predict(n_periods=forecast_period)
+        forecast_dates = pd.date_range(start=train["ds"].iloc[-1] + pd.DateOffset(months=1),
+                                       periods=len(preds), freq="MS")
+        forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": preds})
+
+        # Apply scenario adjustments.
+        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
+
+        # Inverse differencing if needed.
+        if is_diff and last_historical_value is not None:
+            forecast_df = inverse_difference(forecast_df, last_historical_value)
+
+        match_len = min(len(test["y"]), len(forecast_df))
+        rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
+        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
+
+        result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
+
+    except Exception as e:
+        st.warning(f"ARIMA Model failed: {e}")
+
+    return "ARIMA", result
+
+def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff,
+                    demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
+    result = {}
+    try:
+        # If category adjustments are used, aggregate training data by date.
+        if category_scenarios:
+            train = train.groupby("ds", as_index=False).agg({"y": "sum"})
+        
+        # 1. Detect historical patterns
+        monthly_avg = train.groupby(train["ds"].dt.month)["y"].mean()
+        peak_month = monthly_avg.idxmax()
+        peak_value = monthly_avg.max()
+        
+        # 2. Feature engineering
+        data_xgb = train.copy()
+        data_xgb["month"] = data_xgb["ds"].dt.month  # Base feature
+        data_xgb["year"] = data_xgb["ds"].dt.year
+        data_xgb["month_year_interaction"] = data_xgb["month"] * (data_xgb["year"] - data_xgb["year"].min())
+        
+        # Peak alignment features
+        data_xgb["days_from_peak"] = (data_xgb["month"] - peak_month).apply(lambda x: x if x >= 0 else x + 12)
+        data_xgb["is_peak_month"] = (data_xgb["month"] == peak_month).astype(int)
+        
+        # Phase-aligned seasonal features
+        phase_shift = peak_month - 1  # Shift waveform peak to historical peak month
+        data_xgb["sin_month"] = np.sin(2 * np.pi * (data_xgb["month"] - phase_shift) / 12)
+        data_xgb["cos_month"] = np.cos(2 * np.pi * (data_xgb["month"] - phase_shift) / 12)
+        # Enhanced Fourier terms for more nuanced seasonality
+        data_xgb["sin2_month"] = np.sin(4 * np.pi * (data_xgb["month"] - phase_shift) / 12)
+        data_xgb["cos2_month"] = np.cos(4 * np.pi * (data_xgb["month"] - phase_shift) / 12)
+        
+        # Lag features with yearly focus
+        max_lag = min(24, len(train) - 1)  # 2-year window
+        for lag in [1, 2, 12, 24]:
+            if lag <= max_lag:
+                data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
+        
+        data_xgb.dropna(inplace=True)
+        
+        # 3. Feature selection with fixed order
+        feature_order = [
+            'month', 'year', 'month_year_interaction', 'is_peak_month', 'days_from_peak',
+            'sin_month', 'cos_month', 'sin2_month', 'cos2_month', 'lag_1', 'lag_2', 'lag_12', 'lag_24'
+        ]
+        feature_cols = [col for col in feature_order if col in data_xgb.columns]
+    
+        # 4. Model configuration
+        model = XGBRegressor(
+            n_estimators=200,
+            max_depth=4,
+            learning_rate=0.05,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            objective='reg:squarederror',
+            random_state=42,
+            n_jobs=-1
+        )
+        model.fit(data_xgb[feature_cols], data_xgb["y"])
+        
+        # 5. Compute base dynamic boost factor based on recent peaks (using the last 3 years)
+        recent_years = sorted(train["ds"].dt.year.unique())[-3:]
+        recent_data = train[train["ds"].dt.year.isin(recent_years)]
+        recent_monthly_avg = recent_data.groupby(recent_data["ds"].dt.month)["y"].mean()
+        
+        if recent_monthly_avg.mean() != 0:
+            dynamic_boost = recent_monthly_avg.get(peak_month, peak_value) / recent_monthly_avg.mean()
+        else:
+            dynamic_boost = 1.25
+        
+        # Optionally, clamp the base boost factor to a reasonable range
+        dynamic_boost = max(min(dynamic_boost, 1.2), 1.0)
+        
+        # 6. Compute YOY growth for peak values using the actual peak month values per year
+        yearly_peaks = {}
+        for year in sorted(train["ds"].dt.year.unique()):
+            year_data = train[(train["ds"].dt.year == year) & (train["ds"].dt.month == peak_month)]
+            if not year_data.empty:
+                yearly_peaks[year] = year_data["y"].mean()  # or .max() if you prefer
+        
+        growth_factors = []
+        unique_years = sorted(yearly_peaks.keys())
+        for i in range(len(unique_years) - 1):
+            y1 = unique_years[i]
+            y2 = unique_years[i+1]
+            if yearly_peaks[y1] > 0:
+                growth_factors.append(yearly_peaks[y2] / yearly_peaks[y1])
+        if growth_factors:
+            yoy_growth = np.mean(growth_factors)
+        else:
+            yoy_growth = 1.0
+
+        # Impose a floor to ensure peaks do not decrease (if your data supports growth)
+        yoy_growth = max(yoy_growth, 1.0)
+        
+        # Remember the last training year for compounding
+        last_training_year = unique_years[-1]
+        
+        # 7. Forecasting with dynamic, compounding peak adjustment
+        last_row = data_xgb[feature_cols].iloc[-1].copy()
+        last_date = data_xgb["ds"].iloc[-1]
+        preds = []
+        
+        for i in range(forecast_period):
+            future_date = last_date + pd.DateOffset(months=i+1)
+            is_peak = int(future_date.month == peak_month)
+            future_year = future_date.year
+            
+            # Compute compounded boost for future year:
+            years_ahead = future_year - last_training_year
+            compounded_boost = dynamic_boost * (yoy_growth ** years_ahead)
+            compounded_boost = max(compounded_boost, 1.0)  # ensure it doesn't fall below 1.0
+            
+            # Initialize features for the future date
+            features = {col: last_row[col] for col in feature_cols}
+            features.update({
+                'month': future_date.month,
+                'year': future_year,
+                'month_year_interaction': future_date.month * (future_year - data_xgb["year"].min()),
+                'is_peak_month': is_peak,
+                'days_from_peak': (future_date.month - peak_month) % 12,
+                'sin_month': np.sin(2 * np.pi * (future_date.month - phase_shift) / 12),
+                'cos_month': np.cos(2 * np.pi * (future_date.month - phase_shift) / 12),
+                'sin2_month': np.sin(4 * np.pi * (future_date.month - phase_shift) / 12),
+                'cos2_month': np.cos(4 * np.pi * (future_date.month - phase_shift) / 12)
+            })
+            
+            # Predict with the XGBoost model
+            base_pred = model.predict(pd.DataFrame([features]))[0]
+            
+            # Apply the compounded boost for the peak month
+            if is_peak:
+                pred = base_pred * compounded_boost
+            else:
+                pred = base_pred
+                
+            preds.append(pred)
+            
+            # Update state for lag features; shift previous lags and use current prediction as new lag_1
+            for lag in [24, 12, 2, 1]:
+                if f'lag_{lag}' in feature_cols:
+                    if lag == 1:
+                        last_row['lag_1'] = pred
+                    else:
+                        last_row[f'lag_{lag}'] = last_row.get(f'lag_{lag-1}', pred)
+        
+        # 8. Create forecast dataframe
         forecast_df = pd.DataFrame({
             "ds": pd.date_range(
-                start=train["ds"].iloc[-1] + pd.DateOffset(months=1),
+                start=last_date + pd.DateOffset(months=1),
                 periods=forecast_period,
                 freq="MS"
             ),
-            "yhat": preds,
-            "yhat_lower": conf_int[:, 0],
-            "yhat_upper": conf_int[:, 1]
+            "yhat": preds
         })
-        
-        # Apply scenarios
-        forecast_df = adjust_forecast(forecast_df, demand_shock, 
-                                    seasonality_adjustment, external_shock,
-                                    category_scenarios)
-        
-        # Differencing reversal
-        if is_diff and last_historical_value is not None:
-            forecast_df = inverse_difference(forecast_df, last_historical_value)
-        
-        # Enhanced evaluation
-        metrics = comprehensive_metrics(
-            test["y"].iloc[:len(forecast_df)],
-            forecast_df["yhat"]
-        )
-        
-        result = {
-            **metrics,
-            "Forecast": forecast_df,
-            "Model": model,
-            "Explanation": explanation
-        }
-
-    except Exception as e:
-        st.error(f"ARIMA Error: {str(e)}")
-        result = {"error": str(e)}
     
-    return "ARIMA", result
-
-# ====================== XGBOOST MODEL ======================
-def train_xgb_model(train, test, forecast_period, last_historical_value,
-                    is_diff, demand_shock, seasonality_adjustment,
-                    external_shock, category_scenarios=None):
-    result = {}
-    try:
-        if len(train) < 10:  # Absolute minimum samples
-            raise ValueError(f"Only {len(train)} samples - need at least 10 for training")
-        
-        if category_scenarios:
-            train = train.groupby("ds", as_index=False).agg({"y": "sum"})
-
-        # Initialize and train model
-        model = TemporalXGBoost(horizon=forecast_period)
-        model.fit(train)
-        
-        # Generate forecasts
-        forecast_df = model.predict(forecast_period)
-        
-        # Apply scenario adjustments
-        forecast_df = adjust_forecast(
-            forecast_df, 
-            demand_shock,
-            seasonality_adjustment,
-            external_shock,
-            category_scenarios
-        )
-        
-        # Handle differencing
+        # 9. Post-processing
         if is_diff and last_historical_value is not None:
-            forecast_df["yhat"] = inverse_difference(
-                forecast_df["yhat"], 
-                last_historical_value
-            )
-        
-        # Calculate metrics
-        match_len = min(len(test["y"]), len(forecast_df))
-        metrics = {
-            "RMSE": mean_squared_error(
-                test["y"].iloc[:match_len], 
-                forecast_df["yhat"].iloc[:match_len], 
-                squared=False
-            ),
-            "MAPE": mean_absolute_percentage_error(
-                test["y"].iloc[:match_len],
-                forecast_df["yhat"].iloc[:match_len]
-            ),
-            "FeatureImportances": dict(zip(
-                model.feature_columns,
-                model.model.feature_importances_
-            ))
-        }
-        
-        result = {
-            **metrics,
-            "Forecast": forecast_df,
-            "Model": model
-        }
-
+            forecast_df["yhat"] = last_historical_value + forecast_df["yhat"].cumsum()
+            
+        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
+    
+        # 10. Validation
+        match_len = min(len(test), len(forecast_df))
+        if match_len > 0:
+            rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
+            mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
+        else:
+            rmse, mape = np.nan, np.nan
+    
+        # 11. Robust diagnostics
+        st.write(f"📅 Historical Peak: {calendar.month_abbr[peak_month]}")
+        if not forecast_df.empty:
+            try:
+                peak_idx = forecast_df["yhat"].idxmax()
+                if 0 <= peak_idx < len(forecast_df):
+                    fcst_peak_month = forecast_df.iloc[peak_idx]["ds"].month
+                    st.write(f"🔮 Forecast Peak: {calendar.month_abbr[fcst_peak_month]}")
+                else:
+                    st.warning("⚠️ Could not determine forecast peak")
+            except Exception as e:
+                st.warning("⚠️ Peak detection failed")
+    
+        result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
+    
     except Exception as e:
-        st.error(f"XGBoost Error: {str(e)}")
+        st.warning(f"❌ XGBoost Model Failed: {str(e)}")
         result = {"error": str(e)}
     
     return "XGBoost", result
 
-# ====================== AUTOML MODEL ======================
-def train_automl_model(train, test, forecast_period, last_historical_value,
-                       is_diff, demand_shock, seasonality_adjustment,
-                       external_shock, category_scenarios=None, 
-                       time_budget=600):
+def train_automl_model(train, test, forecast_period, last_historical_value, is_diff, 
+                       demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, time_budget=None):
+    """
+    Train an AutoML model using FLAML for time series forecasting.
+    """
     result = {}
     try:
-        # Initialize AutoTS system
-        automl = AutoTS(time_budget=time_budget)
-        
-        # Train ensemble
-        automl.train(train)
-        
-        # Generate future dataframe
-        future_dates = pd.date_range(
-            start=train["ds"].iloc[-1] + pd.DateOffset(months=1),
-            periods=forecast_period,
-            freq="MS"
-        ).to_frame(index=False, name="ds")
-        
-        # Generate predictions
-        ensemble_pred = automl.predict(future_dates)
-        
-        # Create forecast dataframe
-        forecast_df = pd.DataFrame({
-            "ds": future_dates["ds"],
-            "yhat": ensemble_pred,
-            "yhat_lower": ensemble_pred * 0.9,
-            "yhat_upper": ensemble_pred * 1.1
-        })
-        
-        # Apply scenarios and differencing
-        forecast_df = adjust_forecast(forecast_df, demand_shock,
-                                    seasonality_adjustment, external_shock,
-                                    category_scenarios)
-        
-        if is_diff and last_historical_value is not None:
-            forecast_df = inverse_difference(forecast_df, last_historical_value)
-        
-        # Enhanced evaluation
-        metrics = comprehensive_metrics(
-            test["y"].iloc[:len(forecast_df)],
-            forecast_df["yhat"]
+        # Feature Engineering: work on a copy of the training data.
+        data_automl = train.copy()
+
+        # If category adjustments are used, aggregate the data by date (summing up "y")
+        if category_scenarios:
+            data_automl = data_automl.groupby("ds", as_index=False).agg({"y": "sum"})
+
+        # Use the aggregated dataset's length for subsequent calculations.
+        n = len(data_automl)
+
+        # Determine maximum lag based on aggregated dataset size
+        max_lag = min(24, n - 1)
+        if n <= 6:
+            max_lag = min(3, n - 1)
+        elif n <= 12:
+            max_lag = min(6, n - 1)
+        elif n <= 24:
+            max_lag = min(12, n - 1)
+
+        # Add lag features
+        for lag in range(1, max_lag + 1):
+            data_automl[f"lag_{lag}"] = data_automl["y"].shift(lag)
+
+        # Add rolling statistics
+        for window in [3, 6, 12]:
+            data_automl[f"rolling_mean_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).mean()
+            data_automl[f"rolling_std_{window}"] = data_automl["y"].rolling(window=window, min_periods=1).std()
+
+        # Add year-over-year growth (if sufficient data)
+        if n > 12:
+            data_automl["yoy_growth"] = (data_automl["y"] / data_automl["y"].shift(12)) - 1
+        else:
+            data_automl["yoy_growth"] = 0
+
+        # Add differenced values
+        data_automl["y_diff"] = data_automl["y"].diff().fillna(0)
+
+        # Add rolling mean growth
+        data_automl["rolling_mean_growth"] = data_automl["y"].rolling(window=3).mean().diff().fillna(0)
+
+        # Add trigonometric features for seasonality
+        data_automl["sin_month"] = np.sin(2 * np.pi * data_automl["ds"].dt.month / 12)
+        data_automl["cos_month"] = np.cos(2 * np.pi * data_automl["ds"].dt.month / 12)
+
+        # Log-transform if the target variable has a large range
+        if data_automl["y"].max() / data_automl["y"].min() > 5:
+            data_automl["y_log"] = np.log1p(data_automl["y"])
+            apply_log = True
+        else:
+            data_automl["y_log"] = data_automl["y"]
+            apply_log = False
+
+        # Drop rows with missing values so that X and y align
+        data_automl.dropna(inplace=True)
+
+        # Prepare features and target
+        feature_cols = [col for col in data_automl.columns if col not in ["y", "ds", "y_log"]]
+        y_train = data_automl["y_log"] if apply_log else data_automl["y"]
+        X_train = data_automl[feature_cols]
+
+        # Dynamic time budget calculation using the aggregated data length
+        if time_budget is None:
+            time_budget = min(600, max(60, n * 0.1 + len(feature_cols) * 2))  # 60s to 600s
+            st.info(f"Dynamic time budget set to {time_budget} seconds based on dataset size and complexity.")
+
+        # Decide on evaluation method based on number of samples:
+        # Use holdout if we have too few samples for 5-fold CV.
+        eval_method = "cv" if len(X_train) >= 5 else "holdout"
+
+        # Train AutoML model using FLAML
+        automl_model = AutoML()
+        automl_model.fit(
+            X_train=X_train,
+            y_train=y_train,
+            task="regression",
+            time_budget=time_budget,
+            eval_method=eval_method,
+            estimator_list=["xgboost", "lgbm", "rf", "catboost"],
+            metric="r2",
+            early_stop=True,
+            verbose=1
         )
-        
-        result = {
-            **metrics,
-            "Forecast": forecast_df,
-            "EnsembleWeights": automl.ensemble_weights,
-            "Models": automl.models
-        }
+
+        # Generate future features for forecasting
+        future_features = []
+        last_date = data_automl["ds"].iloc[-1]
+        last_row = data_automl.iloc[-1].copy()
+
+        for i in range(forecast_period):
+            future_row = {}
+            # Update lag features based on available max_lag
+            for lag in range(1, max_lag + 1):
+                if lag == 1:
+                    value = last_row["y_log"] if apply_log else last_row["y"]
+                    future_row[f"lag_{lag}"] = float(value)
+                else:
+                    prev_value = last_row.get(f"lag_{lag - 1}")
+                    if prev_value is None:
+                        prev_value = last_row["y_log"] if apply_log else last_row["y"]
+                    future_row[f"lag_{lag}"] = float(prev_value)
+            # Update rolling statistics for each window
+            for window in [3, 6, 12]:
+                lag_val = last_row.get(f"lag_{window}")
+                if lag_val is not None:
+                    if apply_log:
+                        delta = (float(last_row["y_log"]) - float(lag_val)) / window
+                    else:
+                        delta = (float(last_row["y"]) - float(lag_val)) / window
+                    base_val = last_row.get(f"rolling_mean_{window}")
+                    if base_val is None:
+                        base_val = last_row["y_log"] if apply_log else last_row["y"]
+                    future_row[f"rolling_mean_{window}"] = float(base_val) + delta
+                else:
+                    base_val = last_row.get(f"rolling_mean_{window}")
+                    if base_val is None:
+                        base_val = last_row["y_log"] if apply_log else last_row["y"]
+                    future_row[f"rolling_mean_{window}"] = float(base_val)
+                std_val = last_row.get(f"rolling_std_{window}")
+                future_row[f"rolling_std_{window}"] = float(std_val) if std_val is not None else 0.0
+
+            future_row["yoy_growth"] = float(last_row.get("yoy_growth", 0))
+            future_row["y_diff"] = float(last_row.get("y_diff", 0))
+            future_row["rolling_mean_growth"] = float(last_row.get("rolling_mean_growth", 0))
+            
+            # Update trigonometric features based on the future month
+            future_month = (last_date.month + i) % 12 or 12
+            future_row["sin_month"] = np.sin(2 * np.pi * future_month / 12)
+            future_row["cos_month"] = np.cos(2 * np.pi * future_month / 12)
+            
+            # Ensure no None values remain in future_row
+            for key, value in future_row.items():
+                if value is None:
+                    future_row[key] = 0.0
+            
+            future_features.append(future_row)
+            
+            # Update last_row with future_row values for iterative forecasting
+            last_row = last_row.copy()
+            for key, value in future_row.items():
+                last_row[key] = value
+
+        # Create future DataFrame ensuring all required columns are present
+        future_df = pd.DataFrame(future_features)
+        future_df.fillna(0, inplace=True)
+        for col in X_train.columns:
+            if col not in future_df.columns:
+                future_df[col] = 0
+        future_df = future_df[X_train.columns]
+
+        # Generate forecasts
+        automl_forecast = automl_model.predict(future_df)
+        # Fallback: if predict returns None, use a naive forecast (repeat last value)
+        if automl_forecast is None:
+            st.error("FLAML did not produce a valid model. Falling back to a naive forecast.")
+            last_value = last_row["y_log"] if apply_log else last_row["y"]
+            automl_forecast = np.full(forecast_period, float(last_value))
+
+        if apply_log:
+            automl_forecast = np.expm1(automl_forecast)
+
+        # Create forecast DataFrame
+        forecast_df = pd.DataFrame({
+            "ds": pd.date_range(start=last_date + pd.DateOffset(months=1),
+                                 periods=forecast_period, freq="MS"),
+            "yhat": automl_forecast,
+            "yhat_lower": automl_forecast * 0.9,
+            "yhat_upper": automl_forecast * 1.1
+        })
+
+        # Inverse differencing if applicable
+        if isinstance(last_historical_value, (int, float)):
+            forecast_df["yhat"] = inverse_difference(forecast_df["yhat"], last_historical_value)
+            forecast_df["yhat_lower"] = inverse_difference(forecast_df["yhat_lower"], last_historical_value)
+            forecast_df["yhat_upper"] = inverse_difference(forecast_df["yhat_upper"], last_historical_value)
+
+        # Apply forecast adjustments
+        forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
+
+        # Evaluate model performance: use the minimum length from test and forecast
+        match_len = min(len(test["y"]), len(forecast_df))
+        rmse = np.sqrt(mean_squared_error(test["y"].values[:match_len], forecast_df["yhat"].iloc[:match_len]))
+        mape = mean_absolute_percentage_error(test["y"].values[:match_len], forecast_df["yhat"].iloc[:match_len])
+        result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
 
     except Exception as e:
-        st.error(f"AutoML Error: {str(e)}")
-        result = {"error": str(e)}
-    
-    return "AutoML", result
+        st.error(f"AutoML Model failed: {e}")
+    return ("AutoML", result)
+
+def shape_score(actual, forecast):
+    if len(actual) != len(forecast):
+        min_len = min(len(actual), len(forecast))
+        actual = actual[:min_len]
+        forecast = forecast[:min_len]
+    corr, _ = pearsonr(actual, forecast)
+    return corr
+
+def combined_score(rmse, corr, max_rmse, alpha, beta):
+    norm_rmse = rmse / max_rmse
+    return alpha * norm_rmse + beta * (1 - corr)
 
 def main():
     # Set subscription level: "free" for basic features, "premium" for full access
@@ -1480,33 +1068,19 @@ def main():
 
                 if subscription_level == "premium":
                     # PREMIUM PIPELINE
-                    # STEP 4: Tune Prophet Model with Optuna
+                    # STEP 4: Tune Prophet Model
                     step += 1
-                    step_message.text(f"Step {step} of {total_steps}: Tuning Prophet model with Optuna...")
-                    with st.spinner("🚀 Running advanced hyperparameter optimization..."):
-                        try:
-                            tune_result = tune_prophet(train, n_trials=50)
-                            best_params = {
-                                **tune_result['params'],
-                                'custom_seasonalities': tune_result['custom_seasonalities']
-                            }
-                            best_rmse = tune_result['metrics']['best_rmse']
-                            time.sleep(1)
-                        except Exception as e:
-                            st.error(f"Hyperparameter tuning failed: {str(e)}")
-                            return
-                    
+                    step_message.text(f"Step {step} of {total_steps}: Tuning Prophet model...")
+                    with st.spinner("🚀 Tuning Prophet model..."):
+                        best_params, best_rmse = find_best_prophet_params(train)
+                        time.sleep(1)
+                    if best_params is None:
+                        st.error("No valid Prophet parameters were found.")
+                        return
                     st.success(f"✅ Best Prophet Params: {best_params}")
                     overall_status.write(f"📉 Best RMSE (CV): {best_rmse:.2f}")
-
-                        # Add optimization visualization
-                    with st.expander("🔍 View Hyperparameter Optimization Results"):
-                        try:
-                            from optuna.visualization import plot_optimization_history
-                            fig = plot_optimization_history(tune_result['study'])
-                            st.plotly_chart(fig)
-                        except Exception as e:
-                            st.warning(f"Could not display optimization details: {str(e)}")
+                    progress_bar.progress(int((step / total_steps) * 100))
+                    time.sleep(1)
 
                     # STEP 5: Train Prophet Model
                     step += 1
@@ -1550,20 +1124,20 @@ def main():
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
-                    # # STEP 9: Train AutoML Model
-                    # step += 1
-                    # step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
-                    # with st.spinner("🚀 Training AutoML Model..."):
-                    #     automl_model_name, automl_res = train_automl_model(
-                    #         train, test, forecast_period,
-                    #         last_historical_value, is_diff,
-                    #         demand_shock, seasonality_adjustment, external_shock,
-                    #         category_scenarios, time_budget
-                    #     )
-                    #     time.sleep(1)
-                    # st.success("✅ AutoML Model Training Complete!")
-                    # progress_bar.progress(int((step / total_steps) * 100))
-                    # time.sleep(1)
+                    # STEP 9: Train AutoML Model
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Training AutoML model...")
+                    with st.spinner("🚀 Training AutoML Model..."):
+                        automl_model_name, automl_res = train_automl_model(
+                            train, test, forecast_period,
+                            last_historical_value, is_diff,
+                            demand_shock, seasonality_adjustment, external_shock,
+                            category_scenarios, time_budget
+                        )
+                        time.sleep(1)
+                    st.success("✅ AutoML Model Training Complete!")
+                    progress_bar.progress(int((step / total_steps) * 100))
+                    time.sleep(1)
 
                     # STEP 9: Compile Forecast Results (Premium)
                     step += 1
@@ -1573,8 +1147,8 @@ def main():
                     results = {
                         prophet_model_name: prophet_res,
                         # arima_model_name: arima_res,
-                        xgb_model_name: xgb_res
-                        # automl_model_name: automl_res
+                        xgb_model_name: xgb_res,
+                        automl_model_name: automl_res
                     }
                     valid_results = {model: res for model, res in results.items() if res.get("Forecast") is not None}
                     if not valid_results:
@@ -1588,109 +1162,31 @@ def main():
                     step += 1
                     step_message.text(f"Step {step} of {total_steps}: Displaying model performance comparison...")
                     comparison_data = []
-
-                    with st.expander("📊 Model Performance Metrics", expanded=True):
-                        if not st.session_state.model_results:
-                            st.warning("No model results found. Please train the models first.")
-                        else:
-                            # Calculate metrics with error handling
-                            valid_rmses = []
-                            for model, res in st.session_state.model_results.items():
-                                try:
-                                    forecast_df = res["Forecast"]
-                                    match_len = min(len(test["y"]), len(forecast_df))
-                                    actual = test["y"].iloc[:match_len].values
-                                    pred = forecast_df["yhat"].iloc[:match_len].values
-                                    
-                                    # Calculate metrics with NaN protection
-                                    rmse = np.nan
-                                    mape = np.nan
-                                    corr = np.nan
-                                    
-                                    if len(actual) > 0 and len(pred) > 0:
-                                        with warnings.catch_warnings():
-                                            warnings.simplefilter("ignore")
-                                            rmse = np.sqrt(mean_squared_error(actual, pred))
-                                            mape = np.mean(np.abs((actual - pred)/np.maximum(actual, 1e-8))) * 100
-                                            corr = pearsonr(actual, pred)[0] if np.std(actual) > 0 and np.std(pred) > 0 else np.nan
-                                    
-                                    res.update({
-                                        "RMSE": rmse,
-                                        "MAPE": mape,
-                                        "Shape (corr)": corr
-                                    })
-                                    valid_rmses.append(rmse) if not np.isnan(rmse) else None
-                                    
-                                    comparison_data.append({
-                                        "Model": model,
-                                        "RMSE": rmse,
-                                        "MAPE": mape,
-                                        "Shape (corr)": corr
-                                    })
-                                    
-                                except Exception as e:
-                                    st.error(f"Error evaluating {model}: {str(e)}")
-                                    comparison_data.append({
-                                        "Model": model,
-                                        "RMSE": np.nan,
-                                        "MAPE": np.nan,
-                                        "Shape (corr)": np.nan
-                                    })
-
-                            # Calculate combined scores
-                            max_rmse = max(valid_rmses) if valid_rmses else 1.0
-                            for item in comparison_data:
-                                item["Combined Score"] = combined_score(
-                                    item["RMSE"], 
-                                    item["Shape (corr)"], 
-                                    max_rmse,
-                                    alpha=0.5,
-                                    beta=1.0
-                                )
-
-                            # Create styled dataframe
-                            display_df = pd.DataFrame(comparison_data)
-                            
-                            # Format numbers and handle NaNs
-                            styled_df = display_df.style \
-                                .format({
-                                    "RMSE": "{:.2f}",
-                                    "MAPE": "{:.1%}",
-                                    "Shape (corr)": "{:.2f}",
-                                    "Combined Score": "{:.3f}"
-                                }, na_rep="N/A") \
-                                .background_gradient(
-                                    subset=["Combined Score"], 
-                                    cmap="YlGn",
-                                    vmin=display_df["Combined Score"].min(),
-                                    vmax=display_df["Combined Score"].max()
-                                ) \
-                                .set_caption(
-                                    "Model Performance Comparison (Lower Combined Score is Better)\n"
-                                    "Combined Score = 50% Normalized RMSE + 50% (1 - Correlation)"
-                                )
-
-                            # Display results
-                            st.dataframe(styled_df, use_container_width=True)
-                            
-                            # Find and display best model
-                            if not display_df.empty:
-                                best_model = display_df.loc[display_df["Combined Score"].idxmin(), "Model"]
-                                st.success(f"✨ **AI-Recommended Model:** `{best_model}`")
-                                st.markdown(f"**Rationale:** Selected based on optimal balance between error minimization (RMSE) "
-                                            f"and pattern matching (Correlation) metrics")
-                                
-                                # Show metric definitions
-                            show_explanations = st.checkbox("ℹ️ Show Metric Explanations")
-                            if show_explanations:
-                                st.markdown("### 📖 Metric Explanations")
-                                st.markdown("""
-                                - **RMSE (Root Mean Squared Error):** Measures average error magnitude
-                                - **MAPE (Mean Absolute Percentage Error):** Shows average percentage error
-                                - **Shape Correlation:** Measures pattern matching (1 = perfect match)
-                                - **Combined Score:** Balanced metric (50% RMSE, 50% pattern matching)
-                                """)
-
+                    for model, res in st.session_state.model_results.items():
+                        forecast_df = res["Forecast"]
+                        match_len = min(len(test["y"]), len(forecast_df))
+                        actual = test["y"].iloc[:match_len].values
+                        pred = forecast_df["yhat"].iloc[:match_len].values
+                        corr = shape_score(actual, pred)
+                        res["Shape (corr)"] = corr
+                        comparison_data.append({
+                            "Model": model,
+                            "RMSE": res["RMSE"],
+                            "MAPE": res["MAPE"],
+                            "Shape (corr)": res["Shape (corr)"]
+                        })
+                    if comparison_data:
+                        max_rmse = max(res["RMSE"] for res in st.session_state.model_results.values())
+                        for model, res in st.session_state.model_results.items():
+                            res["Combined Score"] = combined_score(res["RMSE"], res["Shape (corr)"], max_rmse, 0.5, 1.0)
+                        for item in comparison_data:
+                            item["Combined Score"] = combined_score(item["RMSE"], item["Shape (corr)"], max_rmse, 0.5, 1.0)
+                        comparison_df = pd.DataFrame(comparison_data).sort_values(by="Combined Score")
+                        st.dataframe(comparison_df.style.highlight_min(subset=["Combined Score"], color="lightgreen"))
+                        best_model = comparison_df.iloc[0]["Model"]
+                        st.success(f"✨ **AI-Selected Best Model (Combined):** {best_model}")
+                    else:
+                        st.warning("No model results found. Please train the models first.")
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
