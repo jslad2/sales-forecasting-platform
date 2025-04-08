@@ -653,13 +653,13 @@ class TemporalXGBoost:
             start_date += pd.DateOffset(**{self.freq.lower()+'s': 1})
         
         return pd.DataFrame({
-            'ds': pd.date_range(
-                start=current_state['date'] + pd.DateOffset(**{self.freq.lower()+'s': 1}),
-                periods=periods,
-                freq=self.freq
-            ),
-            'yhat': forecasts
-        })
+        'ds': pd.date_range(
+            start=current_state['date'],
+            periods=periods,
+            freq=self.freq
+        ),
+        'yhat': forecasts
+    })
 
     def _generate_features(self, state):
         """Feature vector generation with validation"""
@@ -696,26 +696,27 @@ class TemporalXGBoost:
         return features
 
     def _update_state(self, state, pred):
-        """State management with bounds checking"""
-        # Update lags
-        for lag in sorted([int(k.split('_')[1]) for k in state['lags'].keys()], reverse=True):
-            if lag == 1:
-                state['lags'][f'lag_1'] = pred
-            else:
-                prev_lag = f'lag_{lag-1}'
-                state['lags'][f'lag_{lag}'] = state['lags'].get(prev_lag, pred)
+        """Updated with valid frequency parameters"""
+        # Map frequency to valid DateOffset parameters
+        freq_map = {
+            'MS': 'months',
+            'M': 'months',
+            'D': 'days',
+            'H': 'hours',
+            'Q': 'months'  # Quarters are 3 months
+        }
         
-        # Update rolling stats
-        for window in [3, 6, 12]:
-            mean_key = f'rolling_mean_{window}'
-            if mean_key in state['rolling_stats']:
-                current_mean = state['rolling_stats'][mean_key]
-                new_mean = ((current_mean * (window-1)) + pred) / window
-                state['rolling_stats'][mean_key] = new_mean
+        # Get offset parameter with fallback
+        offset_param = freq_map.get(self.freq, 'days')
         
-        # Update trend and date
-        state['trend'] += 1
-        state['date'] += pd.DateOffset(**{self.freq.lower()+'s': 1})
+        # Calculate offset duration
+        if self.freq == 'Q':
+            offset_value = 3  # Quarters are 3 months
+        else:
+            offset_value = 1
+
+        # Update date with validated offset
+        state['date'] += pd.DateOffset(**{offset_param: offset_value})
 
 class AutoTS:
     def __init__(self, time_budget=600, ensemble_size=4):
