@@ -630,7 +630,7 @@ class TemporalXGBoost:
             raise RuntimeError(f"Training failed: {str(e)}")
 
     def predict(self, periods=None):
-        """Generate forecasts automatically from last training date"""
+        """Generate forecasts with validated date handling"""
         if periods is None:
             periods = self.horizon
             
@@ -640,26 +640,40 @@ class TemporalXGBoost:
         forecasts = []
         current_state = copy.deepcopy(self.last_state)
         
-        # Calculate first prediction date
-        start_date = current_state['date'] + pd.DateOffset(
-            **{self.freq.lower()+'s': 1}
+        # Frequency to DateOffset mapping
+        freq_mapping = {
+            'MS': ('months', 1),
+            'M': ('months', 1),
+            'Q': ('months', 3),
+            'D': ('days', 1),
+            'H': ('hours', 1),
+            'W': ('weeks', 1)
+        }
+        
+        # Get offset parameters with fallback to daily
+        offset_param, offset_value = freq_mapping.get(
+            self.freq, ('days', 1)
         )
         
+        # Generate prediction dates
+        start_date = current_state['date'] + pd.DateOffset(**{offset_param: offset_value})
+        dates = pd.date_range(
+            start=start_date,
+            periods=periods,
+            freq=self.freq
+        )
+        
+        # Generate forecasts
         for _ in range(periods):
             features = self._generate_features(current_state)
             pred = self.model.predict(pd.DataFrame([features]))[0]
             forecasts.append(pred)
             self._update_state(current_state, pred)
-            start_date += pd.DateOffset(**{self.freq.lower()+'s': 1})
-        
+            
         return pd.DataFrame({
-        'ds': pd.date_range(
-            start=current_state['date'],
-            periods=periods,
-            freq=self.freq
-        ),
-        'yhat': forecasts
-    })
+            'ds': dates,
+            'yhat': forecasts
+        })
 
     def _generate_features(self, state):
         """Feature vector generation with validation"""
@@ -696,31 +710,39 @@ class TemporalXGBoost:
         return features
 
     def _update_state(self, state, pred):
-        """Updated with valid pandas frequency handling"""
-        # Map frequency to valid DateOffset parameters
+        """State update with frequency-aware date increment"""
         freq_mapping = {
-            'MS': 'months',  # Month start
-            'M': 'months',   # Month end
-            'D': 'days',
-            'H': 'hours',
-            'Q': 'months'   # Handle quarters as 3 months
+            'MS': ('months', 1),
+            'M': ('months', 1),
+            'Q': ('months', 3),
+            'D': ('days', 1),
+            'H': ('hours', 1),
+            'W': ('weeks', 1)
         }
         
-        # Get offset parameters
-        offset_param = freq_mapping.get(self.freq, 'days')
-        offset_value = 3 if self.freq == 'Q' else 1
-
-        # Update date with validated offset
+        offset_param, offset_value = freq_mapping.get(
+            self.freq, ('days', 1)
+        )
+        
+        # Update date using validated offset
         state['date'] += pd.DateOffset(**{offset_param: offset_value})
         
-        # Calculate offset duration
-        if self.freq == 'Q':
-            offset_value = 3  # Quarters are 3 months
-        else:
-            offset_value = 1
-
-        # Update date with validated offset
-        state['date'] += pd.DateOffset(**{offset_param: offset_value})
+        # Update lags (existing code)
+        for lag in sorted([int(k.split('_')[1]) for k in state['lags'].keys()], reverse=True):
+            if lag == 1:
+                state['lags'][f'lag_1'] = pred
+            else:
+                state['lags'][f'lag_{lag}'] = state['lags'].get(f'lag_{lag-1}', pred)
+        
+        # Update rolling stats (existing code)
+        for window in [3, 6, 12]:
+            mean_key = f'rolling_mean_{window}'
+            if mean_key in state['rolling_stats']:
+                current_mean = state['rolling_stats'][mean_key]
+                new_mean = ((current_mean * (window-1)) + pred) / window
+                state['rolling_stats'][mean_key] = new_mean
+        
+        return state
 
 class AutoTS:
     def __init__(self, time_budget=600, ensemble_size=4):
