@@ -417,7 +417,6 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
     
     return "Prophet", result
 
-
 def train_arima_model(train, test, forecast_period, last_historical_value, is_diff,
                       demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
     result = {}
@@ -1146,7 +1145,7 @@ def main():
                     time.sleep(1)
                     results = {
                         prophet_model_name: prophet_res,
-                        # arima_model_name: arima_res,
+                        arima_model_name: arima_res,
                         xgb_model_name: xgb_res,
                         automl_model_name: automl_res
                     }
