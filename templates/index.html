@@ -6,6 +6,15 @@
     <title>SynovaAI - AI-Powered Sales Forecasting & Insights</title>
     <meta name="description" content="Turn raw data into AI-powered sales forecasts and insights—instantly!">
 
+    <!-- ✅ Google Analytics 4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-LKEQTSKLCF"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-LKEQTSKLCF');
+    </script>
+
     <!-- Open Graph Meta Tags for SEO -->
     <meta property="og:title" content="SynovaAI - AI-Powered Sales Forecasting & Insights">
     <meta property="og:description" content="Turn raw data into AI-powered sales forecasts and insights—instantly!">
@@ -117,9 +126,6 @@
             window.scrollTo({ top: 0, behavior: "smooth" });
         }
 
-        /**
-         * ✅ Dynamically updates login/logout buttons based on authentication status
-         */
         function updateAuthButtons() {
             const authContainer = document.querySelector("#auth-buttons");
             if (!authContainer) return;
@@ -134,9 +140,6 @@
             }
         }
 
-        /**
-         * ✅ Logout Function (Removes JWT & Redirects)
-         */
         function logout() {
             localStorage.removeItem("access_token");
             window.location.href = "/login";
