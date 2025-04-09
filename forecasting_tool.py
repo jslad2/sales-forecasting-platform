@@ -1096,19 +1096,19 @@ def main():
                     progress_bar.progress(int((step / total_steps) * 100))
                     time.sleep(1)
 
-                    # # STEP 6: Train ARIMA Model
-                    # step += 1
-                    # step_message.text(f"Step {step} of {total_steps}: Training ARIMA model...")
-                    # with st.spinner("🚀 Training ARIMA model..."):
-                    #     arima_model_name, arima_res = train_arima_model(
-                    #         train, test, forecast_period,
-                    #         last_historical_value, is_diff,
-                    #         demand_shock, seasonality_adjustment, external_shock, category_scenarios
-                    #     )
-                    #     time.sleep(1)
-                    # st.success("✅ ARIMA Model Training Complete!")
-                    # progress_bar.progress(int((step / total_steps) * 100))
-                    # time.sleep(1)
+                    # STEP 6: Train ARIMA Model
+                    step += 1
+                    step_message.text(f"Step {step} of {total_steps}: Training ARIMA model...")
+                    with st.spinner("🚀 Training ARIMA model..."):
+                        arima_model_name, arima_res = train_arima_model(
+                            train, test, forecast_period,
+                            last_historical_value, is_diff,
+                            demand_shock, seasonality_adjustment, external_shock, category_scenarios
+                        )
+                        time.sleep(1)
+                    st.success("✅ ARIMA Model Training Complete!")
+                    progress_bar.progress(int((step / total_steps) * 100))
+                    time.sleep(1)
 
                     # STEP 7: Train XGBoost Model
                     step += 1
@@ -1262,7 +1262,7 @@ def main():
                     st.markdown("### 🔍 Forecast Comparison Across Models")
                     model_colors = {
                         "Prophet": "blue",
-                        # "ARIMA": "green",
+                        "ARIMA": "green",
                         "XGBoost": "red",
                         "AutoML": "purple"
                     }
