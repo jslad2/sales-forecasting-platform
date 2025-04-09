@@ -442,28 +442,43 @@ def train_prophet_model(train, test, forecast_period, best_params, last_historic
 
 def train_arima_model(train, test, forecast_period, last_historical_value, is_diff,
                       demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
+    """
+    Trains an ARIMA model with improvements:
+      - Automatic inference of seasonal frequency.
+      - Robust seasonal decomposition and auto_arima configuration.
+    """
     result = {}
     try:
-        # If category adjustments are used, aggregate training data by date.
         if category_scenarios:
             train = train.groupby("ds", as_index=False).agg({"y": "sum"})
-        
-        # Detect seasonality
+
+        # Infer the frequency to set the seasonal period.
+        inferred_freq = pd.infer_freq(train["ds"])
+        if inferred_freq is None:
+            seasonal_period = 12
+        elif inferred_freq in ['MS', 'M']:
+            seasonal_period = 12
+        elif inferred_freq in ['D']:
+            seasonal_period = 7
+        else:
+            seasonal_period = 12
+
+        # Use seasonal decomposition to flag seasonality.
         try:
-            decomposition = seasonal_decompose(train["y"], model="additive", period=12)
-            seasonality_present = np.any(np.abs(decomposition.seasonal) > 0.01)
-            acf_values = acf(train["y"], nlags=12, fft=False)
-            seasonality_confirmed = any(np.abs(acf_values[1:]) > 0.2)
-            seasonal = seasonality_present and seasonality_confirmed
+            decomposition = seasonal_decompose(train["y"], model="additive", period=seasonal_period)
+            seasonal_present = np.any(np.abs(decomposition.seasonal) > 0.01)
+            acf_values = acf(train["y"], nlags=seasonal_period, fft=False)
+            seasonal_confirmed = any(np.abs(acf_values[1:]) > 0.2)
+            seasonal = seasonal_present and seasonal_confirmed
         except Exception as e:
-            st.warning(f"Error in seasonality analysis: {e}")
+            st.warning(f"Seasonality analysis failed: {e}")
             seasonal = False
 
-        # Fit auto_arima
+        # Fit auto_arima with tighter approximation settings.
         model = auto_arima(
             train["y"],
             seasonal=seasonal,
-            m=12 if seasonal else 1,
+            m=seasonal_period if seasonal else 1,
             d=None,
             D=1 if seasonal else 0,
             start_p=0, start_q=0,
@@ -472,7 +487,8 @@ def train_arima_model(train, test, forecast_period, last_historical_value, is_di
             max_P=2, max_Q=2,
             suppress_warnings=True,
             error_action="ignore",
-            stepwise=True
+            stepwise=True,
+            approximation=False
         )
 
         preds = model.predict(n_periods=forecast_period)
@@ -480,7 +496,7 @@ def train_arima_model(train, test, forecast_period, last_historical_value, is_di
                                        periods=len(preds), freq="MS")
         forecast_df = pd.DataFrame({"ds": forecast_dates, "yhat": preds})
 
-        # Apply scenario adjustments.
+        # Apply adjustments.
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
 
         # Inverse differencing if needed.
@@ -490,127 +506,112 @@ def train_arima_model(train, test, forecast_period, last_historical_value, is_di
         match_len = min(len(test["y"]), len(forecast_df))
         rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
         mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
-
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
 
     except Exception as e:
-        st.warning(f"ARIMA Model failed: {e}")
+        st.warning(f"Updated ARIMA Model failed: {e}")
 
     return "ARIMA", result
 
 def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff,
                     demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
+    """
+    Trains an XGBoost model with improvements:
+      - Outlier clipping to smooth extreme values.
+      - Expanded lag features and seasonality indicators.
+      - Updated hyperparameters for robustness.
+    """
     result = {}
     try:
-        # If category adjustments are used, aggregate training data by date.
         if category_scenarios:
             train = train.groupby("ds", as_index=False).agg({"y": "sum"})
-        
-        # 1. Detect historical patterns
+
+        # Outlier handling: clip extreme y values.
+        lower_bound, upper_bound = train["y"].quantile([0.05, 0.95])
+        train["y"] = train["y"].clip(lower=lower_bound, upper=upper_bound)
+
+        # Determine peak month robustly.
         monthly_avg = train.groupby(train["ds"].dt.month)["y"].mean()
         peak_month = monthly_avg.idxmax()
         peak_value = monthly_avg.max()
-        
-        # 2. Feature engineering
+
+        # Feature engineering.
         data_xgb = train.copy()
-        data_xgb["month"] = data_xgb["ds"].dt.month  # Base feature
+        data_xgb["month"] = data_xgb["ds"].dt.month
         data_xgb["year"] = data_xgb["ds"].dt.year
         data_xgb["month_year_interaction"] = data_xgb["month"] * (data_xgb["year"] - data_xgb["year"].min())
-        
-        # Peak alignment features
-        data_xgb["days_from_peak"] = (data_xgb["month"] - peak_month).apply(lambda x: x if x >= 0 else x + 12)
-        data_xgb["is_peak_month"] = (data_xgb["month"] == peak_month).astype(int)
-        
-        # Phase-aligned seasonal features
-        phase_shift = peak_month - 1  # Shift waveform peak to historical peak month
+        data_xgb["days_from_peak"] = (data_xgb["ds"].dt.month - peak_month) % 12
+        data_xgb["is_peak_month"] = (data_xgb["ds"].dt.month == peak_month).astype(int)
+        phase_shift = peak_month - 1
         data_xgb["sin_month"] = np.sin(2 * np.pi * (data_xgb["month"] - phase_shift) / 12)
         data_xgb["cos_month"] = np.cos(2 * np.pi * (data_xgb["month"] - phase_shift) / 12)
-        # Enhanced Fourier terms for more nuanced seasonality
         data_xgb["sin2_month"] = np.sin(4 * np.pi * (data_xgb["month"] - phase_shift) / 12)
         data_xgb["cos2_month"] = np.cos(4 * np.pi * (data_xgb["month"] - phase_shift) / 12)
-        
-        # Lag features with yearly focus
-        max_lag = min(24, len(train) - 1)  # 2-year window
-        for lag in [1, 2, 12, 24]:
+
+        # Create multiple lag features.
+        max_lag = min(24, len(train) - 1)
+        for lag in [1, 2, 3, 6, 12, 24]:
             if lag <= max_lag:
                 data_xgb[f"lag_{lag}"] = data_xgb["y"].shift(lag)
-        
         data_xgb.dropna(inplace=True)
-        
-        # 3. Feature selection with fixed order
+
         feature_order = [
             'month', 'year', 'month_year_interaction', 'is_peak_month', 'days_from_peak',
-            'sin_month', 'cos_month', 'sin2_month', 'cos2_month', 'lag_1', 'lag_2', 'lag_12', 'lag_24'
-        ]
-        feature_cols = [col for col in feature_order if col in data_xgb.columns]
-    
-        # 4. Model configuration
+            'sin_month', 'cos_month', 'sin2_month', 'cos2_month'
+        ] + [f"lag_{lag}" for lag in [1, 2, 3, 6, 12, 24] if f"lag_{lag}" in data_xgb.columns]
+        feature_cols = feature_order
+
+        # Updated hyperparameters.
         model = XGBRegressor(
-            n_estimators=200,
-            max_depth=4,
-            learning_rate=0.05,
+            n_estimators=300,
+            max_depth=5,
+            learning_rate=0.03,
             subsample=0.8,
             colsample_bytree=0.8,
             objective='reg:squarederror',
             random_state=42,
-            n_jobs=-1
+            n_jobs=-1,
+            reg_alpha=0.1,
+            reg_lambda=1.0
         )
         model.fit(data_xgb[feature_cols], data_xgb["y"])
-        
-        # 5. Compute base dynamic boost factor based on recent peaks (using the last 3 years)
+
+        # Recalculate a dynamic boost factor based on recent peak performance.
         recent_years = sorted(train["ds"].dt.year.unique())[-3:]
         recent_data = train[train["ds"].dt.year.isin(recent_years)]
         recent_monthly_avg = recent_data.groupby(recent_data["ds"].dt.month)["y"].mean()
-        
         if recent_monthly_avg.mean() != 0:
             dynamic_boost = recent_monthly_avg.get(peak_month, peak_value) / recent_monthly_avg.mean()
         else:
-            dynamic_boost = 1.25
-        
-        # Optionally, clamp the base boost factor to a reasonable range
-        dynamic_boost = max(min(dynamic_boost, 1.2), 1.0)
-        
-        # 6. Compute YOY growth for peak values using the actual peak month values per year
+            dynamic_boost = 1.0
+        dynamic_boost = np.clip(dynamic_boost, 1.0, 1.2)
+
+        # Year-over-year growth calculation.
         yearly_peaks = {}
         for year in sorted(train["ds"].dt.year.unique()):
             year_data = train[(train["ds"].dt.year == year) & (train["ds"].dt.month == peak_month)]
             if not year_data.empty:
-                yearly_peaks[year] = year_data["y"].mean()  # or .max() if you prefer
-        
+                yearly_peaks[year] = year_data["y"].mean()
         growth_factors = []
         unique_years = sorted(yearly_peaks.keys())
         for i in range(len(unique_years) - 1):
-            y1 = unique_years[i]
-            y2 = unique_years[i+1]
-            if yearly_peaks[y1] > 0:
-                growth_factors.append(yearly_peaks[y2] / yearly_peaks[y1])
-        if growth_factors:
-            yoy_growth = np.mean(growth_factors)
-        else:
-            yoy_growth = 1.0
-
-        # Impose a floor to ensure peaks do not decrease (if your data supports growth)
+            if yearly_peaks[unique_years[i]] > 0:
+                growth_factors.append(yearly_peaks[unique_years[i+1]] / yearly_peaks[unique_years[i]])
+        yoy_growth = np.mean(growth_factors) if growth_factors else 1.0
         yoy_growth = max(yoy_growth, 1.0)
-        
-        # Remember the last training year for compounding
-        last_training_year = unique_years[-1]
-        
-        # 7. Forecasting with dynamic, compounding peak adjustment
+        last_training_year = unique_years[-1] if unique_years else data_xgb["year"].max()
+
+        # Forecast generation.
         last_row = data_xgb[feature_cols].iloc[-1].copy()
         last_date = data_xgb["ds"].iloc[-1]
         preds = []
-        
         for i in range(forecast_period):
             future_date = last_date + pd.DateOffset(months=i+1)
             is_peak = int(future_date.month == peak_month)
             future_year = future_date.year
-            
-            # Compute compounded boost for future year:
             years_ahead = future_year - last_training_year
             compounded_boost = dynamic_boost * (yoy_growth ** years_ahead)
-            compounded_boost = max(compounded_boost, 1.0)  # ensure it doesn't fall below 1.0
-            
-            # Initialize features for the future date
+            compounded_boost = max(compounded_boost, 1.0)
             features = {col: last_row[col] for col in feature_cols}
             features.update({
                 'month': future_date.month,
@@ -623,68 +624,37 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
                 'sin2_month': np.sin(4 * np.pi * (future_date.month - phase_shift) / 12),
                 'cos2_month': np.cos(4 * np.pi * (future_date.month - phase_shift) / 12)
             })
-            
-            # Predict with the XGBoost model
             base_pred = model.predict(pd.DataFrame([features]))[0]
-            
-            # Apply the compounded boost for the peak month
-            if is_peak:
-                pred = base_pred * compounded_boost
-            else:
-                pred = base_pred
-                
+            pred = base_pred * compounded_boost if is_peak else base_pred
             preds.append(pred)
-            
-            # Update state for lag features; shift previous lags and use current prediction as new lag_1
-            for lag in [24, 12, 2, 1]:
+            # Update lag features for iterative forecasting.
+            for lag in [24, 12, 6, 3, 2, 1]:
                 if f'lag_{lag}' in feature_cols:
                     if lag == 1:
                         last_row['lag_1'] = pred
                     else:
                         last_row[f'lag_{lag}'] = last_row.get(f'lag_{lag-1}', pred)
-        
-        # 8. Create forecast dataframe
+
         forecast_df = pd.DataFrame({
-            "ds": pd.date_range(
-                start=last_date + pd.DateOffset(months=1),
-                periods=forecast_period,
-                freq="MS"
-            ),
+            "ds": pd.date_range(start=last_date + pd.DateOffset(months=1),
+                                periods=forecast_period, freq="MS"),
             "yhat": preds
         })
-    
-        # 9. Post-processing
+
         if is_diff and last_historical_value is not None:
             forecast_df["yhat"] = last_historical_value + forecast_df["yhat"].cumsum()
-            
+
         forecast_df = adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
-    
-        # 10. Validation
+
         match_len = min(len(test), len(forecast_df))
-        if match_len > 0:
-            rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
-            mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
-        else:
-            rmse, mape = np.nan, np.nan
-    
-        # 11. Robust diagnostics
-        if not forecast_df.empty:
-            try:
-                peak_idx = forecast_df["yhat"].idxmax()
-                if 0 <= peak_idx < len(forecast_df):
-                    fcst_peak_month = forecast_df.iloc[peak_idx]["ds"].month
-                    st.write(f"🔮 Forecast Peak: {calendar.month_abbr[fcst_peak_month]}")
-                else:
-                    st.warning("⚠️ Could not determine forecast peak")
-            except Exception as e:
-                st.warning("⚠️ Peak detection failed")
-    
+        rmse = mean_squared_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len], squared=False)
+        mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast_df["yhat"].iloc[:match_len])
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast_df}
-    
+
     except Exception as e:
-        st.warning(f"❌ XGBoost Model Failed: {str(e)}")
+        st.warning(f"Updated XGBoost Model failed: {str(e)}")
         result = {"error": str(e)}
-    
+
     return "XGBoost", result
 
 def train_automl_model(train, test, forecast_period, last_historical_value, is_diff, 
