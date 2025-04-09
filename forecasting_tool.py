@@ -657,8 +657,6 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
 
     return "XGBoost", result
 
-import numpy as np
-
 def dynamic_rmse_metric(y_true, y_pred, *args, **kwargs):
     """
     Custom dynamic RMSE that penalizes errors more strongly near peak values.
