@@ -657,11 +657,15 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
 
     return "XGBoost", result
 
+import numpy as np
+
 def dynamic_rmse_metric(y_true, y_pred, *args, **kwargs):
     """
     Custom dynamic RMSE that penalizes errors more strongly near peak values.
-    This version ensures y_true and y_pred are one-dimensional by reshaping y_pred
-    if its total length is an integer multiple of the length of y_true.
+    
+    If the sizes of y_true and y_pred differ but one is an exact multiple of the other,
+    the larger array is aggregated (averaged) to match the smaller.
+    Otherwise, it is split approximately equally using np.array_split.
     
     Args:
         y_true (array-like): True target values.
@@ -671,41 +675,43 @@ def dynamic_rmse_metric(y_true, y_pred, *args, **kwargs):
     Returns:
         float: The weighted RMSE.
     """
-    # Convert y_true and y_pred to numpy arrays and ensure y_true is 1D.
-    y_true = np.asarray(y_true).reshape(-1)
-    y_pred = np.asarray(y_pred)
+    # Convert inputs to flattened numpy arrays.
+    y_true = np.asarray(y_true).flatten()
+    y_pred = np.asarray(y_pred).flatten()
     
-    # If y_pred is 1D but its length doesn't match y_true,
-    # check if it can be divided evenly.
-    if y_pred.ndim == 1:
-        if y_pred.shape[0] != y_true.shape[0]:
-            total = y_pred.size
-            n_samples = y_true.shape[0]
-            if total % n_samples == 0:
-                extra = total // n_samples
-                # Reshape and average over the extra predictions.
-                y_pred = y_pred.reshape(n_samples, extra).mean(axis=1)
+    n_true = len(y_true)
+    n_pred = len(y_pred)
+    
+    # If the lengths differ, aggregate the larger one.
+    if n_true != n_pred:
+        if n_true > n_pred:
+            factor = n_true // n_pred
+            if factor * n_pred == n_true:
+                # Reshape y_true to (n_pred, factor) and average over axis 1.
+                y_true = y_true.reshape(n_pred, factor).mean(axis=1)
             else:
-                raise ValueError(f"Length of y_pred ({y_pred.shape[0]}) is not compatible with y_true ({n_samples}).")
-    elif y_pred.ndim > 1:
-        # If multi-dimensional, average over all extra dimensions.
-        y_pred = y_pred.mean(axis=tuple(range(1, y_pred.ndim)))
+                # Otherwise, split y_true into n_pred nearly equal parts.
+                y_true = np.array([np.mean(block) for block in np.array_split(y_true, n_pred)])
+        elif n_pred > n_true:
+            factor = n_pred // n_true
+            if factor * n_true == n_pred:
+                y_pred = y_pred.reshape(n_true, factor).mean(axis=1)
+            else:
+                y_pred = np.array([np.mean(block) for block in np.array_split(y_pred, n_true)])
     
-    # Final sanity check: both arrays should be 1D and equal in length.
-    y_pred = y_pred.reshape(-1)
-    if y_pred.shape[0] != y_true.shape[0]:
-        raise ValueError(f"After processing, shapes still don't match: y_true {y_true.shape}, y_pred {y_pred.shape}")
+    # Final sanity check: both arrays should now have the same length.
+    if len(y_true) != len(y_pred):
+        raise ValueError(f"After aggregation, shapes still don't match: y_true {y_true.shape}, y_pred {y_pred.shape}")
     
-    # Compute a dynamic threshold based on 90% of the maximum true value.
+    # Dynamic weighting: set a peak threshold at 90% of the maximum value in y_true.
     peak_threshold = 0.9 * np.max(y_true)
-    # Create weights: assign a higher weight (e.g., 2.0) to observations at or above the threshold.
+    # Assign higher weight (2.0) to samples at or above the threshold.
     weights = np.where(y_true >= peak_threshold, 2.0, 1.0)
-    # Calculate weighted squared errors.
+    
+    # Compute weighted squared errors and the weighted RMSE.
     weighted_squared_errors = weights * (y_pred - y_true) ** 2
-    # Return the root of the mean weighted squared error.
     weighted_rmse = np.sqrt(np.mean(weighted_squared_errors))
     return weighted_rmse
-
 
 def train_automl_model(train, test, forecast_period, last_historical_value, is_diff, 
                        demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, time_budget=None):
