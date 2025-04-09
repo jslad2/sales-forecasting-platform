@@ -660,29 +660,36 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
 def dynamic_rmse_metric(y_true, y_pred, *args, **kwargs):
     """
     Custom dynamic RMSE that penalizes errors more strongly near peak values.
-    Accepts extra positional and keyword arguments (ignored) to be compatible with FLAML's interface.
-
+    Accepts extra positional and keyword arguments to be compatible with FLAML.
+    
+    If the predicted array has extra dimensions, they are averaged
+    to obtain a scalar prediction for each sample.
+    
     Args:
         y_true (array-like): True target values.
         y_pred (array-like): Predicted values.
-        *args, **kwargs: Extra arguments that are passed by FLAML.
-        
+        *args, **kwargs: Additional parameters passed by FLAML (ignored).
+    
     Returns:
         float: The weighted RMSE.
     """
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
     
-    # Set a dynamic threshold based on 90% of the maximum of y_true.
+    # If predictions come in with extra dimensions, average across axis 1.
+    if y_pred.ndim > 1 and y_pred.shape[1] > 1:
+        y_pred = y_pred.mean(axis=1)
+    
+    # Compute a threshold at 90% of the maximum true value.
     peak_threshold = 0.9 * np.max(y_true)
     
-    # Create weights: double the weight for observations near or above the peak threshold.
+    # Create a weight: assign a higher weight (e.g., 2) to values near or above the peak threshold.
     weights = np.where(y_true >= peak_threshold, 2.0, 1.0)
     
     # Calculate weighted squared errors.
     weighted_squared_errors = weights * (y_pred - y_true) ** 2
     
-    # Compute and return the weighted RMSE.
+    # Compute the square root of the mean weighted squared error.
     weighted_rmse = np.sqrt(np.mean(weighted_squared_errors))
     return weighted_rmse
 
