@@ -360,61 +360,84 @@ def adjust_forecast(forecast_df, demand_shock, seasonality_adjustment, external_
     return forecast_df
 
 def train_prophet_model(train, test, forecast_period, best_params, last_historical_value,
-                        is_diff, demand_shock, seasonality_adjustment, external_shock, category_scenarios=None):
+                        is_diff, demand_shock, seasonality_adjustment, external_shock,
+                        category_scenarios=None, holidays=None, growth_type='linear'):
+    """
+    Trains a Prophet model with improvements:
+      - Outlier clipping on y values.
+      - Option to choose between 'linear' and 'logistic' growth.
+      - Optional holiday effects.
+      - Enhanced seasonalities.
+    """
     result = {}
     try:
-        # If category adjustments are used, aggregate training data by date.
+        # If category adjustments are provided, aggregate training data.
         if category_scenarios:
             train = train.groupby("ds", as_index=False).agg({"y": "sum"})
-        
-        # Set logistic growth parameters: 
-        # "cap" is set to 20% above the max observed value and "floor" is set to 1 (instead of 0)
-        train["cap"] = 1.2 * train["y"].max()
-        train["floor"] = 1  # Setting a minimal positive floor to avoid negatives
-        
-        # Initialize Prophet with tuned parameters and logistic growth.
-        model = Prophet(
-            growth="logistic",  # enforce nonnegative forecasts
-            seasonality_mode=best_params["seasonality_mode"],
-            changepoint_prior_scale=best_params["changepoint_prior_scale"]
-        )
-        try:
-            model = detect_and_add_seasonalities(model, train)
-        except Exception as e:
-            st.warning(f"Seasonality detection failed: {e}. Proceeding without additional seasonalities.")
-        
+
+        # Outlier handling: clip extreme values using the 5th and 95th percentiles.
+        lower_bound, upper_bound = train["y"].quantile([0.05, 0.95])
+        train["y"] = train["y"].clip(lower=lower_bound, upper=upper_bound)
+
+        # Set growth parameters based on growth_type.
+        if growth_type == "logistic":
+            # Use a slightly tighter cap than before.
+            train["cap"] = 1.1 * train["y"].max()
+            train["floor"] = max(train["y"].min() * 0.9, 1)  # ensure minimal positive floor
+            model = Prophet(
+                growth="logistic",
+                seasonality_mode=best_params["seasonality_mode"],
+                changepoint_prior_scale=best_params["changepoint_prior_scale"],
+                holidays=holidays,
+                yearly_seasonality=(len(train) >= 365),
+                weekly_seasonality=(len(train) >= 30),
+                daily_seasonality=False
+            )
+        else:
+            model = Prophet(
+                growth="linear",
+                seasonality_mode=best_params["seasonality_mode"],
+                changepoint_prior_scale=best_params["changepoint_prior_scale"],
+                holidays=holidays,
+                yearly_seasonality=(len(train) >= 365),
+                weekly_seasonality=(len(train) >= 30),
+                daily_seasonality=False
+            )
+
+        # Add custom seasonalities robustly.
+        model = detect_and_add_seasonalities(model, train)
+
         # Fit the model.
         model.fit(train)
-        
-        # Create a future dataframe.
+
+        # Create future dataframe.
         future = model.make_future_dataframe(periods=forecast_period, freq="MS", include_history=False)
-        # Add cap and floor to the future dataframe.
-        future["cap"] = train["cap"].max()
-        future["floor"] = 1
-        
+        if growth_type == "logistic":
+            future["cap"] = train["cap"].max()
+            future["floor"] = train["floor"].min()
+
         forecast = model.predict(future)
         forecast = forecast[forecast["ds"] > train["ds"].max()]
-        
-        # Clamp forecasts to be nonnegative (if any negatives remain).
+
+        # Clamp forecasts to be nonnegative.
         forecast["yhat"] = forecast["yhat"].clip(lower=0)
-        
-        # Apply scenario adjustments.
+
+        # Apply any global or category-specific adjustments.
         forecast = adjust_forecast(forecast, demand_shock, seasonality_adjustment, external_shock, category_scenarios)
-        
+
         # Inverse differencing if needed.
         if is_diff and last_historical_value is not None:
             forecast = inverse_difference(forecast, last_historical_value)
-        
+
         # Evaluate on the overlapping period.
         match_len = min(len(test["y"]), len(forecast))
         rmse = mean_squared_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len], squared=False)
         mape = mean_absolute_percentage_error(test["y"].iloc[:match_len], forecast["yhat"].iloc[:match_len])
-        
         result = {"RMSE": float(rmse), "MAPE": float(mape), "Forecast": forecast}
-    
+
     except Exception as e:
-        st.warning(f"Prophet Model failed: {e}")
-    
+        st.warning(f"Updated Prophet Model failed: {e}")
+
     return "Prophet", result
 
 def train_arima_model(train, test, forecast_period, last_historical_value, is_diff,
@@ -645,7 +668,6 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
             rmse, mape = np.nan, np.nan
     
         # 11. Robust diagnostics
-        st.write(f"📅 Historical Peak: {calendar.month_abbr[peak_month]}")
         if not forecast_df.empty:
             try:
                 peak_idx = forecast_df["yhat"].idxmax()
