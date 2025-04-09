@@ -657,39 +657,38 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
 
     return "XGBoost", result
 
-def dynamic_rmse_metric(y_true, y_pred, *args, **kwargs):
+def dynamic_rmse_metric(X_val, y_val, estimator, labels, 
+                          X_train, y_train, weight_val=None, weight_train=None, 
+                          config=None, groups_val=None, groups_train=None):
     """
     Custom dynamic RMSE that penalizes errors more strongly near peak values.
     
-    If the sizes of y_true and y_pred differ but one is an exact multiple of the other,
-    the larger array is aggregated (averaged) to match the smaller.
-    Otherwise, it is split approximately equally using np.array_split.
+    This function computes the RMSE between y_val and the predictions from the estimator
+    on X_val, with higher weights applied to samples above 90% of the maximum true value.
+    If the sizes of y_val and the predictions differ (e.g. due to cross-validation),
+    the larger array is aggregated (averaged) to match the size of the smaller.
     
-    Args:
-        y_true (array-like): True target values.
-        y_pred (array-like): Predicted values.
-        *args, **kwargs: Extra arguments passed by FLAML (ignored).
-        
     Returns:
         tuple: (weighted_rmse, {"dynamic_rmse": weighted_rmse})
                where weighted_rmse is a float that should be minimized.
     """
-    # Convert inputs to flattened numpy arrays.
-    y_true = np.asarray(y_true).flatten()
+    # Get predictions from the estimator on the validation set.
+    y_pred = estimator.predict(X_val)
+    
+    # Convert true values and predictions to flattened numpy arrays.
+    y_true = np.asarray(y_val).flatten()
     y_pred = np.asarray(y_pred).flatten()
     
     n_true = len(y_true)
     n_pred = len(y_pred)
     
-    # If the lengths differ, aggregate the larger one.
+    # If lengths differ, aggregate the larger one.
     if n_true != n_pred:
         if n_true > n_pred:
             factor = n_true // n_pred
             if factor * n_pred == n_true:
-                # Reshape y_true to (n_pred, factor) and average over axis 1.
                 y_true = y_true.reshape(n_pred, factor).mean(axis=1)
             else:
-                # Otherwise, split y_true into n_pred nearly equal parts.
                 y_true = np.array([np.mean(block) for block in np.array_split(y_true, n_pred)])
         elif n_pred > n_true:
             factor = n_pred // n_true
@@ -698,20 +697,20 @@ def dynamic_rmse_metric(y_true, y_pred, *args, **kwargs):
             else:
                 y_pred = np.array([np.mean(block) for block in np.array_split(y_pred, n_true)])
     
-    # Final sanity check: both arrays should now have the same length.
+    # Sanity check: ensure that after aggregation, the shapes match.
     if len(y_true) != len(y_pred):
         raise ValueError(f"After aggregation, shapes still don't match: y_true {y_true.shape}, y_pred {y_pred.shape}")
     
-    # Dynamic weighting: set a peak threshold at 90% of the maximum value in y_true.
+    # Compute dynamic weighting: set a threshold at 90% of the maximum true value.
     peak_threshold = 0.9 * np.max(y_true)
-    # Assign higher weight (2.0) to samples at or above the threshold.
+    # Assign a higher weight (2.0) to values at or above this threshold.
     weights = np.where(y_true >= peak_threshold, 2.0, 1.0)
     
-    # Compute weighted squared errors and the weighted RMSE.
-    weighted_squared_errors = weights * (y_pred - y_true) ** 2
+    # Compute weighted squared errors and the resulting RMSE.
+    weighted_squared_errors = weights * (y_pred - y_true)**2
     weighted_rmse = np.sqrt(np.mean(weighted_squared_errors))
     
-    # Return a tuple: the score to minimize and a dict of logged metrics.
+    # Return a tuple: the score (to be minimized) and a dictionary for logging.
     return weighted_rmse, {"dynamic_rmse": weighted_rmse}
 
 def train_automl_model(train, test, forecast_period, last_historical_value, is_diff, 
