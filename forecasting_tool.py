@@ -671,7 +671,8 @@ def dynamic_rmse_metric(y_true, y_pred, *args, **kwargs):
         *args, **kwargs: Extra arguments passed by FLAML (ignored).
         
     Returns:
-        float: The weighted RMSE.
+        tuple: (weighted_rmse, {"dynamic_rmse": weighted_rmse})
+               where weighted_rmse is a float that should be minimized.
     """
     # Convert inputs to flattened numpy arrays.
     y_true = np.asarray(y_true).flatten()
@@ -709,7 +710,9 @@ def dynamic_rmse_metric(y_true, y_pred, *args, **kwargs):
     # Compute weighted squared errors and the weighted RMSE.
     weighted_squared_errors = weights * (y_pred - y_true) ** 2
     weighted_rmse = np.sqrt(np.mean(weighted_squared_errors))
-    return weighted_rmse
+    
+    # Return a tuple: the score to minimize and a dict of logged metrics.
+    return weighted_rmse, {"dynamic_rmse": weighted_rmse}
 
 def train_automl_model(train, test, forecast_period, last_historical_value, is_diff, 
                        demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, time_budget=None):
