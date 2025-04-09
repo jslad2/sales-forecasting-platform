@@ -660,46 +660,52 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
 def dynamic_rmse_metric(y_true, y_pred, *args, **kwargs):
     """
     Custom dynamic RMSE that penalizes errors more strongly near peak values.
-    Accepts additional positional/keyword arguments to be compatible with FLAML.
-
-    This version explicitly converts inputs to 1D arrays:
-      - y_true is reshaped to be one-dimensional.
-      - If y_pred is multidimensional, it is averaged across all extra dimensions.
+    This version ensures y_true and y_pred are one-dimensional by reshaping y_pred
+    if its total length is an integer multiple of the length of y_true.
     
     Args:
         y_true (array-like): True target values.
         y_pred (array-like): Predicted values.
         *args, **kwargs: Extra arguments passed by FLAML (ignored).
-    
+        
     Returns:
         float: The weighted RMSE.
     """
-    # Force y_true to be a flat 1D array.
+    # Convert y_true and y_pred to numpy arrays and ensure y_true is 1D.
     y_true = np.asarray(y_true).reshape(-1)
-    
-    # Convert y_pred to a numpy array.
     y_pred = np.asarray(y_pred)
     
-    # If y_pred is multidimensional (e.g. shape: (n_samples, extra_dims)),
-    # take the mean over all axes except the first.
-    if y_pred.ndim > 1:
+    # If y_pred is 1D but its length doesn't match y_true,
+    # check if it can be divided evenly.
+    if y_pred.ndim == 1:
+        if y_pred.shape[0] != y_true.shape[0]:
+            total = y_pred.size
+            n_samples = y_true.shape[0]
+            if total % n_samples == 0:
+                extra = total // n_samples
+                # Reshape and average over the extra predictions.
+                y_pred = y_pred.reshape(n_samples, extra).mean(axis=1)
+            else:
+                raise ValueError(f"Length of y_pred ({y_pred.shape[0]}) is not compatible with y_true ({n_samples}).")
+    elif y_pred.ndim > 1:
+        # If multi-dimensional, average over all extra dimensions.
         y_pred = y_pred.mean(axis=tuple(range(1, y_pred.ndim)))
     
-    # Confirm that y_pred is now a 1D array.
+    # Final sanity check: both arrays should be 1D and equal in length.
     y_pred = y_pred.reshape(-1)
-
+    if y_pred.shape[0] != y_true.shape[0]:
+        raise ValueError(f"After processing, shapes still don't match: y_true {y_true.shape}, y_pred {y_pred.shape}")
+    
     # Compute a dynamic threshold based on 90% of the maximum true value.
     peak_threshold = 0.9 * np.max(y_true)
-    
-    # Create a weight vector: assign higher weight (e.g., 2.0) to observations above threshold.
+    # Create weights: assign a higher weight (e.g., 2.0) to observations at or above the threshold.
     weights = np.where(y_true >= peak_threshold, 2.0, 1.0)
-    
-    # Compute the weighted squared errors.
+    # Calculate weighted squared errors.
     weighted_squared_errors = weights * (y_pred - y_true) ** 2
-    
-    # Calculate and return the weighted RMSE.
+    # Return the root of the mean weighted squared error.
     weighted_rmse = np.sqrt(np.mean(weighted_squared_errors))
     return weighted_rmse
+
 
 def train_automl_model(train, test, forecast_period, last_historical_value, is_diff, 
                        demand_shock, seasonality_adjustment, external_shock, category_scenarios=None, time_budget=None):
