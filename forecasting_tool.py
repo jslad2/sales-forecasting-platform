@@ -660,36 +660,44 @@ def train_xgb_model(train, test, forecast_period, last_historical_value, is_diff
 def dynamic_rmse_metric(y_true, y_pred, *args, **kwargs):
     """
     Custom dynamic RMSE that penalizes errors more strongly near peak values.
-    Accepts extra positional and keyword arguments to be compatible with FLAML.
-    
-    If the predicted array has extra dimensions, they are averaged
-    to obtain a scalar prediction for each sample.
+    Accepts additional positional/keyword arguments to be compatible with FLAML.
+
+    This version explicitly converts inputs to 1D arrays:
+      - y_true is reshaped to be one-dimensional.
+      - If y_pred is multidimensional, it is averaged across all extra dimensions.
     
     Args:
         y_true (array-like): True target values.
         y_pred (array-like): Predicted values.
-        *args, **kwargs: Additional parameters passed by FLAML (ignored).
+        *args, **kwargs: Extra arguments passed by FLAML (ignored).
     
     Returns:
         float: The weighted RMSE.
     """
-    y_true = np.array(y_true)
-    y_pred = np.array(y_pred)
+    # Force y_true to be a flat 1D array.
+    y_true = np.asarray(y_true).reshape(-1)
     
-    # If predictions come in with extra dimensions, average across axis 1.
-    if y_pred.ndim > 1 and y_pred.shape[1] > 1:
-        y_pred = y_pred.mean(axis=1)
+    # Convert y_pred to a numpy array.
+    y_pred = np.asarray(y_pred)
     
-    # Compute a threshold at 90% of the maximum true value.
+    # If y_pred is multidimensional (e.g. shape: (n_samples, extra_dims)),
+    # take the mean over all axes except the first.
+    if y_pred.ndim > 1:
+        y_pred = y_pred.mean(axis=tuple(range(1, y_pred.ndim)))
+    
+    # Confirm that y_pred is now a 1D array.
+    y_pred = y_pred.reshape(-1)
+
+    # Compute a dynamic threshold based on 90% of the maximum true value.
     peak_threshold = 0.9 * np.max(y_true)
     
-    # Create a weight: assign a higher weight (e.g., 2) to values near or above the peak threshold.
+    # Create a weight vector: assign higher weight (e.g., 2.0) to observations above threshold.
     weights = np.where(y_true >= peak_threshold, 2.0, 1.0)
     
-    # Calculate weighted squared errors.
+    # Compute the weighted squared errors.
     weighted_squared_errors = weights * (y_pred - y_true) ** 2
     
-    # Compute the square root of the mean weighted squared error.
+    # Calculate and return the weighted RMSE.
     weighted_rmse = np.sqrt(np.mean(weighted_squared_errors))
     return weighted_rmse
 
