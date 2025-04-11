@@ -1,41 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Data Services - SynovaAI</title>
-        <meta name="description" content="Transform your business with AI-driven insights and analytics from SynovaAI.">
-    
-        <!-- ✅ Google Analytics -->
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-LKEQTSKLCF"></script>
-        <script>
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-LKEQTSKLCF');
-        </script>
-    
-        <!-- Open Graph Meta Tags for SEO -->
-        <meta property="og:title" content="Data Services - SynovaAI">
-        <meta property="og:description" content="Transform your business with AI-driven insights and analytics from SynovaAI.">
-        <meta property="og:image" content="{{ url_for('static', filename='images/og-image.png') }}">
-        <meta property="og:url" content="https://www.synovaai.com/data-services">
-    
-        <!-- Stylesheet -->
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    </head>
-    
-<body class="data-services-page">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Services - SynovaAI</title>
+    <meta name="description" content="Transform your business with AI-driven insights and analytics from SynovaAI.">
 
-    <!-- Header -->
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="Data Services - SynovaAI">
+    <meta property="og:description" content="Transform your business with AI-driven insights and analytics from SynovaAI.">
+    <meta property="og:image" content="{{ url_for('static', filename='images/og-image.png') }}">
+    <meta property="og:url" content="https://www.synovaai.com/data-services">
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-LKEQTSKLCF"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-LKEQTSKLCF');
+    </script>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body class="data-services-page">
+    <!-- Header (Matches Homepage) -->
     <header>
-<nav>
+        <nav>
             <ul class="nav-links">
                 <li><a href="{{ url_for('home') }}" class="nav-link">Home</a></li>
-                <li><a href="{{ url_for('data_services') }}" class="nav-link">Data Services</a></li>
+                <li><a href="{{ url_for('data_services') }}" class="nav-link active">Data Services</a></li>
                 <li><a href="{{ url_for('pricing') }}" class="nav-link">Pricing</a></li>
                 <li><a href="{{ url_for('contact') }}" class="nav-link">Contact</a></li>
-                <li id="auth-buttons"> <!-- Dynamic Auth Buttons Here --> </li>
+                <li id="auth-buttons"></li>
             </ul>
         </nav>
         <div class="logo">SYNOVAAI</div>
@@ -43,273 +42,178 @@
 
     <!-- Hero Section -->
     <section class="hero">
-        <article class="hero-text">
-            <h1>Unlock the Power of Your Data</h1>
-            <p>Transform your business with AI-driven insights and analytics.</p>
-        </article>
+        <div class="content-container">
+            <article class="hero-text">
+                <h1>Unlock the Power of Your Data</h1>
+                <p>Transform your business with AI-driven insights and analytics.</p>
+            </article>
+        </div>
     </section>
 
-    <!-- What We Offer Section (Now at the Top) -->
+    <!-- Services Grid -->
     <section id="data-services" class="data-services">
-        <h2>What We Offer</h2>
-        <p>At SynovaAI, we provide cutting-edge AI-driven solutions to help you make better business decisions.</p>
-        <div class="service-grid">
-            <!-- Forecasting -->
-            <a href="#forecasting" class="service-card-link">
-                <div class="service-card">
-                    <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="Forecasting Icon" loading="lazy">
-                    <h3>AI-Powered Forecasting</h3>
-                    <p>Predict trends, optimize inventory, and maximize revenue.</p>
-                </div>
-            </a>
+        <div class="content-container">
+            <h2>What We Offer</h2>
+            <p class="section-intro">At SynovaAI, we provide cutting-edge AI-driven solutions to help you make better business decisions.</p>
+            
+            <div class="service-grid">
+                <!-- Forecasting Card -->
+                <a href="#forecasting" class="service-card-link">
+                    <div class="service-card">
+                        <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="Forecasting" loading="lazy">
+                        <h3>AI-Powered Forecasting</h3>
+                        <p>Predict trends, optimize inventory, and maximize revenue.</p>
+                    </div>
+                </a>
 
-            <!-- Interactive Dashboards -->
-            <a href="#dashboards" class="service-card-link">
-                <div class="service-card">
-                    <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Dashboard Icon" loading="lazy">
-                    <h3>Interactive Dashboards</h3>
-                    <p>Gain real-time insights with fully customizable dashboards.</p>
-                </div>
-            </a>
+                <!-- Dashboards Card -->
+                <a href="#dashboards" class="service-card-link">
+                    <div class="service-card">
+                        <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Dashboards" loading="lazy">
+                        <h3>Interactive Dashboards</h3>
+                        <p>Gain real-time insights with customizable dashboards.</p>
+                    </div>
+                </a>
 
-            <!-- Support & Consulting -->
-            <a href="#consulting" class="service-card-link">
-                <div class="service-card">
-                    <img src="{{ url_for('static', filename='images/support-icon.png') }}" alt="Support & Consulting Icon" loading="lazy">
-                    <h3>Support & Consulting</h3>
-                    <p>Expert guidance in Power BI, SQL, and data forecasting.</p>
-                </div>
-            </a>
+                <!-- Consulting Card -->
+                <a href="#consulting" class="service-card-link">
+                    <div class="service-card">
+                        <img src="{{ url_for('static', filename='images/support-icon.png') }}" alt="Consulting" loading="lazy">
+                        <h3>Support & Consulting</h3>
+                        <p>Expert guidance in BI tools and data strategy.</p>
+                    </div>
+                </a>
+            </div>
         </div>
     </section>
 
-    <!-- AI-Powered Forecasting -->
+    <!-- Service Details -->
+    <!-- Forecasting Section -->
     <section id="forecasting" class="service-detail">
-        <div class="service-detail-container">
-            <div class="service-detail-image">
-                <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="AI Forecasting">
-            </div>
-            <div class="service-detail-content">
-                <h2>AI-Powered Forecasting</h2>
-                <p>Our AI forecasting tool helps businesses predict trends, optimize inventory, and maximize revenue. 
-                Using machine learning models, we analyze historical data to provide highly accurate demand forecasts.</p>
-                <ul>
-                    <li>✅ <strong>Sales & Demand Forecasting</strong> - Predict future trends based on data patterns.</li>
-                    <li>✅ <strong>Inventory Optimization</strong> - Avoid overstocking or shortages.</li>
-                    <li>✅ <strong>AI-Powered Trend Analysis</strong> - Identify hidden patterns in customer behavior.</li>
-                </ul>
-            </div>
-        </div>
-    </section>
-
-    <!-- Interactive Dashboards -->
-    <section id="dashboards" class="service-detail">
-        <div class="service-detail-container reverse">
-            <div class="service-detail-image">
-                <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Interactive Dashboards">
-            </div>
-            <div class="service-detail-content">
-                <h2>Interactive Dashboards</h2>
-                <p>Gain real-time insights with fully customizable dashboards designed to track key performance indicators.
-                Our dashboards integrate data from multiple sources, providing you with a seamless data visualization experience.</p>
-                <ul>
-                    <li>📊 <strong>Real-Time Data Insights</strong> - Stay updated with live reports.</li>
-                    <li>📈 <strong>KPI Tracking & Reporting</strong> - Monitor essential business metrics.</li>
-                    <li>🔗 <strong>Power BI & SQL Integration</strong> - Seamlessly connect your data sources.</li>
-                </ul>
+        <div class="content-container">
+            <div class="service-detail-container">
+                <div class="service-image">
+                    <img src="{{ url_for('static', filename='images/forecasting-demo.png') }}" alt="Forecasting Demo">
+                </div>
+                <div class="service-content">
+                    <h2>AI-Powered Forecasting</h2>
+                    <p>Our machine learning models analyze historical data to deliver accurate demand forecasts and inventory recommendations.</p>
+                    <ul class="feature-list">
+                        <li>✅ Real-time sales predictions</li>
+                        <li>✅ Inventory optimization</li>
+                        <li>✅ Customizable reporting</li>
+                    </ul>
+                </div>
             </div>
         </div>
     </section>
 
-    <!-- Support & Consulting -->
+    <!-- Dashboards Section -->
+    <section id="dashboards" class="service-detail alt-bg">
+        <div class="content-container">
+            <div class="service-detail-container reverse">
+                <div class="service-image">
+                    <img src="{{ url_for('static', filename='images/dashboard-demo.png') }}" alt="Dashboard Demo">
+                </div>
+                <div class="service-content">
+                    <h2>Interactive Dashboards</h2>
+                    <p>Monitor key metrics through real-time visualizations powered by Power BI and custom analytics.</p>
+                    <ul class="feature-list">
+                        <li>📊 Custom KPI tracking</li>
+                        <li>📈 Multi-source integration</li>
+                        <li>🔗 API connectivity</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Consulting Section -->
     <section id="consulting" class="service-detail">
-        <div class="service-detail-container">
-            <div class="service-detail-image">
-                <img src="{{ url_for('static', filename='images/support-icon.png') }}" alt="Support & Consulting">
-            </div>
-            <div class="service-detail-content">
-                <h2>Support & Consulting</h2>
-                <p>We provide expert consulting services to help you set up, manage, and optimize your data analytics pipeline.
-                Whether it’s Power BI dashboards or advanced SQL queries, we offer tailored solutions to meet your needs.</p>
-                <ul>
-                    <li>🎯 <strong>Power BI & SQL Optimization</strong> - Get the most out of your reporting tools.</li>
-                    <li>📊 <strong>Data Strategy Consulting</strong> - Improve your data-driven decision-making.</li>
-                    <li>🚀 <strong>AI & Predictive Modeling Support</strong> - Implement cutting-edge AI insights.</li>
-                </ul>
+        <div class="content-container">
+            <div class="service-detail-container">
+                <div class="service-image">
+                    <img src="{{ url_for('static', filename='images/consulting-demo.png') }}" alt="Consulting Demo">
+                </div>
+                <div class="service-content">
+                    <h2>Expert Support & Consulting</h2>
+                    <p>Get end-to-end support for your data strategy from our team of certified experts.</p>
+                    <ul class="feature-list">
+                        <li>🎯 BI tool optimization</li>
+                        <li>📊 Data pipeline design</li>
+                        <li>🚀 AI implementation</li>
+                    </ul>
+                </div>
             </div>
         </div>
     </section>
-    
 
-    <!-- Call to Action Section -->
+    <!-- CTA Section -->
     <section class="cta">
-        <div class="cta-container">
-            <h2>Let's Get Started</h2>
-            <p>Discover how SynovaAI can transform your business with AI-powered insights.</p>
-            <a href="{{ url_for('contact') }}" class="cta-button">Contact Us</a>
+        <div class="content-container">
+            <div class="cta-container">
+                <h2>Ready to Transform Your Business?</h2>
+                <p>Start your AI-powered analytics journey today.</p>
+                <div class="cta-buttons">
+                    <a href="{{ url_for('pricing') }}" class="cta-button primary">View Plans</a>
+                    <a href="{{ url_for('contact') }}" class="cta-button secondary">Contact Sales</a>
+                </div>
+            </div>
         </div>
     </section>
 
-
-    <!-- Back to Top Button -->
-    <button onclick="scrollToTop()" class="top-button" aria-label="Back to Top">⬆ Back to Top</button>
+    <!-- Back to Top -->
+    <button onclick="scrollToTop()" class="top-button" aria-label="Back to top">↑</button>
 
     <!-- Footer -->
     <footer>
-        <p>&copy; 2025 SynovaAI. All rights reserved.</p>
+        <div class="content-container">
+            <p>&copy; 2025 SynovaAI. All rights reserved.</p>
+            <div class="footer-links">
+                <a href="/privacy">Privacy Policy</a>
+                <a href="/terms">Terms of Service</a>
+                <a href="/contact">Contact</a>
+            </div>
+        </div>
     </footer>
 
-<!-- JavaScript -->
-<script>
-    document.addEventListener("DOMContentLoaded", function() {
-        console.log("✅ Data Services Page Loaded");
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>
+    <script>
+        // Unified Scroll Handling (Matches Homepage)
+        document.addEventListener("DOMContentLoaded", function() {
+            // Auth buttons
+            updateAuthButtons();
 
-        // ✅ Highlight Active Page in Navigation
-        const navLinks = document.querySelectorAll(".nav-link");
-        const currentPage = window.location.pathname;
+            // Header scroll effect
+            const header = document.querySelector("header");
+            window.addEventListener("scroll", () => {
+                header.classList.toggle("scrolled", window.scrollY > 50);
+            });
 
-        navLinks.forEach(link => {
-            if (link.getAttribute("href") === currentPage) {
-                link.classList.add("active");
-            } else {
-                link.classList.remove("active");
-            }
+            // Back to top button
+            const topButton = document.querySelector(".top-button");
+            window.addEventListener("scroll", () => {
+                topButton.style.opacity = window.scrollY > 300 ? "1" : "0";
+            });
+
+            // Service card animations
+            const observer = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if(entry.isIntersecting) {
+                        entry.target.classList.add("show");
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            document.querySelectorAll(".service-card").forEach(card => {
+                observer.observe(card);
+            });
         });
 
-        // ✅ Smooth Scroll to Top
         function scrollToTop() {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            window.scrollTo({ top: 0, behavior: "smooth" });
         }
-        document.querySelector(".top-button").addEventListener("click", scrollToTop);
-
-        // ✅ Show "Back to Top" Button on Scroll
-        window.addEventListener("scroll", function() {
-            let backToTop = document.querySelector(".top-button");
-            if (window.scrollY > 100) {
-                backToTop.style.display = "block";
-            } else {
-                backToTop.style.display = "none";
-            }
-        });
-
-        // ✅ Animate Service Cards on Scroll
-        let cards = document.querySelectorAll(".service-card");
-        let observer = new IntersectionObserver(entries => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add("show");
-                }
-            });
-        }, { threshold: 0.2 });
-
-        cards.forEach(card => observer.observe(card));
-
-        // ✅ Fallback for browsers that don't support IntersectionObserver
-        if (!('IntersectionObserver' in window)) {
-            console.warn("⚠ IntersectionObserver not supported!");
-            document.querySelectorAll(".service-card").forEach(card => card.classList.add("show"));
-        }
-
-        // ✅ Ensure Navbar Updates Correctly Based on Authentication
-        updateNavbar();
-    });
-
-    /**
-     * ✅ Function to Check Authentication (Protects Restricted Pages)
-     */
-    async function checkAuth() {
-        const token = localStorage.getItem("access_token");
-
-        if (!token) {
-            console.warn("❌ No JWT token found.");
-            
-            // 🔹 Only redirect if the page is protected
-            const protectedPages = ["/dashboard", "/profile", "/account-settings"];
-            if (protectedPages.includes(window.location.pathname)) {
-                alert("⚠ Session expired. Please log in again.");
-                window.location.href = "/login";
-            }
-            return;
-        }
-
-        try {
-            console.log("🔍 Verifying JWT token...");
-            const response = await fetch("/api/verify-token", {
-                method: "GET",
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-
-            if (!response.ok) {
-                console.warn("❌ Invalid or expired token.");
-                localStorage.removeItem("access_token");
-
-                // Redirect only if the page is protected
-                if (protectedPages.includes(window.location.pathname)) {
-                    window.location.href = "/login";
-                }
-            } else {
-                console.log("✅ JWT verified. Access granted.");
-            }
-        } catch (error) {
-            console.error("🔥 Error verifying token:", error);
-            localStorage.removeItem("access_token");
-
-            if (protectedPages.includes(window.location.pathname)) {
-                window.location.href = "/login";
-            }
-        }
-    }
-
-    /**
-     * ✅ Function to Update Navbar (Handles Login/Logout)
-     */
-    function updateNavbar() {
-        console.log("🔍 Checking authentication for navbar...");
-        
-        const authButtons = document.getElementById("auth-buttons");
-        if (!authButtons) return;
-
-        const token = localStorage.getItem("access_token");
-
-        if (token) {
-            console.log("✅ User is logged in.");
-            authButtons.innerHTML = `
-                <a href="/dashboard" class="dashboard-btn">Dashboard</a>
-                <a href="#" class="logout-btn" onclick="logout()">Logout</a>
-            `;
-        } else {
-            console.log("❌ No user token found.");
-            
-            // Ensure login button appears correctly
-            authButtons.innerHTML = `<a href="/login" class="login-btn">Login</a>`;
-        }
-    }
-
-    /**
-     * ✅ Logout Function
-     */
-    function logout() {
-        console.log("🚪 Logging out...");
-        localStorage.removeItem("access_token");
-        document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC"; // ✅ Remove cookie
-        updateNavbar(); // ✅ Update navbar immediately
-        window.location.href = "/";  // ✅ Redirect to homepage
-    }
-
-</script>
-
-<!-- ✅ Load Central Authentication Logic -->
-<script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>
-
-<!-- ✅ Ensure Authentication is Checked Only on Protected Pages -->
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const protectedPages = ["/dashboard", "/profile", "/account-settings"];
-        if (protectedPages.includes(window.location.pathname)) {
-            checkAuth();  // ✅ Enforce authentication on protected pages
-        }
-    });
-</script>
-
+    </script>
 </body>
 </html>
