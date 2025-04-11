@@ -95,8 +95,11 @@ header {
   
   /* --- Scrolled Header State --- */
   header.scrolled {
-    /* Slightly grey background */
-    background: #f8f8f8 !important;
+    transform: translateX(-50%) scale(0.95); /* Shrink the header */
+    background-color: #f8f8f8 !important;      /* Slightly gray background */
+    border-radius: 8px !important;             /* Rounded edges */
+    padding: 12px 50px !important;             /* Reduced padding for smaller height */
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1) !important;
     
     /* Rounded edges */
     border-radius: 8px !important;
