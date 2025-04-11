@@ -1,6 +1,5 @@
 /* ========== CSS Variables ========== */
 :root {
-    /* Colors */
     --primary-color: #2B3A42;
     --secondary-color: #64D8CB;
     --accent-color: #FF8800;
@@ -8,13 +7,9 @@
     --text-color: #333333;
     --white-color: #FFFFFF;
     --gray-color: #666666;
-    
-    /* Typography */
     --font-size-base: 1rem;
     --font-size-lg: 1.25rem;
     --font-size-xl: 2rem;
-    
-    /* Breakpoints */
     --breakpoint-sm: 480px;
     --breakpoint-md: 768px;
     --breakpoint-lg: 1024px;
@@ -125,15 +120,26 @@ header {
     color: #ccc;
 }
 
-/* ========== Section Styles ========== */
-/* CTA Section */
+.hero-buttons {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+/* ========== CTA Section ========== */
 .cta {
     background: linear-gradient(135deg, #2B3A42, #354854);
     color: var(--white-color);
     padding: 80px 20px;
+    text-align: center;
 }
 
-/* Services Section */
+.cta-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+/* ========== Services Section ========== */
 .service-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -148,11 +154,18 @@ header {
     border: 1px solid #D0D3D8;
     border-radius: 15px;
     padding: 35px;
+    text-align: center;
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* Forecasting Section */
+.service-card img {
+    width: 70px;
+    margin-bottom: 20px;
+    transition: transform 0.3s ease;
+}
+
+/* ========== Forecasting Tool ========== */
 .forecasting-tool {
     max-width: 800px;
     margin: 50px auto;
@@ -160,21 +173,96 @@ header {
     background: var(--white-color);
     border-radius: 12px;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    text-align: center;
 }
 
-/* ========== Footer ========== */
+/* ========== Contact Page Styles ========== */
+.contact-form {
+    max-width: 600px;
+    margin: 40px auto;
+    padding: 30px;
+    background: var(--white-color);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.contact-form input,
+.contact-form textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+/* ========== Pricing Page Styles ========== */
+.pricing-container {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin: 50px auto;
+}
+
+.pricing-card {
+    background: var(--white-color);
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    width: 300px;
+}
+
+/* ========== Footer Styles ========== */
 footer {
     background-color: var(--primary-color);
     color: var(--white-color);
     padding: 40px 20px;
+    text-align: center;
 }
 
-.footer-links {
-    margin-top: 20px;
+.footer-links a {
+    color: var(--white-color);
+    text-decoration: none;
+    margin: 0 10px;
 }
 
-.social-icons {
-    margin-top: 20px;
+.social-icons a {
+    color: var(--white-color);
+    margin: 0 10px;
+    font-size: 1.5rem;
+}
+
+/* ========== Utilities ========== */
+.cta-button {
+    display: inline-block;
+    padding: 15px 30px;
+    border-radius: 50px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: 0.3s;
+    background: var(--secondary-color);
+    color: var(--white-color);
+}
+
+.cta-button:hover {
+    background: var(--accent-color);
+    transform: translateY(-2px);
+}
+
+.secondary-button {
+    background: transparent;
+    border: 2px solid var(--white-color);
+}
+
+/* ========== Animations ========== */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* ========== Responsive Design ========== */
@@ -188,48 +276,36 @@ footer {
     header {
         padding: 20px;
     }
-    
+
     .hero {
         padding: 100px 20px 80px;
     }
-    
+
     .hero-heading {
         font-size: 2.5rem;
     }
-    
+
     .service-grid {
         grid-template-columns: 1fr;
+    }
+
+    .pricing-container {
+        flex-direction: column;
+        align-items: center;
     }
 }
 
 @media (max-width: 480px) {
     .hero-heading {
-        font-size: 1.5rem;
+        font-size: 1.8rem;
     }
     
     .nav-menu {
         flex-direction: column;
+        text-align: center;
     }
-}
-
-/* ========== Utilities ========== */
-.cta-button {
-    display: inline-block;
-    padding: 15px 30px;
-    border-radius: 50px;
-    font-weight: 600;
-    text-decoration: none;
-    transition: 0.3s;
-}
-
-/* ========== Animations ========== */
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
+    
+    .nav-item {
+        margin: 10px 0;
     }
 }
