@@ -42,18 +42,25 @@ h1, h2, h3 {
 /* ======================== */
 /* ======== Header ======== */
 /* ======================== */
+/* ===== Default Header State ===== */
 header {
     position: fixed;
     top: 0;
-    left: 0;
-    right: 0;
+    left: 50%;
+    transform: translateX(-50%) scale(1); /* Center horizontally; scale=1 = full size */
+    width: 100%;
     z-index: 9999;
     background: transparent;
-    padding: 20px 50px; /* Full-size header padding */
+    padding: 20px 50px; /* Full-size padding */
     display: flex;
     justify-content: space-between;
     align-items: center;
-    transition: all 0.3s ease; /* Smooth transition for all properties */
+    transition: 
+      transform 0.3s ease,
+      background 0.3s ease,
+      padding 0.3s ease,
+      border-radius 0.3s ease,
+      box-shadow 0.3s ease; /* Smooth transitions for changed properties */
   }
   
   /* Navigation & Logo Styles Remain Unchanged */
@@ -63,11 +70,9 @@ header {
     padding: 0;
     display: flex;
   }
-  
   header nav li {
     margin-right: 20px;
   }
-  
   header nav a {
     color: var(--white-color);
     text-decoration: none;
@@ -77,46 +82,42 @@ header {
     transition: all 0.3s ease-in-out;
     border-radius: 5px;
   }
-  
   header nav a:hover {
     background-color: var(--accent-color);
     color: var(--white-color);
     box-shadow: 0px 4px 10px rgba(255, 136, 0, 0.3);
   }
-  
   header .logo {
     font-size: var(--font-size-xl);
     font-weight: bold;
     color: var(--secondary-color);
     text-decoration: none;
-    transition: color 0.3s ease; /* Logo color transition */
+    transition: color 0.3s ease;
   }
   
-  /* === Scrolled Header State === */
+  /* ===== Scrolled Header State ===== */
   header.scrolled {
-    /* Background and shape */
-    background-color: #f8f8f8 !important; /* Slightly gray background */
-    border-radius: 8px !important;         /* Rounded edges */
-    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1) !important;
+    /* Shrink via scale (about 95% of original size) */
+    transform: translateX(-50%) scale(0.95);
     
-    /* Reduced padding for a shorter height */
+    /* Change background & add rounded edges only when scrolled */
+    background-color: #f8f8f8 !important;
+    border-radius: 8px !important;
+    
+    /* Reduced padding for smaller height */
     padding: 12px 50px !important;
     
-    /* Shrink the width (make it centered and slightly narrower) */
-    width: 95%;                            /* Adjust percentage as desired */
-    left: 50%;                             /* Center horizontally */
-    transform: translateX(-50%);
+    /* Optional: subtle shadow for depth */
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1) !important;
   }
   
-  /* --- Optional: Adjust the logo and nav links when scrolled --- */
+  /* Optionally update colors for logo and nav links when scrolled */
   header.scrolled .logo {
     color: var(--primary-color) !important;
   }
-  
   header.scrolled nav a {
     color: var(--text-color) !important;
   }
-  
   header.scrolled nav a:hover {
     color: var(--white-color) !important;
     background-color: var(--accent-color) !important;
