@@ -42,6 +42,7 @@ h1, h2, h3 {
 /* ======================== */
 /* ======== Header ======== */
 /* ======================== */
+
 /* --- Default Header (Non-Scrolled State) --- */
 header {
     position: fixed;
@@ -54,22 +55,22 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    transition: all 0.3s ease; /* Smooth transition for all properties */
-  }
-  
-  /* --- Navigation and Logo Styles (Unchanged) --- */
-  header nav ul {
+    transition: all 0.3s ease;
+}
+
+/* --- Navigation and Logo Styles --- */
+header nav ul {
     list-style: none;
     margin: 0;
     padding: 0;
     display: flex;
-  }
-  
-  header nav li {
+}
+
+header nav li {
     margin-right: 20px;
-  }
-  
-  header nav a {
+}
+
+header nav a {
     color: var(--white-color);
     text-decoration: none;
     font-weight: bold;
@@ -77,60 +78,61 @@ header {
     padding: 10px 15px;
     transition: all 0.3s ease-in-out;
     border-radius: 5px;
-  }
-  
-  header nav a:hover {
+}
+
+header nav a:hover {
     background-color: var(--accent-color);
     color: var(--white-color);
     box-shadow: 0px 4px 10px rgba(255, 136, 0, 0.3);
-  }
-  
-  header .logo {
+}
+
+header .logo {
     font-size: var(--font-size-xl);
     font-weight: bold;
     color: var(--secondary-color);
     text-decoration: none;
-    transition: color 0.3s ease; /* Logo color transition */
-  }
-  
-  /* --- Scrolled Header State --- */
-  header.scrolled {
+    transition: color 0.3s ease;
+}
+
+/* --- Scrolled Header State --- */
+header.scrolled {
+    /* Positioning */
+    position: fixed;
     top: 20px;
-    left: 50%;                /* Center horizontally */
-    width: 90%;               /* Adjusted for a wider appearance */
-    max-width: 1400px;        /* Increased max-width for larger screens */
-    transform: translateX(-50%); 
-    background-color: #f8f8f8 !important;
-    border-radius: 8px !important;
-    padding: 12px 30px !important;  /* Reduced horizontal padding */
-    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1) !important;
-    box-sizing: border-box;   
-    position: fixed;          
+    left: 50%;
+    transform: translateX(-50%);
+    
+    /* Sizing */
+    width: 90%;
+    max-width: 1400px;
+    box-sizing: border-box;
+    
+    /* Visual Style */
+    background: rgba(248, 248, 248, 0.95) !important;
+    border-radius: 8px;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+    
+    /* Spacing */
+    padding: 12px 30px !important;
     margin: 0 auto;
     
-    /* Rounded edges */
-    border-radius: 8px !important;
-    
-    /* Adjusted padding (if desired) */
-    padding: 12px 12px !important;
-    
-    /* Optional subtle shadow */
-    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1) !important;
-  }
-  
-  /* Change styles for logo and nav links when scrolled (if necessary) */
-  header.scrolled .logo {
+    /* Transition */
+    transition: all 0.3s ease, background 0.2s linear;
+}
+
+/* Scrolled State Text Adjustments */
+header.scrolled .logo {
     color: var(--primary-color) !important;
-  }
-  
-  header.scrolled nav a {
+}
+
+header.scrolled nav a {
     color: var(--text-color) !important;
-  }
-  
-  header.scrolled nav a:hover {
+}
+
+header.scrolled nav a:hover {
     color: var(--white-color) !important;
     background-color: var(--accent-color) !important;
-  }
+}
   
 
 /* ======================== */
