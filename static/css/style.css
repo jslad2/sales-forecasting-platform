@@ -119,18 +119,6 @@ header.scrolled {
     box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1) !important;
   }
   
-  /* Optionally update colors for logo and nav links when scrolled */
-  header.scrolled .logo {
-    color: var(--primary-color) !important;
-  }
-  header.scrolled nav a {
-    color: var(--text-color) !important;
-  }
-  header.scrolled nav a:hover {
-    color: var(--white-color) !important;
-    background-color: var(--accent-color) !important;
-  }
-  
 
 /* ======================== */
 /* ======== Hero ========== */
