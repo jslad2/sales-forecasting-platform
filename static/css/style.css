@@ -30,10 +30,12 @@ h1, h2, h3 {
     font-weight: 700;
 }
 
-/* Header Styling */
+/* Header Styling - ClearCogs Inspired */
 header {
     position: absolute;
-    top: 0; left: 0; right: 0;
+    top: 0;
+    left: 0;
+    right: 0;
     z-index: 9999;
     background: transparent;
     padding: 20px 50px;
@@ -76,6 +78,7 @@ header .logo {
     color: var(--secondary-color);
     text-decoration: none;
 }
+
 
 /* Hero Section */
 .hero {
