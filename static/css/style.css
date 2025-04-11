@@ -97,15 +97,15 @@ header {
   header.scrolled {
     top: 20px;
     left: 50%;                /* Center horizontally */
-    width: 95%;               /* Fluid width */
-    max-width: 1200px;        /* Max content width */
-    transform: translateX(-50%); /* Center adjustment */
+    width: 90%;               /* Adjusted for a wider appearance */
+    max-width: 1400px;        /* Increased max-width for larger screens */
+    transform: translateX(-50%); 
     background-color: #f8f8f8 !important;
     border-radius: 8px !important;
-    padding: 12px 50px !important;
+    padding: 12px 30px !important;  /* Reduced horizontal padding */
     box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1) !important;
-    box-sizing: border-box;   /* Include padding in width calculation */
-    position: fixed;           /* Ensure this is set for positioning */
+    box-sizing: border-box;   
+    position: fixed;          
     margin: 0 auto;
     
     /* Rounded edges */
