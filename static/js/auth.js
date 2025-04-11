@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", function () {
     console.log("✅ auth.js is loaded and running!");
 
-    updateNavbar(); // ✅ Ensure navbar updates on page load
+    updateAuthButtons(); // ✅ Ensure navbar updates on page load
 
     const loginForm = document.querySelector("#login-form");
 
@@ -185,7 +185,7 @@ async function fetchWithAuth(url, options = {}) {
 /**
  * ✅ Updates the navbar dynamically based on authentication state
  */
-function updateNavbar() {
+function updateAuthButtons() {
     console.log("🔍 Checking authentication for navbar...");
     
     const authButtons = document.getElementById("auth-buttons");
@@ -214,6 +214,6 @@ function logout() {
     console.log("🚪 Logging out...");
     localStorage.removeItem("access_token");
     document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC"; // ✅ Remove cookie
-    updateNavbar(); // ✅ Update navbar immediately
+    updateAuthButtons(); // ✅ Update navbar immediately
     window.location.href = "/";  // ✅ Redirect to homepage
 }
