@@ -42,39 +42,52 @@ h1, h2, h3 {
 /* ======================== */
 /* ======== Header ======== */
 /* ======================== */
-/* ===== Default Header State ===== */
 header {
     position: fixed;
     top: 0;
-    left: 50%;
-    transform: translateX(-50%) scale(1); /* Center horizontally; scale=1 = full size */
-    width: 100%;
+    left: 0;
+    right: 0;
     z-index: 9999;
-    background: transparent;
-    padding: 20px 50px; /* Full-size padding */
+    /* Translucent white with a frosted glass effect */
+    background-color: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    padding: 20px 50px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    transition: 
-      transform 0.3s ease,
-      background 0.3s ease,
-      padding 0.3s ease,
-      border-radius 0.3s ease,
-      box-shadow 0.3s ease; /* Smooth transitions for changed properties */
+    transition: all 0.3s ease; /* Smooth transition for all properties */
   }
   
-  /* Navigation & Logo Styles Remain Unchanged */
+  /* === Logo Styling === */
+  header .logo {
+    font-size: var(--font-size-xl);
+    font-weight: bold;
+    color: var(--secondary-color);
+    text-decoration: none;
+    transition: color 0.3s ease; /* Logo color transition */
+  }
+  
+  /* === Navigation Container === */
+  header nav {
+    flex: 1; /* allows the nav to take available space */
+    display: flex;
+    justify-content: center; /* center-aligns the nav links */
+  }
+  
+  /* === Navigation Links List === */
   header nav ul {
     list-style: none;
     margin: 0;
     padding: 0;
     display: flex;
+    gap: 20px; /* provides spacing between links */
   }
-  header nav li {
-    margin-right: 20px;
-  }
+  
+  /* === Navigation Link Styles === */
   header nav a {
-    color: var(--white-color);
+    /* For non-scrolled state, you might want to use a darker text color 
+       since the header background is light. Adjust the variable as needed. */
+    color: var(--text-color, #333);
     text-decoration: none;
     font-weight: bold;
     font-size: var(--font-size-base);
@@ -82,21 +95,16 @@ header {
     transition: all 0.3s ease-in-out;
     border-radius: 5px;
   }
+  
+  /* Hover effect for nav links */
   header nav a:hover {
     background-color: var(--accent-color);
     color: var(--white-color);
     box-shadow: 0px 4px 10px rgba(255, 136, 0, 0.3);
   }
-  header .logo {
-    font-size: var(--font-size-xl);
-    font-weight: bold;
-    color: var(--secondary-color);
-    text-decoration: none;
-    transition: color 0.3s ease;
-  }
   
   /* ===== Scrolled Header State ===== */
-  header.scrolled {
+header.scrolled {
     /* Shrink via scale (about 95% of original size) */
     transform: translateX(-50%) scale(0.95);
     
@@ -123,6 +131,7 @@ header {
     background-color: var(--accent-color) !important;
   }
   
+
 /* ======================== */
 /* ======== Hero ========== */
 /* ======================== */
