@@ -162,12 +162,12 @@ header.scrolled nav a:hover {
 }
 
 .hero-content {
-    position: relative;
-    z-index: 2;
-    max-width: 1200px;
+    /* Constrain text content to header width */
+    width: 90%;
+    max-width: 1400px;
     margin: 0 auto;
-    text-align: left;
-    animation: fadeInUp 1s ease-out;
+    padding: 0 20px;
+    box-sizing: border-box;
 }
 
 .hero-left {
@@ -210,7 +210,10 @@ header.scrolled nav a:hover {
 }
 
 .cta-container {
-    max-width: 800px;
+    /* Constrain text content to header width */
+    width: 90%;
+    max-width: 1400px;
+    margin: 0 auto;
     text-align: center;
     padding: 20px;
 }
