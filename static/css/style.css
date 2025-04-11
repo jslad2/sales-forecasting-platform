@@ -47,15 +47,20 @@ h1, h2, h3 {
 header {
     position: fixed;
     top: 0;
-    left: 0;
-    right: 0;
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 9999;
     background: transparent;
-    padding: 20px 50px;
+    padding: 15px 40px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     transition: all 0.3s ease;
+    width: 80%;              /* Narrower initial width */
+    max-width: 1000px;       /* Smaller max-width */
+    box-sizing: border-box;
+    border-radius: 8px;
+    margin: 0 auto;
 }
 
 /* --- Navigation and Logo Styles --- */
@@ -96,28 +101,13 @@ header .logo {
 
 /* --- Scrolled Header State --- */
 header.scrolled {
-    /* Positioning */
-    position: fixed;
     top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    
-    /* Sizing */
-    width: 90%;
-    max-width: 1400px;
-    box-sizing: border-box;
-    
-    /* Visual Style */
-    background: rgba(248, 248, 248, 0.95) !important;
-    border-radius: 8px;
-    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
-    
-    /* Spacing */
+    background: rgba(248, 248, 248, 0.98) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
     padding: 12px 30px !important;
-    margin: 0 auto;
-    
-    /* Transition */
-    transition: all 0.3s ease, background 0.2s linear;
+    width: 90%;              /* Slightly wider when scrolled */
+    max-width: 1200px;       /* Larger max-width for box state */
+    backdrop-filter: blur(5px); /* Subtle blur effect */
 }
 
 /* Scrolled State Text Adjustments */
