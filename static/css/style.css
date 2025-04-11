@@ -111,12 +111,10 @@ header .logo {
 .hero {
     position: relative;
     background-image: url('static/images/hero-background5.jpg');
-    background-size: cover;              /* Fill area but crop smart */
-    background-position: center top;     /* Focus the cubes toward the top */
+    background-size: contain;  /* No crop */
+    background-position: center;
     background-repeat: no-repeat;
-    background-attachment: fixed;        /* Parallax effect on scroll */
-    background-color: #000;              /* Fallback */
-    color: white;
+    background-color: #000;  /* Fill around image */
     padding: 140px 20px;
     text-align: center;
 }
