@@ -96,14 +96,17 @@ header {
   /* --- Scrolled Header State --- */
   header.scrolled {
     top: 20px;
-    left: 20%;
-    width: 95%;         /* Fluid width relative to the viewport */
-    max-width: 1200px;  /* Limits the width on larger screens */
-    transform: translateX(-20%);
-    background-color: #f8f8f8 !important;      /* Slightly gray background */
-    border-radius: 8px !important;             /* Rounded edges */
-    padding: 12px 50px !important;             /* Reduced padding for a shorter height */
+    left: 50%;                /* Center horizontally */
+    width: 95%;               /* Fluid width */
+    max-width: 1200px;        /* Max content width */
+    transform: translateX(-50%); /* Center adjustment */
+    background-color: #f8f8f8 !important;
+    border-radius: 8px !important;
+    padding: 12px 50px !important;
     box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1) !important;
+    box-sizing: border-box;   /* Include padding in width calculation */
+    position: fixed;           /* Ensure this is set for positioning */
+    margin: 0 auto;
     
     /* Rounded edges */
     border-radius: 8px !important;
