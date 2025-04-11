@@ -109,38 +109,31 @@ header .logo {
 
 /* Hero Section */
 .hero {
-    position: relative;
-    background-color: #000; /* Fallback */
-    padding: 220px 20px; /* Good balance for desktop */
+    background-image: url('static/images/hero-background5.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed; /* Optional for parallax effect */
+    color: white;
+    padding: 220px 20px;
     text-align: center;
+    position: relative;
     overflow: hidden;
 }
 
-.hero::before {
-    content: "";
+.hero .overlay {
+    background: rgba(0, 0, 0, 0.55); /* Dark overlay */
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background-image: url('static/images/hero-background5.jpg');
-    background-size: cover;
-    background-position: center top;
-    background-repeat: no-repeat;
-    background-attachment: fixed;
-    background-color: rgba(0,0,0,0.5); /* subtle dark overlay */
-    background-blend-mode: multiply;  /* This blends the image with dark overlay */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     z-index: 1;
-}
-
-.hero::after {
-    content: "";
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0.6); /* Dark overlay */
-    z-index: 2;
 }
 
 .hero-text {
     position: relative;
-    z-index: 3;
+    z-index: 2;
     max-width: 700px;
     margin: 0 auto;
     animation: fadeInUp 1s ease-out;
@@ -152,7 +145,6 @@ header .logo {
     font-weight: 700;
     letter-spacing: 1px;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-    color: #fff;
 }
 
 .hero-text p {
@@ -161,6 +153,7 @@ header .logo {
     color: #ddd;
 }
 
+/* CTA Button */
 .cta-button {
     background: linear-gradient(90deg, var(--secondary-color), var(--accent-color));
     color: var(--white-color);
@@ -192,8 +185,6 @@ header .logo {
         transform: translateY(0);
     }
 }
-
-
 
 /* CTA Section - Improved Layout */
 .cta {
