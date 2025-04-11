@@ -95,7 +95,10 @@ header {
   
   /* --- Scrolled Header State --- */
   header.scrolled {
-    transform: translateX(-50%) scale(0.95); /* Shrink the header */
+    top: 20px;
+    left: 50%;
+    width: 1200px;               /* or 90%, or whatever you prefer */
+    transform: translateX(-50%);
     background-color: #f8f8f8 !important;      /* Slightly gray background */
     border-radius: 8px !important;             /* Rounded edges */
     padding: 12px 50px !important;             /* Reduced padding for smaller height */
