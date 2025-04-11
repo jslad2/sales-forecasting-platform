@@ -111,13 +111,15 @@ header .logo {
 .hero {
     position: relative;
     background-image: url('static/images/hero-background5.jpg');
-    background-size: contain;  /* No crop */
-    background-position: center;
+    background-size: cover;
+    background-position: center top;
     background-repeat: no-repeat;
-    background-color: #000;  /* Fill around image */
-    padding: 140px 20px;
+    background-attachment: fixed;
+    background-color: #000;
+    padding: 240px 20px; /* Increased height */
     text-align: center;
 }
+
 
 .hero .overlay {
     position: absolute;
@@ -148,6 +150,20 @@ header .logo {
     font-size: var(--font-size-lg);
     margin-bottom: 30px;
     color: #E0E0E0;
+}
+
+.hero-image-container {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.hero-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* or contain */
+    opacity: 0.3; /* Optional dark overlay */
 }
 
 .cta-button {

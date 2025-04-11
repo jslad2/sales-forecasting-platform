@@ -42,14 +42,16 @@
 </header>
 
 <!-- Hero Section with Background Image -->
-<section class="hero" style="background-image: url('static/images/hero-background5.jpg');">
-    <div class="overlay"></div>
+<section class="hero">
+    <div class="hero-image-container">
+      <img src="static/images/hero-background5.jpg" alt="AI Forecasting" class="hero-img">
+    </div>
     <div class="hero-text">
       <h1>Effortless AI Sales Forecasting</h1>
       <p>Predict your future sales in minutes — turn raw data into actionable forecasts without writing a single line of code.</p>
       <a href="{{ url_for('data_services') }}" class="cta-button">Start Forecasting Now →</a>
     </div>
-  </section>  
+  </section> 
 
 <!-- Tools Overview -->
 <section class="data-services">
