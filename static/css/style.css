@@ -46,8 +46,9 @@ header {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 
     /* Optional: Glass effect */
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px); /* Safari Support */
+    /* backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);  */
+    /* Safari Support */
 }
 
 
