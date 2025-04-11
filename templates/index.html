@@ -31,18 +31,18 @@
 <header>
     <nav>
         <ul class="nav-links">
-            <li><a href="/" class="nav-link active">Home</a></li>
-            <li><a href="/data_services" class="nav-link">Data Services</a></li>
-            <li><a href="/pricing" class="nav-link">Pricing</a></li>
-            <li><a href="/contact" class="nav-link">Contact</a></li>
-            <li id="auth-buttons"></li>
+            <li><a href="{{ url_for('home') }}" class="nav-link">Home</a></li>
+            <li><a href="{{ url_for('data_services') }}" class="nav-link">Data Services</a></li>
+            <li><a href="{{ url_for('pricing') }}" class="nav-link">Pricing</a></li>
+            <li><a href="{{ url_for('contact') }}" class="nav-link">Contact</a></li>
+            <li id="auth-buttons"> <!-- Dynamic Auth Buttons Here --> </li>
         </ul>
     </nav>
     <div class="logo">SYNOVAAI</div>
 </header>
 
 <!-- Hero Section with Background Image -->
-<section class="hero" style="background-image: url('static/images/hero-background.jpg');">
+<section class="hero" style="background-image: url('static/images/hero-background2.jpg');">
     <div class="overlay"></div>
     <div class="hero-text">
       <h1>Effortless AI Sales Forecasting</h1>
