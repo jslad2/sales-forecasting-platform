@@ -110,10 +110,10 @@ header .logo {
 /* Hero Section Improvements */
 .hero {
     background-image: url('static/images/hero-background3.jpg');
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    background-color: #000; /* fallback for empty space */
+    background-size: cover;
+    background-position: center top;
+    background-attachment: fixed; /* Parallax effect */
+    background-color: #000;
 }
 
 .hero .overlay {
