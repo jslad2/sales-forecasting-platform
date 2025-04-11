@@ -109,7 +109,7 @@ header {
     border-radius: 8px !important;
     
     /* Adjusted padding (if desired) */
-    padding: 12px 50px !important;
+    padding: 12px 12px !important;
     
     /* Optional subtle shadow */
     box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1) !important;
