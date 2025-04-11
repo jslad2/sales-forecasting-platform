@@ -32,7 +32,7 @@ h1, h2, h3 {
 
 /* Header Styling */
 header {
-    background-color: var(--primary-color);
+    background-color: rgba(35, 49, 58, 0.85);  /* Semi-transparent background */
     color: var(--white-color);
     padding: 20px 50px;
     display: flex;
@@ -41,8 +41,15 @@ header {
     position: sticky;
     top: 0;
     z-index: 1000;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+    /* Optional: Subtle shadow or border for separation */
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+
+    /* Optional: Glass effect */
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px); /* Safari Support */
 }
+
 
 /* Navigation Menu */
 header nav ul {
