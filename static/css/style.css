@@ -107,31 +107,79 @@ header .logo {
     text-decoration: none;
 }
 
-/* Hero Section */
+/* Hero Section Improvements */
 .hero {
-    background: linear-gradient(135deg, var(--primary-color), #354854);
-    color: var(--white-color);
+    position: relative;
+    background-image: url('static/images/hero-background.jpg');
+    background-size: cover;
+    background-position: center;
+    color: white;
+    padding: 120px 20px;
     text-align: center;
-    padding: 100px 20px;
-    animation: gradientShift 10s infinite alternate;
 }
 
-@keyframes gradientShift {
-    0% { background-position: 0% 50%; }
-    100% { background-position: 100% 50%; }
+.hero .overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.55);
 }
 
-.hero h1 {
+.hero-text {
+    position: relative;
+    z-index: 2;
+    max-width: 700px;
+    margin: 0 auto;
+    animation: fadeInUp 1s ease-out;
+}
+
+.hero-text h1 {
     font-size: var(--font-size-xl);
     margin-bottom: 20px;
     font-weight: 700;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    letter-spacing: 1px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.4);
 }
 
-.hero p {
+.hero-text p {
     font-size: var(--font-size-lg);
     margin-bottom: 30px;
+    color: #E0E0E0;
 }
+
+.cta-button {
+    background: linear-gradient(90deg, var(--secondary-color), var(--accent-color));
+    color: var(--white-color);
+    padding: 15px 30px;
+    font-size: var(--font-size-lg);
+    border-radius: 8px;
+    font-weight: bold;
+    transition: all 0.3s ease-in-out;
+    display: inline-block;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0px 4px 10px rgba(255, 136, 0, 0.3);
+}
+
+.cta-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0px 6px 12px rgba(255, 136, 0, 0.4);
+}
+
+@keyframes fadeInUp {
+    0% {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 
 /* CTA Section - Improved Layout */
 .cta {
