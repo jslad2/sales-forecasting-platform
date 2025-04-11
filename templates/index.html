@@ -96,19 +96,32 @@
   </footer>
 
   <script src="static/js/auth.js" defer></script>
-  <script>
-    document.addEventListener("DOMContentLoaded", function() {
-      updateAuthButtons();
-      const topButton = document.querySelector(".top-button");
-      window.onscroll = function() {
-        topButton.style.opacity = window.scrollY > 300 ? "1" : "0";
-      };
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    // Update authentication buttons
+    updateAuthButtons();
+
+    // Back to Top Button functionality
+    const topButton = document.querySelector(".top-button");
+    window.addEventListener("scroll", function() {
+      topButton.style.opacity = window.scrollY > 300 ? "1" : "0";
     });
 
-    function scrollToTop() {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  </script>
+    // Header scroll behavior to add .scrolled class
+    const header = document.querySelector("header");
+    window.addEventListener("scroll", function() {
+      if (window.scrollY > 100) {  // Adjust threshold as needed
+        header.classList.add("scrolled");
+      } else {
+        header.classList.remove("scrolled");
+      }
+    });
+  });
+
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+</script>
 
 </body>
 </html>

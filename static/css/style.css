@@ -89,6 +89,23 @@ header .logo {
     text-decoration: none;
 }
 
+/* Header when Scrolled */
+header.scrolled {
+    position: fixed; /* stays pinned to top */
+    background: rgba(255, 255, 255, 0.95);  /* Solid background for clarity */
+    padding: 10px 50px;  /* Smaller padding gives a subtle shrink effect */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Adjust link colors in the header when scrolled */
+header.scrolled .nav-link {
+    color: #333;  /* Dark text on the light background */
+}
+
+header.scrolled .nav-link:hover {
+    color: var(--accent-color);
+}
+
 /* ======================== */
 /* ======== Hero ========== */
 /* ======================== */
