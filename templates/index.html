@@ -76,11 +76,19 @@
 </section>
 
 <!-- Call to Action -->
-<section class="cta">
+<section class="cta" 
+  style="
+    background-image: url('static/images/cta-background.jpg');
+    background-size: cover;
+    background-position: center;
+    color: white;
+  "
+>
     <h2>Ready to Forecast Smarter?</h2>
     <p>Join businesses already using SynovaAI to unlock data-driven decisions and stay ahead of demand.</p>
     <a href="{{ url_for('pricing') }}" class="cta-button primary-button">See Pricing Plans</a>
 </section>
+
 
 <button onclick="scrollToTop()" class="top-button" aria-label="Back to Top">⬆ Back to Top</button>
 
