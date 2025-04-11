@@ -125,7 +125,8 @@ header .logo {
     background-position: center top;
     background-repeat: no-repeat;
     background-attachment: fixed;
-    opacity: 0.3; /* Adjust image intensity */
+    background-color: rgba(0,0,0,0.5); /* subtle dark overlay */
+    background-blend-mode: multiply;  /* This blends the image with dark overlay */
     z-index: 1;
 }
 
