@@ -97,11 +97,12 @@ header {
   header.scrolled {
     top: 20px;
     left: 50%;
-    width: 1200px;               /* or 90%, or whatever you prefer */
+    width: 95%;         /* Fluid width relative to the viewport */
+    max-width: 1200px;  /* Limits the width on larger screens */
     transform: translateX(-50%);
     background-color: #f8f8f8 !important;      /* Slightly gray background */
     border-radius: 8px !important;             /* Rounded edges */
-    padding: 12px 50px !important;             /* Reduced padding for smaller height */
+    padding: 12px 50px !important;             /* Reduced padding for a shorter height */
     box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1) !important;
     
     /* Rounded edges */
