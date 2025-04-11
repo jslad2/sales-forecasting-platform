@@ -6,13 +6,11 @@
     <title>SynovaAI - Effortless AI Sales Forecasting</title>
     <meta name="description" content="Effortless AI Sales Forecasting for businesses. Generate accurate sales forecasts in minutes — no data science required.">
 
-    <!-- SEO & Social -->
     <meta property="og:title" content="SynovaAI - Effortless AI Sales Forecasting">
     <meta property="og:description" content="Turn your sales data into actionable forecasts with SynovaAI. Predict demand. Plan smarter. Grow faster.">
     <meta property="og:image" content="static/images/og-image.png">
     <meta property="og:url" content="https://www.synovaai.com">
 
-    <!-- Google Analytics 4 -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-LKEQTSKLCF"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -21,13 +19,11 @@
       gtag('config', 'G-LKEQTSKLCF');
     </script>
 
-    <!-- Styles -->
     <link rel="stylesheet" href="static/css/style.css">
 </head>
 
 <body class="home-page">
 
-<!-- Navigation -->
 <header>
     <nav>
         <ul class="nav-links">
@@ -35,7 +31,7 @@
             <li><a href="{{ url_for('data_services') }}" class="nav-link">Data Services</a></li>
             <li><a href="{{ url_for('pricing') }}" class="nav-link">Pricing</a></li>
             <li><a href="{{ url_for('contact') }}" class="nav-link">Contact</a></li>
-            <li id="auth-buttons"> <!-- Dynamic Auth Buttons Here --> </li>
+            <li id="auth-buttons"></li>
         </ul>
     </nav>
     <div class="logo">SYNOVAAI</div>
@@ -44,17 +40,16 @@
 <!-- Hero Section -->
 <section class="hero">
     <div class="hero-content">
-      <div class="hero-text">
-        <h1>Effortless AI Sales Forecasting</h1>
-        <p>Turn raw data into forecasts — in minutes, not days.</p>
-        <a href="{{ url_for('data_services') }}" class="cta-button">Start Forecasting →</a>
-      </div>
-      <div class="hero-supporting-text">
-        <p>Helping businesses predict demand and optimize inventory with AI-powered insights.</p>
-      </div>
+        <div class="hero-left">
+            <h1>Effortless AI Sales Forecasting</h1>
+            <p>Turn raw data into actionable insights to plan smarter, sell better, and stay ahead of demand.</p>
+            <div class="hero-buttons">
+                <a href="{{ url_for('data_services') }}" class="cta-button primary-button">Get Started</a>
+                <a href="{{ url_for('pricing') }}" class="cta-button secondary-button">See Pricing</a>
+            </div>
+        </div>
     </div>
-  </section>
-  
+</section>
 
 <!-- Tools Overview -->
 <section class="data-services">
@@ -81,16 +76,14 @@
 </section>
 
 <!-- Call to Action -->
-<section class="cta" style="background-image: url('static/images/cta-background.jpg'); background-size: cover; background-position: center; color: white;">
+<section class="cta">
     <h2>Ready to Forecast Smarter?</h2>
     <p>Join businesses already using SynovaAI to unlock data-driven decisions and stay ahead of demand.</p>
-    <a href="/pricing" class="cta-button primary-button">See Pricing Plans</a>
+    <a href="{{ url_for('pricing') }}" class="cta-button primary-button">See Pricing Plans</a>
 </section>
 
-<!-- Back to Top Button -->
 <button onclick="scrollToTop()" class="top-button" aria-label="Back to Top">⬆ Back to Top</button>
 
-<!-- Footer -->
 <footer>
     <p>&copy; 2025 SynovaAI. All rights reserved.</p>
     <div class="footer-links">
@@ -99,18 +92,13 @@
     </div>
 </footer>
 
-<!-- JavaScript -->
 <script src="static/js/auth.js" defer></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         updateAuthButtons();
         const topButton = document.querySelector(".top-button");
         window.onscroll = function() {
-            if (window.scrollY > 300) {
-                topButton.style.opacity = "1";
-            } else {
-                topButton.style.opacity = "0";
-            }
+            topButton.style.opacity = window.scrollY > 300 ? "1" : "0";
         };
     });
 
