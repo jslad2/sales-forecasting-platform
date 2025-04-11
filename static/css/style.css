@@ -56,7 +56,7 @@ header {
     justify-content: space-between;
     align-items: center;
     transition: all 0.3s ease;
-    width: 80%;              /* Narrower initial width */
+    width: 90%;              /* Narrower initial width */
     max-width: 1000px;       /* Smaller max-width */
     box-sizing: border-box;
     border-radius: 8px;
