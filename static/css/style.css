@@ -31,16 +31,18 @@ h1, h2, h3 {
 }
 
 /* Header Styling - ClearCogs Inspired */
-.hero {
-    margin: 0;
-    padding-top: 140px; /* Ensure text sits below the header */
-    padding-bottom: 80px;
-    background: url('static/images/hero-bg.jpg') center/cover no-repeat;
-    position: relative;
-    overflow: hidden;
-    color: #fff;
+header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    background: transparent;
+    padding: 20px 50px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
-
 
 /* Navigation Menu */
 header nav ul {
@@ -867,96 +869,3 @@ footer {
     margin: 15px auto;
 }
 
-.clearcogs-header {
-    position: absolute;     /* Floats over the hero section */
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 9999;
-    background: transparent;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 20px 50px;
-    /* Optional: If text is white on hero, ensure links have white color */
-    color: #fff;
-}
-
-/* Logo */
-.clearcogs-header .logo img {
-    max-height: 40px; /* Adjust as needed */
-    object-fit: contain;
-}
-
-/* Center Nav */
-.nav-center ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    gap: 2rem;  /* Space between links */
-}
-
-.nav-center ul li a {
-    color: #fff;                 /* White text, adjust if needed */
-    text-decoration: none;
-    font-weight: 500;
-    transition: color 0.3s ease;
-}
-
-.nav-center ul li a:hover {
-    color: var(--secondary-color);
-}
-
-/* Right-Side Links & Button */
-.nav-right {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-}
-
-/* “Login” Link */
-.nav-right .login-link {
-    color: #fff;
-    text-decoration: none;
-    font-weight: 500;
-    padding: 6px 12px;
-    border-radius: 4px;
-    transition: background 0.3s ease;
-}
-
-.nav-right .login-link:hover {
-    background: rgba(255,255,255,0.15);
-}
-
-/* “Get Started” CTA Button */
-.nav-cta-button {
-    background-color: #fff;      /* White button */
-    color: #333;                 /* Dark text */
-    font-weight: 600;
-    border-radius: 24px;         /* Pill shape */
-    padding: 8px 20px;
-    transition: background 0.3s ease, color 0.3s ease;
-    text-decoration: none;
-}
-
-.nav-cta-button:hover {
-    background-color: var(--accent-color);
-    color: #fff;
-    transform: translateY(-2px);
-}
-
-@media (max-width: 768px) {
-    .clearcogs-header {
-      padding: 10px 20px;
-    }
-    .nav-center ul {
-      display: none;  /* Hide the menu or transform into a burger menu if you like */
-    }
-    /* Alternatively, you can do a simple single-column layout if you prefer */
-    
-    .nav-right {
-      gap: 0.5rem;
-    }
-  }
-  
