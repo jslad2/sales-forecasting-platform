@@ -47,11 +47,8 @@ h1, h2, h3 {
 header {
     position: fixed;
     top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 9999;
     background: transparent;
-    padding: 15px 40px;
+    padding: 12px 30px;
     display: flex;
     justify-content: space-between;
     align-items: center;
