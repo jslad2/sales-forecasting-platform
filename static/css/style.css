@@ -109,12 +109,17 @@ header .logo {
 
 /* Hero Section Improvements */
 .hero {
+    position: relative;
     background-image: url('static/images/hero-background3.jpg');
-    background-size: cover;
-    background-position: center top;
-    background-attachment: fixed; /* Parallax effect */
-    background-color: #000;
+    background-size: contain;        /* Prevent zooming/cropping */
+    background-repeat: no-repeat;    /* No image tiling */
+    background-position: center top; /* Align nicely */
+    background-color: #000;          /* Fallback for empty space */
+    color: white;
+    padding: 120px 20px;
+    text-align: center;
 }
+
 
 .hero .overlay {
     position: absolute;
