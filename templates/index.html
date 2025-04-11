@@ -11,6 +11,7 @@
     <meta property="og:image" content="static/images/og-image.png">
     <meta property="og:url" content="https://www.synovaai.com">
 
+    <!-- Google Analytics 4 -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-LKEQTSKLCF"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -24,6 +25,7 @@
 
 <body class="home-page">
 
+<!-- Header -->
 <header>
     <nav>
         <ul class="nav-links">
@@ -37,8 +39,8 @@
     <div class="logo">SYNOVAAI</div>
 </header>
 
-<!-- Hero Section -->
-<section class="hero" style="background-image: url('static/images/hero-background5.jpg'); background-size: cover; background-position: center; color: white; padding: 220px 20px; text-align: center; position: relative;">
+<!-- Hero Section (ClearCogs-Inspired Layout) -->
+<section class="hero">
     <div class="hero-content">
         <div class="hero-left">
             <h1>Effortless AI Sales Forecasting</h1>
@@ -48,6 +50,12 @@
                 <a href="{{ url_for('pricing') }}" class="cta-button secondary-button">See Pricing</a>
             </div>
         </div>
+        <!-- Optional: Add a right-side illustration or supporting image if desired -->
+        <!--
+        <div class="hero-right">
+            <img src="static/images/some-illustration.png" alt="Illustration" />
+        </div>
+        -->
     </div>
 </section>
 
@@ -82,8 +90,10 @@
     <a href="{{ url_for('pricing') }}" class="cta-button primary-button">See Pricing Plans</a>
 </section>
 
+<!-- Back to Top Button -->
 <button onclick="scrollToTop()" class="top-button" aria-label="Back to Top">⬆ Back to Top</button>
 
+<!-- Footer -->
 <footer>
     <p>&copy; 2025 SynovaAI. All rights reserved.</p>
     <div class="footer-links">

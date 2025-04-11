@@ -32,16 +32,14 @@ h1, h2, h3 {
 
 /* Header Styling */
 header {
-    background-color: rgba(35, 49, 58, 0.85);
-    color: var(--white-color);
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    z-index: 9999;
+    background: transparent;
     padding: 20px 50px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 /* Navigation Menu */
@@ -82,34 +80,27 @@ header .logo {
 /* Hero Section */
 .hero {
     position: relative;
-    background-image: url('static/images/hero-background5.jpg');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    color: var(--white-color);
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
+    margin: 0; /* No margin so it hits top of page */
+    padding: 140px 20px 100px; /* Enough top padding for nav overlap, reduce bottom if you want less space */
+    background: url('static/images/hero-background5.jpg') center/cover no-repeat;
+    color: #fff;
 }
 
+/* optional overlay for text clarity */
 .hero::before {
     content: "";
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0.5);  /* Dark overlay for text readability */
+    inset: 0; /* shorthand for top/left/right/bottom: 0 */
+    background: rgba(0,0,0,0.4);
     z-index: 1;
 }
 
 .hero-content {
     position: relative;
     z-index: 2;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
     max-width: 1200px;
     margin: 0 auto;
-    padding: 0 5%;
+    text-align: left; /* or center, up to you */
 }
 
 .hero-left {
