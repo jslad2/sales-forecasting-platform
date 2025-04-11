@@ -98,26 +98,26 @@
   <script src="static/js/auth.js" defer></script>
   <script>
     document.addEventListener("DOMContentLoaded", function() {
-      // Update auth buttons
-      updateAuthButtons();
-      
-      // Top button functionality
-      const topButton = document.querySelector(".top-button");
-      window.addEventListener("scroll", function() {
-        topButton.style.opacity = window.scrollY > 300 ? "1" : "0";
-
-        // Header scroll behavior: Add or remove .scrolled class as needed
+        // Update auth buttons
+        updateAuthButtons();
+        
+        // Header and top button functionality
         const header = document.querySelector("header");
-        if (window.scrollY > 100) {
-          header.classList.add("scrolled");
-        } else {
-          header.classList.remove("scrolled");
-        }
-      });
+        const topButton = document.querySelector(".top-button");
+
+        window.addEventListener("scroll", function() {
+            const scrollY = window.scrollY;
+            
+            // Toggle header scrolled state
+            header.classList.toggle("scrolled", scrollY > 50); // Changed to 50px threshold
+
+            // Toggle top button
+            topButton.style.opacity = scrollY > 300 ? "1" : "0";
+        });
     });
 
     function scrollToTop() {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+        window.scrollTo({ top: 0, behavior: "smooth" });
     }
   </script>
 
