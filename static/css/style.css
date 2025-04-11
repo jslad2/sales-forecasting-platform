@@ -79,6 +79,7 @@ header .logo {
     text-decoration: none;
 }
 
+/* Hero Section */
 .hero {
     position: relative;
     background-image: url('static/images/hero-background5.jpg');
@@ -89,32 +90,42 @@ header .logo {
     min-height: 100vh;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0 5%;
 }
 
 .hero::before {
     content: "";
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0.55);
+    background: rgba(0, 0, 0, 0.5);  /* Dark overlay for text readability */
     z-index: 1;
 }
 
 .hero-content {
     position: relative;
     z-index: 2;
-    max-width: 50%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 5%;
 }
 
-.hero-content h1 {
+.hero-left {
+    max-width: 600px;
+    text-align: left;
+}
+
+.hero-left h1 {
     font-size: 3rem;
     line-height: 1.2;
     font-weight: 700;
     margin-bottom: 20px;
+    color: var(--white-color);
 }
 
-.hero-content p {
+.hero-left p {
     font-size: 1.3rem;
     margin-bottom: 30px;
     color: #ccc;
@@ -130,8 +141,9 @@ header .logo {
     background: var(--secondary-color);
     color: var(--white-color);
     padding: 15px 30px;
-    border-radius: 6px;
-    font-weight: bold;
+    border-radius: 50px;
+    font-weight: 600;
+    text-decoration: none;
     transition: 0.3s;
 }
 
@@ -139,6 +151,18 @@ header .logo {
     background: var(--accent-color);
     transform: translateY(-2px);
 }
+
+/* Optional: You can style a secondary button differently if needed */
+.cta-button.secondary-button {
+    background: transparent;
+    border: 2px solid var(--white-color);
+}
+
+.cta-button.secondary-button:hover {
+    background: var(--white-color);
+    color: var(--primary-color);
+}
+
 
 /* CTA Section */
 .cta {
