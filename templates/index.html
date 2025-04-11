@@ -1,119 +1,114 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SynovaAI - Effortless AI Sales Forecasting</title>
-    <meta name="description" content="Effortless AI Sales Forecasting for businesses. Generate accurate sales forecasts in minutes — no data science required.">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SynovaAI - Effortless AI Sales Forecasting</title>
+  <meta name="description" content="Effortless AI Sales Forecasting for businesses. Generate accurate sales forecasts in minutes — no data science required.">
 
-    <meta property="og:title" content="SynovaAI - Effortless AI Sales Forecasting">
-    <meta property="og:description" content="Turn your sales data into actionable forecasts with SynovaAI. Predict demand. Plan smarter. Grow faster.">
-    <meta property="og:image" content="static/images/og-image.png">
-    <meta property="og:url" content="https://www.synovaai.com">
+  <meta property="og:title" content="SynovaAI - Effortless AI Sales Forecasting">
+  <meta property="og:description" content="Turn your sales data into actionable forecasts with SynovaAI. Predict demand. Plan smarter. Grow faster.">
+  <meta property="og:image" content="static/images/og-image.png">
+  <meta property="og:url" content="https://www.synovaai.com">
 
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-LKEQTSKLCF"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-LKEQTSKLCF');
-    </script>
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-LKEQTSKLCF"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){ dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'G-LKEQTSKLCF');
+  </script>
 
-    <link rel="stylesheet" href="static/css/style.css">
+  <link rel="stylesheet" href="static/css/style.css">
 </head>
 
 <body class="home-page">
 
-<header>
+  <!-- Header (Remains Unchanged; Update CSS for ClearCogs style) -->
+  <header>
     <nav>
-        <ul class="nav-links">
-            <li><a href="{{ url_for('home') }}" class="nav-link">Home</a></li>
-            <li><a href="{{ url_for('data_services') }}" class="nav-link">Data Services</a></li>
-            <li><a href="{{ url_for('pricing') }}" class="nav-link">Pricing</a></li>
-            <li><a href="{{ url_for('contact') }}" class="nav-link">Contact</a></li>
-            <li id="auth-buttons"></li>
-        </ul>
+      <ul class="nav-links">
+        <li><a href="{{ url_for('home') }}" class="nav-link">Home</a></li>
+        <li><a href="{{ url_for('data_services') }}" class="nav-link">Data Services</a></li>
+        <li><a href="{{ url_for('pricing') }}" class="nav-link">Pricing</a></li>
+        <li><a href="{{ url_for('contact') }}" class="nav-link">Contact</a></li>
+        <li id="auth-buttons"></li>
+      </ul>
     </nav>
     <div class="logo">SYNOVAAI</div>
-</header>
+  </header>
 
-<!-- Hero Section -->
-<section class="hero" style="background-image: url('static/images/hero-background5.jpg'); background-size: cover; background-position: center; color: white; padding: 220px 20px; text-align: center; position: relative;">
+  <!-- Hero Section -->
+  <section class="hero" style="background-image: url('static/images/hero-background5.jpg'); background-size: cover; background-position: center; color: white; padding: 220px 20px; text-align: center; position: relative;">
     <div class="hero-content">
-        <div class="hero-left">
-            <h1>Effortless AI Sales Forecasting</h1>
-            <p>Turn raw data into actionable insights to plan smarter, sell better, and stay ahead of demand.</p>
-            <div class="hero-buttons">
-                <a href="{{ url_for('data_services') }}" class="cta-button primary-button">Get Started</a>
-                <a href="{{ url_for('pricing') }}" class="cta-button secondary-button">See Pricing</a>
-            </div>
+      <div class="hero-left">
+        <h1>Effortless AI Sales Forecasting</h1>
+        <p>Turn raw data into actionable insights to plan smarter, sell better, and stay ahead of demand.</p>
+        <div class="hero-buttons">
+          <a href="{{ url_for('data_services') }}" class="cta-button primary-button">Get Started</a>
+          <a href="{{ url_for('pricing') }}" class="cta-button secondary-button">See Pricing</a>
         </div>
+      </div>
     </div>
-</section>
+  </section>
 
-<!-- Tools Overview -->
-<section class="data-services">
+  <!-- Tools Overview -->
+  <section class="data-services">
     <h2>Built for Business Growth</h2>
     <p>Whether you're a small business or a growing enterprise — SynovaAI helps you plan smarter, sell better, and stay ahead of demand.</p>
-
     <div class="service-grid">
-        <div class="service-card">
-            <img src="static/images/forecasting-icon.png" alt="Forecasting Icon">
-            <h3>AI Forecasting</h3>
-            <p>Generate highly accurate sales forecasts with machine learning — no data science team required.</p>
-        </div>
-        <div class="service-card">
-            <img src="static/images/dashboard-icon.png" alt="Dashboard Icon">
-            <h3>Interactive Dashboards</h3>
-            <p>Visualize trends and KPIs in real-time with customizable dashboards designed for decision-makers.</p>
-        </div>
-        <div class="service-card">
-            <img src="static/images/support-icon.png" alt="Support Icon">
-            <h3>Data Consulting</h3>
-            <p>Expert support to help you optimize your forecasts, models, and reporting strategy.</p>
-        </div>
+      <div class="service-card">
+        <img src="static/images/forecasting-icon.png" alt="Forecasting Icon">
+        <h3>AI Forecasting</h3>
+        <p>Generate highly accurate sales forecasts with machine learning — no data science team required.</p>
+      </div>
+      <div class="service-card">
+        <img src="static/images/dashboard-icon.png" alt="Dashboard Icon">
+        <h3>Interactive Dashboards</h3>
+        <p>Visualize trends and KPIs in real-time with customizable dashboards designed for decision-makers.</p>
+      </div>
+      <div class="service-card">
+        <img src="static/images/support-icon.png" alt="Support Icon">
+        <h3>Data Consulting</h3>
+        <p>Expert support to help you optimize your forecasts, models, and reporting strategy.</p>
+      </div>
     </div>
-</section>
+  </section>
 
-<!-- Call to Action -->
-<section class="cta" 
-  style="
-    background-image: url('static/images/cta-background.jpg');
-    background-size: cover;
-    background-position: center;
-    color: white;
-  "
->
+  <!-- Call to Action Section with Background Image -->
+  <section class="cta" style="background-image: url('static/images/cta-background.jpg'); background-size: cover; background-position: center; color: white;">
     <h2>Ready to Forecast Smarter?</h2>
     <p>Join businesses already using SynovaAI to unlock data-driven decisions and stay ahead of demand.</p>
     <a href="{{ url_for('pricing') }}" class="cta-button primary-button">See Pricing Plans</a>
-</section>
+  </section>
 
+  <!-- Back to Top Button -->
+  <button onclick="scrollToTop()" class="top-button" aria-label="Back to Top">⬆ Back to Top</button>
 
-<button onclick="scrollToTop()" class="top-button" aria-label="Back to Top">⬆ Back to Top</button>
-
-<footer>
+  <!-- Footer -->
+  <footer>
     <p>&copy; 2025 SynovaAI. All rights reserved.</p>
     <div class="footer-links">
-        <a href="/privacy_policy.html">Privacy Policy</a>
-        <a href="/terms_of_service.html">Terms of Service</a>
+      <a href="/privacy_policy.html">Privacy Policy</a>
+      <a href="/terms_of_service.html">Terms of Service</a>
     </div>
-</footer>
+  </footer>
 
-<script src="static/js/auth.js" defer></script>
-<script>
+  <script src="static/js/auth.js" defer></script>
+  <script>
     document.addEventListener("DOMContentLoaded", function() {
-        updateAuthButtons();
-        const topButton = document.querySelector(".top-button");
-        window.onscroll = function() {
-            topButton.style.opacity = window.scrollY > 300 ? "1" : "0";
-        };
+      updateAuthButtons();
+      const topButton = document.querySelector(".top-button");
+      window.onscroll = function() {
+        topButton.style.opacity = window.scrollY > 300 ? "1" : "0";
+      };
     });
 
     function scrollToTop() {
-        window.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
-</script>
+  </script>
 
 </body>
 </html>
