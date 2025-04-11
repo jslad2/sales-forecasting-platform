@@ -46,20 +46,19 @@ h1, h2, h3 {
 /* --- Default Header (Non-Scrolled State) --- */
 header {
     position: fixed;
-    top: 20;
+    top: 0;
     left: 50%;
     transform: translateX(-50%);
     z-index: 9999;
     background: transparent;
-    padding: 15px 30px;
+    padding: 20px 50px;      /* Larger initial padding */
     display: flex;
     justify-content: space-between;
     align-items: center;
     transition: all 0.3s ease;
-    width: 90%;              /* Narrower initial width */
-    max-width: 1000px;       /* Smaller max-width */
+    width: 90%;              /* Match scrolled width */
+    max-width: 1400px;       /* Match scrolled max-width */
     box-sizing: border-box;
-    border-radius: 8px;
     margin: 0 auto;
 }
 
