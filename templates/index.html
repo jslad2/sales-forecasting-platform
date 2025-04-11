@@ -25,7 +25,7 @@
 
 <body class="home-page">
 
-  <!-- Header (Remains Unchanged; Update CSS for ClearCogs style) -->
+  <!-- Header (ClearCogs-Inspired) -->
   <header>
     <nav>
       <ul class="nav-links">
@@ -76,7 +76,7 @@
     </div>
   </section>
 
-  <!-- Call to Action Section with Background Image -->
+  <!-- Call to Action Section -->
   <section class="cta" style="background-image: url('static/images/cta-background.jpg'); background-size: cover; background-position: center; color: white;">
     <h2>Ready to Forecast Smarter?</h2>
     <p>Join businesses already using SynovaAI to unlock data-driven decisions and stay ahead of demand.</p>
@@ -96,32 +96,30 @@
   </footer>
 
   <script src="static/js/auth.js" defer></script>
-<script>
-  document.addEventListener("DOMContentLoaded", function() {
-    // Update authentication buttons
-    updateAuthButtons();
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      // Update auth buttons
+      updateAuthButtons();
+      
+      // Top button functionality
+      const topButton = document.querySelector(".top-button");
+      window.addEventListener("scroll", function() {
+        topButton.style.opacity = window.scrollY > 300 ? "1" : "0";
 
-    // Back to Top Button functionality
-    const topButton = document.querySelector(".top-button");
-    window.addEventListener("scroll", function() {
-      topButton.style.opacity = window.scrollY > 300 ? "1" : "0";
+        // Header scroll behavior: Add or remove .scrolled class as needed
+        const header = document.querySelector("header");
+        if (window.scrollY > 100) {
+          header.classList.add("scrolled");
+        } else {
+          header.classList.remove("scrolled");
+        }
+      });
     });
 
-    // Header scroll behavior to add .scrolled class
-    const header = document.querySelector("header");
-    window.addEventListener("scroll", function() {
-      if (window.scrollY > 10) {  // Adjust threshold as needed
-        header.classList.add("scrolled");
-      } else {
-        header.classList.remove("scrolled");
-      }
-    });
-  });
-
-  function scrollToTop() {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-</script>
+    function scrollToTop() {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  </script>
 
 </body>
 </html>
