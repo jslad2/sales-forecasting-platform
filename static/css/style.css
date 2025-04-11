@@ -109,13 +109,11 @@ header .logo {
 
 /* Hero Section Improvements */
 .hero {
-    position: relative;
-    background-image: url('static/images/hero-background.jpg');
-    background-size: cover;
+    background-image: url('static/images/hero-background3.jpg');
+    background-size: contain;
+    background-repeat: no-repeat;
     background-position: center;
-    color: white;
-    padding: 120px 20px;
-    text-align: center;
+    background-color: #000; /* fallback for empty space */
 }
 
 .hero .overlay {
