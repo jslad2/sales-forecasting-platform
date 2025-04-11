@@ -144,12 +144,15 @@ header.scrolled nav a:hover {
 /* ======================== */
 .hero {
     position: relative;
-    margin: 0;
+    margin: 0 auto;
     padding: 140px 20px 100px;
+    width: 90%;
+    max-width: 1400px;
     background: url('static/images/hero-background5.jpg') center/cover no-repeat;
     background-attachment: fixed;
     color: #fff;
     overflow: hidden;
+    box-sizing: border-box;
 }
 
 .hero::before {
@@ -164,14 +167,18 @@ header.scrolled nav a:hover {
 .hero-content {
     position: relative;
     z-index: 2;
-    max-width: 1200px;
+    width: 100%;
+    max-width: 1400px;
     margin: 0 auto;
     text-align: left;
     animation: fadeInUp 1s ease-out;
+    padding: 0 20px;
+    box-sizing: border-box;
 }
 
 .hero-left {
-    max-width: 600px;
+    max-width: 800px; /* Increased from 600px for better proportion */
+    width: 100%;
     text-align: left;
 }
 
@@ -204,15 +211,18 @@ header.scrolled nav a:hover {
     color: var(--white-color);
     text-align: center;
     padding: 80px 20px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    margin: 0 auto;
+    width: 90%;
+    max-width: 1400px;
+    box-sizing: border-box;
 }
 
 .cta-container {
-    max-width: 800px;
-    text-align: center;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
     padding: 20px;
+    box-sizing: border-box;
 }
 
 .cta h2 {
