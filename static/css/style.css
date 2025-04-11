@@ -49,14 +49,14 @@ header {
     right: 0;
     z-index: 9999;
     background: transparent;
-    padding: 20px 50px;
+    padding: 20px 50px; /* Full-size header padding */
     display: flex;
     justify-content: space-between;
     align-items: center;
     transition: all 0.3s ease; /* Smooth transition for all properties */
   }
   
-  /* --- Navigation and Logo Styles (Unchanged) --- */
+  /* Navigation & Logo Styles Remain Unchanged */
   header nav ul {
     list-style: none;
     margin: 0;
@@ -92,22 +92,23 @@ header {
     transition: color 0.3s ease; /* Logo color transition */
   }
   
-  /* --- Scrolled Header State --- */
+  /* === Scrolled Header State === */
   header.scrolled {
-    /* Slightly grey background */
-    background: #f8f8f8 !important;
+    /* Background and shape */
+    background-color: #f8f8f8 !important; /* Slightly gray background */
+    border-radius: 8px !important;         /* Rounded edges */
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1) !important;
     
-    /* Rounded edges */
-    border-radius: 8px !important;
-    
-    /* Adjusted padding (if desired) */
+    /* Reduced padding for a shorter height */
     padding: 12px 50px !important;
     
-    /* Optional subtle shadow */
-    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1) !important;
+    /* Shrink the width (make it centered and slightly narrower) */
+    width: 95%;                            /* Adjust percentage as desired */
+    left: 50%;                             /* Center horizontally */
+    transform: translateX(-50%);
   }
   
-  /* Change styles for logo and nav links when scrolled (if necessary) */
+  /* --- Optional: Adjust the logo and nav links when scrolled --- */
   header.scrolled .logo {
     color: var(--primary-color) !important;
   }
