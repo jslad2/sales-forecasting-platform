@@ -42,9 +42,6 @@ h1, h2, h3 {
 /* ======================== */
 /* ======== Header ======== */
 /* ======================== */
-/* ======================== */
-/* ======== Header ======== */
-/* ======================== */
 header {
     position: fixed;
     top: 0;
@@ -57,20 +54,21 @@ header {
     justify-content: space-between;
     align-items: center;
     transition: all 0.3s ease; /* Smooth transition for all properties */
-}
-
-header nav ul {
+  }
+  
+  /* --- Navigation and Logo Styles (Unchanged) --- */
+  header nav ul {
     list-style: none;
     margin: 0;
     padding: 0;
     display: flex;
-}
-
-header nav li {
+  }
+  
+  header nav li {
     margin-right: 20px;
-}
-
-header nav a {
+  }
+  
+  header nav a {
     color: var(--white-color);
     text-decoration: none;
     font-weight: bold;
@@ -78,42 +76,51 @@ header nav a {
     padding: 10px 15px;
     transition: all 0.3s ease-in-out;
     border-radius: 5px;
-}
-
-header nav a:hover {
+  }
+  
+  header nav a:hover {
     background-color: var(--accent-color);
     color: var(--white-color);
     box-shadow: 0px 4px 10px rgba(255, 136, 0, 0.3);
-}
-
-header .logo {
+  }
+  
+  header .logo {
     font-size: var(--font-size-xl);
     font-weight: bold;
     color: var(--secondary-color);
     text-decoration: none;
     transition: color 0.3s ease; /* Logo color transition */
-}
-
-/* Scrolled Header State */
-header.scrolled {
-    background: rgba(255, 255, 255, 0.98) !important;
+  }
+  
+  /* --- Scrolled Header State --- */
+  header.scrolled {
+    /* Slightly grey background */
+    background: #f8f8f8 !important;
+    
+    /* Rounded edges */
+    border-radius: 8px !important;
+    
+    /* Adjusted padding (if desired) */
     padding: 12px 50px !important;
+    
+    /* Optional subtle shadow */
     box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1) !important;
-}
-
-header.scrolled .logo {
+  }
+  
+  /* Change styles for logo and nav links when scrolled (if necessary) */
+  header.scrolled .logo {
     color: var(--primary-color) !important;
-}
-
-header.scrolled nav a {
+  }
+  
+  header.scrolled nav a {
     color: var(--text-color) !important;
-}
-
-header.scrolled nav a:hover {
+  }
+  
+  header.scrolled nav a:hover {
     color: var(--white-color) !important;
     background-color: var(--accent-color) !important;
-}
-
+  }
+  
 /* ======================== */
 /* ======== Hero ========== */
 /* ======================== */
