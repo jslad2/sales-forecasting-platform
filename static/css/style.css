@@ -108,6 +108,14 @@ header .logo {
 }
 
 /* Hero Section */
+.hero::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(to bottom, rgba(35, 49, 58, 1) 0%, rgba(35, 49, 58, 0.8) 10%, rgba(0, 0, 0, 0.5) 50%, rgba(0,0,0,0.7) 100%);
+    z-index: 1;
+}
+
 .hero {
     background-image: url('static/images/hero-background5.jpg');
     background-size: cover;
