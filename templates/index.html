@@ -42,15 +42,19 @@
 </header>
 
 <!-- Hero Section -->
-<section class="hero" style="background-image: url('static/images/hero-background5.jpg'); background-size: cover; background-position: center; color: white; padding: 220px 20px; text-align: center; position: relative;">
-
-    <div class="hero-text" style="position: relative; z-index: 2; max-width: 700px; margin: 0 auto;">
+<section class="hero">
+    <div class="hero-content">
+      <div class="hero-text">
         <h1>Effortless AI Sales Forecasting</h1>
-        <p>Predict your future sales in minutes — turn raw data into actionable forecasts without writing a single line of code.</p>
-        <a href="{{ url_for('data_services') }}" class="cta-button primary-button">Start Forecasting Now →</a>
+        <p>Turn raw data into forecasts — in minutes, not days.</p>
+        <a href="{{ url_for('data_services') }}" class="cta-button">Start Forecasting →</a>
+      </div>
+      <div class="hero-supporting-text">
+        <p>Helping businesses predict demand and optimize inventory with AI-powered insights.</p>
+      </div>
     </div>
-
-</section>
+  </section>
+  
 
 <!-- Tools Overview -->
 <section class="data-services">
