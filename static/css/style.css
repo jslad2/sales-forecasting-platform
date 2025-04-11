@@ -167,55 +167,13 @@ header .logo {
 }
 
 /* ========== Services Section ========== */
+/* ========== Service Cards Fix ========== */
 .data-services {
     padding: 50px 20px;
-    text-align: center;
     background-color: var(--white-color);
 }
 
-.service-card-link {
-    text-decoration: none;
-    display: block;
-}
-
-.service-card {
-    background: linear-gradient(180deg, #F9FAFB 0%, #F3F4F6 100%);
-    border: 1px solid #D0D3D8;
-    border-radius: 15px;
-    padding: 35px;
-    text-align: center;
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
-    transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
-    opacity: 0;
-    transform: translateY(20px);
-}
-
-.service-card.show {
-    opacity: 1;
-    transform: translateY(0);
-    transition: opacity 0.6s ease, transform 0.6s ease;
-}
-
-.service-card img {
-    width: 70px;
-    margin-bottom: 20px;
-    transition: transform 0.3s ease, opacity 0.3s ease;
-    opacity: 0.9;
-}
-
-.service-card h3 {
-    margin-bottom: 12px;
-    color: var(--primary-color);
-    font-size: var(--font-size-lg);
-    letter-spacing: 0.5px;
-}
-
-.service-card p {
-    color: var(--gray-color);
-    font-size: 1.15rem;
-    line-height: 1.6;
-}
-
+/* Service Card Container */
 .service-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -223,6 +181,63 @@ header .logo {
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
+}
+
+/* Individual Service Card */
+.service-card {
+    opacity: 0;
+    transform: translateY(20px);
+    background: linear-gradient(180deg, #F9FAFB 0%, #F3F4F6 100%);
+    border: 1px solid #D0D3D8;
+    border-radius: 15px;
+    padding: 35px;
+    text-align: center;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    will-change: transform, opacity; /* Critical for animations */
+    display: block !important; /* Force block display */
+}
+
+/* Active State for Cards */
+.service-card.show {
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+    transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+/* Hover Effects */
+.service-card-link:hover .service-card {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15);
+    background: linear-gradient(180deg, #F3F4F6 0%, #E9EBEE 100%);
+}
+
+.service-card:hover img {
+    transform: scale(1.12);
+    opacity: 1;
+}
+
+/* Card Contents */
+.service-card img {
+    width: 70px;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+    opacity: 0.9;
+}
+
+.service-card h3 {
+    margin-bottom: 12px;
+    color: var(--primary-color);
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.service-card p {
+    color: var(--gray-color);
+    font-size: 1.15rem;
+    line-height: 1.6;
+    font-weight: 500;
 }
 
 /* ========== Forecasting Tool ========== */
@@ -331,5 +346,17 @@ footer {
     
     .logo {
         max-width: 150px;
+    }
+}
+
+@media (max-width: 1024px) {
+    .service-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .service-grid {
+        grid-template-columns: 1fr;
     }
 }
