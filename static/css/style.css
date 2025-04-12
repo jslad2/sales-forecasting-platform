@@ -174,9 +174,14 @@ header.scrolled nav a:hover {
   
   .hero-content {
     position: relative;
+    width: 90%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 20px;
     z-index: 2;
-  }  
-
+    box-sizing: border-box;
+  }
+  
 .hero-left {
     max-width: 600px;
     text-align: left;
