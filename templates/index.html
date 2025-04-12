@@ -100,26 +100,38 @@
     document.addEventListener("DOMContentLoaded", function() {
         // Update auth buttons
         updateAuthButtons();
-        
-        // Header and top button functionality
+  
         const header = document.querySelector("header");
         const topButton = document.querySelector(".top-button");
-
+  
         window.addEventListener("scroll", function() {
             const scrollY = window.scrollY;
             
             // Toggle header scrolled state
-            header.classList.toggle("scrolled", scrollY > 50); // Changed to 50px threshold
-
+            header.classList.toggle("scrolled", scrollY > 50);
+  
             // Toggle top button
             topButton.style.opacity = scrollY > 300 ? "1" : "0";
         });
+  
+        // Animate Service Cards on Scroll (Intersection Observer)
+        const observer = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add("show");
+                }
+            });
+        }, { threshold: 0.1 });
+  
+        document.querySelectorAll('.service-card').forEach(card => {
+            observer.observe(card);
+        });
     });
-
+  
     function scrollToTop() {
         window.scrollTo({ top: 0, behavior: "smooth" });
     }
-  </script>
+  </script>  
 
 </body>
 </html>
