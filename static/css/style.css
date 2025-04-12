@@ -211,36 +211,71 @@ header.scrolled nav a:hover {
 /* ======================== */
 /* ====== CTA Section ===== */
 /* ======================== */
+
 .cta {
     background: linear-gradient(135deg, #2B3A42, #354854);
     color: var(--white-color);
     text-align: center;
-    padding: 80px 20px;
+    padding: 100px 20px;
     display: flex;
     justify-content: center;
     align-items: center;
-}
-
-.cta-container {
-    /* Constrain text content to header width */
+  }
+  
+  .cta-container {
     width: 90%;
     max-width: 1400px;
     margin: 0 auto;
     text-align: center;
     padding: 20px;
-}
-
-.cta h2 {
-    font-size: var(--font-size-xl);
+  }
+  
+  .cta h2 {
+    font-size: 2.2rem;
     font-weight: bold;
-    margin-bottom: 15px;
-}
-
-.cta p {
-    font-size: var(--font-size-lg);
-    margin-bottom: 25px;
+    margin-bottom: 20px;
+    color: white;
+  }
+  
+  .cta p {
+    max-width: 600px;
+    margin: 0 auto 30px auto;
+    font-size: 1.1rem;
     color: #E0E0E0;
-}
+  }
+  
+  .cta-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  
+  .cta-button.primary-button {
+    background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
+    color: white;
+    padding: 14px 32px;
+    border-radius: 9999px;
+    transition: background 0.3s ease, transform 0.2s ease;
+  }
+  
+  .cta-button.primary-button:hover {
+    background: linear-gradient(90deg, #2563eb 0%, #0891b2 100%);
+    transform: translateY(-2px);
+  }
+  
+  .cta-button.secondary-button {
+    border: 1px solid #ffffff;
+    color: white;
+    padding: 14px 32px;
+    border-radius: 9999px;
+    transition: background 0.3s ease, transform 0.2s ease;
+  }
+  
+  .cta-button.secondary-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+  }  
 
 /* ======================== */
 /* ==== Service Cards ===== */
@@ -389,6 +424,17 @@ header.scrolled nav a:hover {
     margin-top: 60px;
     font-size: 1.1rem;
     color: #666;
+  }
+  
+  .section-divider {
+    margin-top: 40px;
+    font-size: 1rem;
+    color: #666;
+    border-top: 1px solid #e5e7eb;
+    padding-top: 20px;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
   }
   
 
