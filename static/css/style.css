@@ -513,29 +513,38 @@ header.scrolled nav a:hover {
 /* ======= Footer ========= */
 /* ======================== */
 footer {
-    background-color: var(--primary-color);
-    color: var(--white-color);
-    text-align: center;
+    background: #1f2937;  /* Dark Slate */
+    color: #cbd5e1;       /* Soft Gray */
     padding: 40px 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .footer-container {
+    max-width: 1200px;
+    margin: 0 auto;
     display: flex;
-    flex-direction: column;
+    justify-content: space-between;
     align-items: center;
-}
-
-.footer-links {
-    margin-top: 20px;
-}
-
-.footer-links a {
-    color: var(--white-color);
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .footer-left p {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+  
+  .footer-right a {
+    color: #cbd5e1;
+    margin-left: 20px;
+    font-size: 0.9rem;
     text-decoration: none;
-    margin: 0 10px;
-    font-size: 1.2rem;
-}
-
-.footer-links a:hover {
-    color: var(--secondary-color);
-}
+    transition: color 0.3s ease;
+  }
+  
+  .footer-right a:hover {
+    color: var(--brand-color); /* your primary accent color */
+  }  
 
 .social-icons {
     margin-top: 20px;
