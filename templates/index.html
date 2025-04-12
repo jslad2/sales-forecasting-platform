@@ -39,16 +39,24 @@
     <div class="logo">SYNOVAAI</div>
   </header>
 
-  <!-- Hero Section -->
-  <section class="hero" style="background-image: url('static/images/hero-background6.png'); background-size: cover; background-position: center; color: white; padding: 220px 20px; text-align: center; position: relative;">
-    <div class="hero-content">
+<!-- Hero Section -->
+<section class="hero" style="background-image: url('static/images/hero-background6.png'); background-size: cover; background-position: center; color: white; padding: 220px 20px; position: relative;">
+    <div class="hero-container">
       <div class="hero-left">
         <h1>Effortless AI Sales Forecasting</h1>
         <p>Turn raw data into actionable insights to plan smarter, sell better, and stay ahead of demand.</p>
+      </div>
+  
+      <div class="hero-right">
         <div class="hero-buttons">
           <a href="{{ url_for('data_services') }}" class="cta-button primary-button">Get Started</a>
           <a href="{{ url_for('pricing') }}" class="cta-button secondary-button">See Pricing</a>
         </div>
+        <ul class="hero-trust">
+          <li>⚡ AI-Powered Forecasting</li>
+          <li>📊 Real-Time Dashboards</li>
+          <li>🚀 Trusted by Growing Teams</li>
+        </ul>
       </div>
     </div>
   </section>
