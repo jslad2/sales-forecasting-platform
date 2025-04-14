@@ -780,6 +780,20 @@ body.scrolled .top-button {
 }
 
 /* === Dashboard Custom Styles === */
+.dashboard-page header {
+    position: relative;
+    top: 0;
+    left: 0;
+    transform: none;
+    background: #1f2937;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0;
+    padding: 15px 30px;
+    margin: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
 .dashboard-hero {
     background: linear-gradient(135deg, #2B3A42, #354854);
   }
