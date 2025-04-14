@@ -30,7 +30,12 @@ import calendar
 import json
 
 # Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
-st.set_page_config(layout="wide", page_title="Time Series Forecasting", page_icon="📈")
+st.set_page_config(
+    layout="wide",
+    page_title="Time Series Forecasting",
+    page_icon="📈",
+    initial_sidebar_state="expanded"  # <=== This keeps the sidebar always open
+)
 
 # Read query params from URL (Passed from Flask Dashboard)
 query_params = st.experimental_get_query_params()
