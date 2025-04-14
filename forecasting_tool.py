@@ -30,12 +30,12 @@ import calendar
 import json
 
 # Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
-st.set_page_config(
-    layout="wide",
-    page_title="Time Series Forecasting",
-    page_icon="📈",
-    initial_sidebar_state="expanded"  # <=== This keeps the sidebar always open
-)
+# st.set_page_config(
+#     layout="wide",
+#     page_title="Time Series Forecasting",
+#     page_icon="📈",
+#     initial_sidebar_state="expanded"  # <=== This keeps the sidebar always open
+# )
 
 # Read query params from URL (Passed from Flask Dashboard)
 query_params = st.experimental_get_query_params()
@@ -49,45 +49,6 @@ if subscription_level != "premium":
 # Optional: Show Welcome Message
 st.markdown(f"### Welcome, {user_id}!")
 st.markdown(f"Your Subscription Level: **{subscription_level.capitalize()}**")
-
-# Dark Mode Toggle
-if "theme" not in st.session_state:
-    st.session_state.theme = "light"
-
-theme = st.radio("🌙 Theme Mode:", ["Light", "Dark"], index=0 if st.session_state.theme == "light" else 1)
-st.session_state.theme = theme
-
-# Dynamic Theme Styling
-if st.session_state.theme == "dark":
-    st.markdown(
-        """
-        <style>
-            body { background-color: #1E1E1E; color: white; }
-            .stButton button { background-color: #56BBAF !important; }
-            .stDataFrame { background-color: #2E2E2E; color: white; }
-            .stTextInput input { background-color: #2E2E2E; color: white; }
-            .stSelectbox select { background-color: #2E2E2E; color: white; }
-            .stRadio div { color: white; }
-            .stMarkdown { color: white; }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-else:
-    st.markdown(
-        """
-        <style>
-            body { background-color: white; color: black; }
-            .stButton button { background-color: #56BBAF !important; }
-            .stDataFrame { background-color: white; color: black; }
-            .stTextInput input { background-color: white; color: black; }
-            .stSelectbox select { background-color: white; color: black; }
-            .stRadio div { color: black; }
-            .stMarkdown { color: black; }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
 
 def check_stationarity(series):
     adf_result = adfuller(series, autolag="AIC")
@@ -921,14 +882,61 @@ def combined_score(rmse, corr, max_rmse, alpha, beta):
     return alpha * norm_rmse + beta * (1 - corr)
 
 def main():
-    # Retrieve user info passed via query params or session state (from Flask)
-    query_params = st.experimental_get_query_params()
+    # Set page and theme config
+    st.set_page_config(
+        layout="wide",
+        page_title="Time Series Forecasting",
+        page_icon="📈",
+        initial_sidebar_state="expanded"
+    )
 
+    # Set theme toggle
+    if "theme" not in st.session_state:
+        st.session_state.theme = "light"
+
+    theme = st.radio("🌙 Theme Mode:", ["Light", "Dark"], index=0 if st.session_state.theme=="light" else 1)
+    st.session_state.theme = theme
+
+    if st.session_state.theme=="dark":
+        st.markdown("""
+        <style>
+            body { background-color: #1E1E1E; color: white; }
+            .stButton button { background-color: #56BBAF !important; }
+            .stDataFrame { background-color: #2E2E2E; color: white; }
+            .stTextInput input { background-color: #2E2E2E; color: white; }
+            .stSelectbox select { background-color: #2E2E2E; color: white; }
+            .stRadio div { color: white; }
+            .stMarkdown { color: white; }
+        </style>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <style>
+            body { background-color: white; color: black; }
+            .stButton button { background-color: #56BBAF !important; }
+            .stDataFrame { background-color: white; color: black; }
+            .stTextInput input { background-color: white; color: black; }
+            .stSelectbox select { background-color: white; color: black; }
+            .stRadio div { color: black; }
+            .stMarkdown { color: black; }
+        </style>
+        """, unsafe_allow_html=True)
+
+    # Retrieve user info passed via query params
+    query_params = st.experimental_get_query_params()
     user_id = query_params.get("user_id", ["guest"])[0]
     subscription_level = query_params.get("subscription_level", ["free"])[0]
 
+    with st.sidebar:
+        st.markdown("### 💡 Scenario Planning")
+        if subscription_level != "premium":
+            st.info("Scenario planning is available only for premium users.")
+        else:
+            st.success("You're using Premium. All features are enabled.")
+
     if subscription_level != "premium":
         st.info("You are using the Free version. Advanced features such as category adjustments, extended forecast horizons, hyperparameter tuning, and forecast downloads are disabled.")
+
     if st.button("🔄 Reset App"):
         st.session_state.clear()
         st.experimental_rerun()
@@ -940,8 +948,7 @@ def main():
             st.write("Uploaded Data:")
             st.dataframe(data)
 
-            st.markdown(
-                """
+            st.markdown("""
                 <div style="text-align: center;">
                     <h2 style="color: #2B3A42;">🛠️ Map Your Columns</h2>
                 </div>
@@ -949,17 +956,9 @@ def main():
 
             col1, col2, col3 = st.columns([1, 1, 1])
             with col1:
-                date_column = st.selectbox(
-                    "📅 Select the Date Column:",
-                    ["-- Select Column --"] + list(data.columns),
-                    key="date_col"
-                )
+                date_column = st.selectbox("📅 Select the Date Column:", ["-- Select Column --"] + list(data.columns), key="date_col")
             with col2:
-                sales_column = st.selectbox(
-                    "💰 Select the Sales Column:",
-                    ["-- Select Column --"] + list(data.columns),
-                    key="sales_col"
-                )
+                sales_column = st.selectbox("💰 Select the Sales Column:", ["-- Select Column --"] + list(data.columns), key="sales_col")
             with col3:
                 if date_column == "-- Select Column --" or sales_column == "-- Select Column --":
                     st.warning("Please select the Date and Sales columns first.")
@@ -983,11 +982,7 @@ def main():
                 forecast_period = 3
             else:
                 st.markdown("### ⏱️ AutoML Time Budget")
-                time_budget = st.slider(
-                    "Set the time budget for AutoML training (in seconds):",
-                    min_value=60, max_value=1200, value=300, step=60,
-                    help="Increase the time budget for larger datasets or more complex models."
-                )
+                time_budget = st.slider("Set the time budget for AutoML training (in seconds):", min_value=60, max_value=1200, value=300, step=60)
                 forecast_period = 24
 
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
@@ -995,21 +990,14 @@ def main():
                 min_future_date = (last_date_in_data + pd.DateOffset(days=1)).date()
 
                 if subscription_level != "premium":
-                    st.sidebar.info("Scenario planning is available only for premium users.")
                     demand_shock = 0
                     seasonality_adjustment = 0
                     external_shock = False
                     category_scenarios = {}
                 else:
                     st.sidebar.markdown("### 🎯 Scenario Planning")
-                    demand_shock = st.sidebar.slider(
-                        "Simulate Demand Shock (% Change in Sales):",
-                        min_value=-50, max_value=50, value=0, step=5
-                    )
-                    seasonality_adjustment = st.sidebar.slider(
-                        "Adjust Seasonality Strength (% Change):",
-                        min_value=-50, max_value=50, value=0, step=5
-                    )
+                    demand_shock = st.sidebar.slider("Simulate Demand Shock (% Change in Sales):", -50, 50, 0, 5)
+                    seasonality_adjustment = st.sidebar.slider("Adjust Seasonality Strength (% Change):", -50, 50, 0, 5)
                     external_shock = st.sidebar.checkbox("Simulate External Shock (e.g., Economic Downturn)")
                     category_scenarios = {}
                     if category_columns:
@@ -1017,30 +1005,14 @@ def main():
                         for col in category_columns:
                             st.sidebar.markdown(f"#### Adjustments for '{col}'")
                             unique_cats = sorted(data[col].dropna().unique())
-                            selected_cats = st.sidebar.multiselect(
-                                f"Pick categories in '{col}' to adjust:",
-                                options=unique_cats,
-                                help=f"Select one or more categories from '{col}' that you want to adjust."
-                            )
+                            selected_cats = st.sidebar.multiselect(f"Pick categories in '{col}' to adjust:", options=unique_cats)
                             category_scenarios[col] = {}
                             for cat in selected_cats:
                                 with st.sidebar.expander(f"Adjust '{cat}' in '{col}'"):
-                                    cat_adjust = st.slider(
-                                        f"Percentage change for '{cat}'",
-                                        min_value=-50, max_value=50, value=0, step=5,
-                                        help=f"Adjust sales for category '{cat}' within column '{col}'"
-                                    )
-                                    cat_start = st.date_input(
-                                        f"Start date for '{cat}'",
-                                        value=min_future_date,
-                                        min_value=min_future_date
-                                    )
+                                    cat_adjust = st.slider(f"Percentage change for '{cat}'", -50, 50, 0, 5)
+                                    cat_start = st.date_input(f"Start date for '{cat}'", value=min_future_date, min_value=min_future_date)
                                     default_end = (last_date_in_data + pd.DateOffset(months=1)).date()
-                                    cat_end = st.date_input(
-                                        f"End date for '{cat}'",
-                                        value=default_end if default_end > min_future_date else min_future_date,
-                                        min_value=cat_start
-                                    )
+                                    cat_end = st.date_input(f"End date for '{cat}'", value=default_end if default_end > min_future_date else min_future_date, min_value=cat_start)
                                     category_scenarios[col][cat] = {
                                         "adjustment": cat_adjust,
                                         "start_date": cat_start,
@@ -1054,15 +1026,11 @@ def main():
                         category_scenarios = {}
 
             if date_column != "-- Select Column --" and sales_column != "-- Select Column --":
-                start_forecast = st.button("✅ Start Forecast", key="start_btn",
-                                           help="Click to generate your AI-powered forecast")
+                start_forecast = st.button("✅ Start Forecast", key="start_btn")
             else:
                 start_forecast = st.button("⏳ Select Columns First", disabled=True, key="start_disabled")
 
-            if subscription_level == "premium":
-                total_steps = 12
-            else:
-                total_steps = 6
+            total_steps = 12 if subscription_level == "premium" else 6
 
             overall_status = st.empty()
             prophet_status = st.empty()
