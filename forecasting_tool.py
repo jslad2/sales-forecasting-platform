@@ -27,18 +27,33 @@ from tqdm import tqdm
 import concurrent.futures
 from scipy.stats import pearsonr
 import calendar
+import json
 
 # Enable Wide Mode (MUST BE THE FIRST STREAMLIT COMMAND)
 st.set_page_config(layout="wide", page_title="Time Series Forecasting", page_icon="📈")
 
-# Add dark mode toggle
+# Read query params from URL (Passed from Flask Dashboard)
+query_params = st.experimental_get_query_params()
+user_id = query_params.get("user_id", ["guest"])[0]
+subscription_level = query_params.get("subscription_level", ["free"])[0]
+
+# Show subscription notice if free plan
+if subscription_level != "premium":
+    st.info("You are using the Free version. Advanced features such as category adjustments, extended forecast horizons, hyperparameter tuning, and forecast downloads are disabled.")
+
+# Optional: Show Welcome Message
+st.markdown(f"### Welcome, {user_id}!")
+st.markdown(f"Your Subscription Level: **{subscription_level.capitalize()}**")
+
+# Dark Mode Toggle
 if "theme" not in st.session_state:
     st.session_state.theme = "light"
 
-theme = st.radio("🌙 Theme Mode:", ["Light", "Dark"], index=0 if st.session_state.theme=="light" else 1)
+theme = st.radio("🌙 Theme Mode:", ["Light", "Dark"], index=0 if st.session_state.theme == "light" else 1)
 st.session_state.theme = theme
 
-if st.session_state.theme=="dark":
+# Dynamic Theme Styling
+if st.session_state.theme == "dark":
     st.markdown(
         """
         <style>
@@ -50,7 +65,9 @@ if st.session_state.theme=="dark":
             .stRadio div { color: white; }
             .stMarkdown { color: white; }
         </style>
-        """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
 else:
     st.markdown(
         """
@@ -63,7 +80,9 @@ else:
             .stRadio div { color: black; }
             .stMarkdown { color: black; }
         </style>
-        """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
 
 def check_stationarity(series):
     adf_result = adfuller(series, autolag="AIC")
@@ -884,7 +903,6 @@ def train_automl_model(train, test, forecast_period, last_historical_value, is_d
 
     return "AutoML", result
 
-
 def shape_score(actual, forecast):
     if len(actual) != len(forecast):
         min_len = min(len(actual), len(forecast))
@@ -898,13 +916,14 @@ def combined_score(rmse, corr, max_rmse, alpha, beta):
     return alpha * norm_rmse + beta * (1 - corr)
 
 def main():
-    # Set subscription level: "free" for basic features, "premium" for full access
-    user_id = "user123"
-    subscription_level = "premium"  # Change to "premium" to enable advanced features
+    # Retrieve user info passed via query params or session state (from Flask)
+    query_params = st.experimental_get_query_params()
+
+    user_id = query_params.get("user_id", ["guest"])[0]
+    subscription_level = query_params.get("subscription_level", ["free"])[0]
 
     if subscription_level != "premium":
         st.info("You are using the Free version. Advanced features such as category adjustments, extended forecast horizons, hyperparameter tuning, and forecast downloads are disabled.")
-
     if st.button("🔄 Reset App"):
         st.session_state.clear()
         st.experimental_rerun()
@@ -1218,6 +1237,26 @@ def main():
                     try:
                         # Retrieve the best model's forecast DataFrame
                         forecast_data = st.session_state.model_results[best_model]["Forecast"]
+
+                        # Save Forecast Data for Dashboard Access
+                        
+                        # Create folder if it doesn't exist
+                        os.makedirs("forecast_data", exist_ok=True)
+
+                        # Pick your user/session id
+                        user_id = "user123"  # (Later tie this to real user/session)
+
+                        # File path
+                        forecast_json_path = f"forecast_data/forecast_{user_id}.json"
+
+                        # Prepare the data (only date & forecasted value)
+                        to_save = forecast_data[["ds", "yhat"]].copy()
+                        to_save["ds"] = to_save["ds"].astype(str)  # ensure json serializable
+
+                        with open(forecast_json_path, "w") as f:
+                            json.dump(to_save.to_dict(orient="records"), f)
+
+                        st.success("✅ Forecast saved successfully for Dashboard!")
 
                         # Compute AI-powered insights
                         highest_point = forecast_data.loc[forecast_data["yhat"].idxmax()]

@@ -298,18 +298,32 @@ def token_required(f):
 def dashboard():
     try:
         user_info = request.user  # Decoded JWT payload
-        user_plan = user_info.get("tier", "free")  # Default to "free" if missing
-        
-        # ✅ If you only have an email, just display it as the name
+        user_plan = user_info.get("tier", "free")
         user_name = user_info.get("email", "User")
 
         logger.debug(f"✅ User {user_name} accessed dashboard. Subscription: {user_plan}")
 
-        # Pass user_name to the template so {{ user_name }} is not empty
+        # For now use email as user_id (safe unique id)
+        user_id = user_info.get("email", "guest").replace("@", "_").replace(".", "_")
+
+        # Load forecast data if available
+        forecast_path = f"forecast_data/forecast_{user_id}.json"
+        forecast_data = []
+
+        if os.path.exists(forecast_path):
+            with open(forecast_path, "r") as f:
+                forecast_data = json.load(f)
+            logger.debug(f"📊 Loaded forecast data for {user_name}")
+        else:
+            logger.info(f"ℹ️ No forecast data found for {user_name}")
+
+        # Render dashboard.html with forecast data
         return render_template('dashboard.html',
                                user_info=user_info,
                                user_plan=user_plan,
-                               user_name=user_name)
+                               user_name=user_name,
+                               forecast_data=forecast_data)
+
     except Exception as e:
         logger.exception("🔥 Error loading dashboard")
         return render_template('500.html'), 500

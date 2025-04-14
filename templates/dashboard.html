@@ -50,12 +50,28 @@
     <div class="card-body text-center">
       <h4 class="mb-4">Your Tools</h4>
       <div class="d-flex flex-wrap justify-content-center gap-3">
-        {% if user_plan == "premium" %}
-        <a href="{{ url_for('forecasting_tool') }}" class="btn btn-primary">📊 Open Forecasting Tool</a>
-        {% else %}
-        <a href="{{ url_for('pricing') }}" class="btn btn-warning">🚀 Upgrade to Premium</a>
+
+        <!-- Open Forecasting Tool -->
+        <a href="https://synovaai-forecasting.streamlit.app/?user_id={{ user_name }}&subscription_level={{ user_plan }}"
+           target="_blank"
+           class="btn btn-primary">
+          📊 Open Forecasting Tool
+        </a>
+
+        <!-- Create New Forecast (same link for now) -->
+        <a href="https://synovaai-forecasting.streamlit.app/?user_id={{ user_name }}&subscription_level={{ user_plan }}"
+           target="_blank"
+           class="btn btn-outline-primary">
+          ➕ Create New Forecast
+        </a>
+
+        <!-- Upgrade to Premium (only show if not premium) -->
+        {% if user_plan != "premium" %}
+        <a href="{{ url_for('pricing') }}" class="btn btn-warning">
+          🚀 Upgrade to Premium
+        </a>
         {% endif %}
-        <a href="{{ url_for('forecasting_tool') }}" class="btn btn-outline-primary">➕ Create New Forecast</a>
+
       </div>
     </div>
   </div>
@@ -110,55 +126,6 @@
   </div>
   {% endif %}
 
-</section>
-
-<!-- Inventory Insights Section -->
-<section class="inventory-section container mb-5">
-  <h3 class="mb-4">Inventory Insights</h3>
-
-  <div class="card shadow-sm">
-    <div class="card-body">
-      <h5 class="mb-3">Item-Level Forecast for {{ forecast_month }}</h5>
-
-      <div class="table-responsive">
-        <table class="table table-hover">
-          <thead class="table-light">
-            <tr>
-              <th>Item</th>
-              <th>Forecasted Sales</th>
-              <th>Current Inventory</th>
-              <th>Inventory Risk</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for item in item_forecast %}
-            <tr>
-              <td>{{ item.name }}</td>
-              <td>{{ item.forecast_qty }}</td>
-              <td>{{ item.stock_qty }}</td>
-              <td>
-                {% if item.stock_qty < item.forecast_qty %}
-                  <span class="badge bg-danger">At Risk</span>
-                {% elif item.stock_qty < (item.forecast_qty * 1.2) %}
-                  <span class="badge bg-warning text-dark">Low Stock</span>
-                {% else %}
-                  <span class="badge bg-success">Healthy</span>
-                {% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      <div class="text-end mt-3">
-        <a href="{{ url_for('export_inventory_forecast') }}" class="btn btn-outline-primary btn-sm">
-          Download Inventory Report
-        </a>
-      </div>
-
-    </div>
-  </div>
 </section>
 
 <!-- Footer -->
