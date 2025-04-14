@@ -779,6 +779,34 @@ body.scrolled .top-button {
     margin-bottom: 10px;
 }
 
+/* === Dashboard Custom Styles === */
+.dashboard-hero {
+    background: linear-gradient(135deg, #2B3A42, #354854);
+  }
+  
+  .dashboard-page .card {
+    border: none;
+    border-radius: 12px;
+    transition: box-shadow 0.3s ease;
+  }
+  
+  .dashboard-page .card:hover {
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.12);
+  }
+  
+  .dashboard-page h3 {
+    font-weight: 600;
+  }
+  
+  .dashboard-page ul {
+    list-style-type: disc;
+    padding-left: 1.25rem;
+  }
+  
+  .dashboard-page .btn {
+    font-weight: 500;
+  }  
+
 /* ======================== */
 /* ====== Animations ====== */
 /* ======================== */

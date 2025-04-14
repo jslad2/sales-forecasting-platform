@@ -1,25 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Dashboard - SynovaAI</title>
-    <link
-        rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css"
-    />
-    <link rel="stylesheet" href="static/css/style.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard - SynovaAI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="static/css/style.css" />
 
-    <!-- ✅ Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-LKEQTSKLCF"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'G-LKEQTSKLCF');
-    </script>
-
+  <!-- ✅ Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-LKEQTSKLCF"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-LKEQTSKLCF');
+  </script>
 </head>
+
 <body class="dashboard-page bg-light">
 
   <!-- Header -->
@@ -30,122 +27,105 @@
         <a href="{{ url_for('home') }}" class="text-white me-3">Home</a>
         <a href="{{ url_for('logout') }}"
            class="btn btn-danger btn-sm"
-           onclick="return confirm('Are you sure you want to logout?')"
-        >
+           onclick="return confirm('Are you sure you want to logout?')">
           Logout
         </a>
       </nav>
     </div>
   </header>
 
-  <!-- Main Dashboard Content -->
-  <section class="dashboard-container container my-5">
-
-    <!-- Welcome + Quick Actions Row -->
-    <div class="row mb-4 align-items-center">
-      <div class="col-md-8">
-        <h2 class="mb-1">
-          Welcome back,
-          <span class="text-primary">{{ user_name }}</span>!
-        </h2>
-        <p class="mb-0">Your Subscription:
-          <strong>{{ user_plan.capitalize() }}</strong>
-        </p>
-      </div>
-      <div class="col-md-4 text-md-end mt-3 mt-md-0">
-        <!-- Quick Actions -->
-        <div class="d-flex flex-wrap gap-2 justify-content-md-end justify-content-center">
-          {% if user_plan == "premium" %}
-            <a href="{{ url_for('forecasting_tool') }}"
-               class="btn btn-primary btn-sm"
-               title="Access your AI Forecasting Tool">
-               📊 Forecast Tool
-            </a>
-          {% else %}
-            <a href="{{ url_for('pricing') }}"
-               class="btn btn-warning btn-sm"
-               title="Upgrade to Premium for advanced features">
-               🚀 Upgrade to Premium
-            </a>
-          {% endif %}
-          <a href="{{ url_for('forecasting_tool') }}"
-             class="btn btn-outline-primary btn-sm"
-             title="Create a new forecast">
-             ➕ New Forecast
-          </a>
-        </div>
-      </div>
-    </div>
-
-    <!-- Stats Cards -->
-    <div class="row g-3">
-      <div class="col-md-4">
-        <div class="card shadow-sm">
-          <div class="card-body text-center">
-            <h5 class="card-title text-secondary">Forecasts Generated</h5>
-            <p class="fs-2 fw-bold text-primary">{{ forecast_count }}</p>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="card shadow-sm">
-          <div class="card-body text-center">
-            <h5 class="card-title text-secondary">Last Login</h5>
-            <p class="fs-2 fw-bold text-primary">{{ last_login }}</p>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="card shadow-sm">
-          <div class="card-body text-center">
-            <h5 class="card-title text-secondary">Subscription Status</h5>
-            <p class="fs-2 fw-bold text-primary">{{ user_plan.capitalize() }}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Forecast Performance Chart -->
-    <div class="mt-5">
-      <h3 class="mb-3">Forecast Performance</h3>
-      <canvas id="forecastChart" width="400" height="200"></canvas>
-    </div>
-
-    <!-- Premium Features Section -->
-    <div class="pricing-section mt-5">
-      <h3 class="mb-3">Ready to Unlock More?</h3>
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <h5 class="card-title text-warning">
-            Premium Plan - $19.99/month
-          </h5>
-          <p class="card-text">
-            Unlock the full potential of SynovaAI with our Premium Plan:
-          </p>
-          <ul>
-            <li>AI-powered Forecasting Tool (unlimited use).</li>
-            <li>Unlimited forecasts and data exports.</li>
-            <li>Priority support and consulting.</li>
-            <li>Advanced AI Insights & Analytics.</li>
-          </ul>
-          <a href="{{ url_for('pricing') }}" class="btn btn-warning btn-lg">
-            Upgrade Now
-          </a>
-        </div>
-      </div>
+  <!-- Hero -->
+  <section class="dashboard-hero bg-primary text-white py-5 mb-4">
+    <div class="container text-center">
+      <h1 class="mb-3">Welcome Back, {{ user_name }}!</h1>
+      <p class="lead mb-0">Your plan: <strong>{{ user_plan.capitalize() }}</strong></p>
     </div>
   </section>
 
+  <!-- Main Container -->
+  <section class="dashboard-container container mb-5">
+
+    <!-- Quick Tools -->
+    <div class="card shadow-sm mb-5">
+      <div class="card-body text-center">
+        <h4 class="mb-4">Your Tools</h4>
+        <div class="d-flex flex-wrap justify-content-center gap-3">
+          {% if user_plan == "premium" %}
+            <a href="{{ url_for('forecasting_tool') }}" class="btn btn-primary">📊 Open Forecasting Tool</a>
+          {% else %}
+            <a href="{{ url_for('pricing') }}" class="btn btn-warning">🚀 Upgrade to Premium</a>
+          {% endif %}
+          <a href="{{ url_for('forecasting_tool') }}" class="btn btn-outline-primary">➕ Create New Forecast</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="row g-4 mb-5">
+      <div class="col-md-4">
+        <div class="card text-center shadow-sm h-100">
+          <div class="card-body">
+            <h6 class="text-secondary mb-2">Forecasts Generated</h6>
+            <p class="display-6 text-primary fw-bold">{{ forecast_count }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card text-center shadow-sm h-100">
+          <div class="card-body">
+            <h6 class="text-secondary mb-2">Last Login</h6>
+            <p class="display-6 text-primary fw-bold">{{ last_login }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card text-center shadow-sm h-100">
+          <div class="card-body">
+            <h6 class="text-secondary mb-2">Subscription Status</h6>
+            <p class="display-6 text-primary fw-bold">{{ user_plan.capitalize() }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Forecast Chart -->
+    <div class="mb-5">
+      <h3 class="mb-3">Forecast Performance</h3>
+      <canvas id="forecastChart" height="120"></canvas>
+    </div>
+
+    <!-- Premium CTA -->
+    {% if user_plan != "premium" %}
+    <div class="card shadow-sm border-warning">
+      <div class="card-body">
+        <h5 class="card-title text-warning">Upgrade to Premium - $19.99/month</h5>
+        <p>Unlock the full power of SynovaAI:</p>
+        <ul>
+          <li>Unlimited AI forecasting</li>
+          <li>Advanced insights & exports</li>
+          <li>Priority support & consulting</li>
+        </ul>
+        <a href="{{ url_for('pricing') }}" class="btn btn-warning">Upgrade Now</a>
+      </div>
+    </div>
+    {% endif %}
+
+  </section>
+
   <!-- Footer -->
-  <footer class="text-center bg-dark text-white p-3 mt-5">
-    <p class="mb-0">© 2025 SynovaAI. All rights reserved.</p>
+  <footer class="text-center bg-dark text-white py-4 mt-auto">
+    <div class="container">
+      <p class="mb-1">
+        <a href="{{ url_for('forecasting_tool') }}" class="text-white text-decoration-underline">Go to Forecast Tool</a>
+      </p>
+      <p class="mb-0">&copy; 2025 SynovaAI. All rights reserved.</p>
+    </div>
   </footer>
 
   <!-- Scripts -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
-    // Chart.js Configuration
     const ctx = document.getElementById('forecastChart').getContext('2d');
     const forecastChart = new Chart(ctx, {
       type: 'line',
@@ -154,10 +134,10 @@
         datasets: [{
           label: 'Sales Forecast',
           data: [65, 59, 80, 81, 56, 55],
-          fill: true, // fill area under the line
+          fill: true,
           backgroundColor: 'rgba(75, 192, 192, 0.2)',
           borderColor: 'rgb(75, 192, 192)',
-          tension: 0.2
+          tension: 0.3
         }]
       },
       options: {
@@ -167,9 +147,7 @@
           tooltip: { enabled: true }
         },
         scales: {
-          y: {
-            beginAtZero: true
-          }
+          y: { beginAtZero: true }
         }
       }
     });
