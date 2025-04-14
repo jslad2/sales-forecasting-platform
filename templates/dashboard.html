@@ -112,6 +112,55 @@
 
 </section>
 
+<!-- Inventory Insights Section -->
+<section class="inventory-section container mb-5">
+  <h3 class="mb-4">Inventory Insights</h3>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h5 class="mb-3">Item-Level Forecast for {{ forecast_month }}</h5>
+
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead class="table-light">
+            <tr>
+              <th>Item</th>
+              <th>Forecasted Sales</th>
+              <th>Current Inventory</th>
+              <th>Inventory Risk</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in item_forecast %}
+            <tr>
+              <td>{{ item.name }}</td>
+              <td>{{ item.forecast_qty }}</td>
+              <td>{{ item.stock_qty }}</td>
+              <td>
+                {% if item.stock_qty < item.forecast_qty %}
+                  <span class="badge bg-danger">At Risk</span>
+                {% elif item.stock_qty < (item.forecast_qty * 1.2) %}
+                  <span class="badge bg-warning text-dark">Low Stock</span>
+                {% else %}
+                  <span class="badge bg-success">Healthy</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="text-end mt-3">
+        <a href="{{ url_for('export_inventory_forecast') }}" class="btn btn-outline-primary btn-sm">
+          Download Inventory Report
+        </a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
 <!-- Footer -->
 <footer class="text-center bg-dark text-white py-4 mt-auto">
   <div class="container">

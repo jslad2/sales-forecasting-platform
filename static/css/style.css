@@ -821,6 +821,22 @@ body.scrolled .top-button {
     font-weight: 500;
   }  
 
+  /* Inventory Insights */
+.inventory-section h3 {
+    font-weight: 600;
+  }
+  
+  .inventory-section table th, 
+  .inventory-section table td {
+    vertical-align: middle;
+  }
+  
+  .inventory-section .badge {
+    font-size: 0.85rem;
+    padding: 0.4em 0.7em;
+  }
+  
+
 /* ======================== */
 /* ====== Animations ====== */
 /* ======================== */
