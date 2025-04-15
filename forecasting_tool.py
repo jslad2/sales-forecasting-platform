@@ -1,40 +1,41 @@
-# ==== Python & ML Libraries ====
-import pandas as pd
-import streamlit as st
-from prophet import Prophet
-from pmdarima import auto_arima
-from xgboost import XGBRegressor
-from flaml import AutoML
-from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
-import numpy as np
-import plotly.express as px
-from statsmodels.tsa.stattools import adfuller, kpss
-import matplotlib.pyplot as plt
-from prophet.plot import add_changepoints_to_plot
-from prophet.diagnostics import cross_validation, performance_metrics
-from sklearn.model_selection import ParameterGrid
-from statsmodels.tsa.seasonal import seasonal_decompose
-from statsmodels.graphics.tsaplots import plot_acf
-import optuna
-from sklearn.model_selection import train_test_split, TimeSeriesSplit
-import plotly.graph_objects as go
-from statsmodels.tsa.stattools import acf
-from datetime import datetime
-import time
+# ==== Core Python Libraries ====
 import os
+import time
 import uuid
 import json
 import calendar
-from scipy.stats import pearsonr
+from datetime import datetime
 import concurrent.futures
-from tqdm import tqdm
-import catboost
 
-# ==== Supabase ====
+# ==== Data & Machine Learning Libraries ====
+import pandas as pd
+import numpy as np
+import streamlit as st
+from prophet import Prophet
+from prophet.plot import add_changepoints_to_plot
+from prophet.diagnostics import cross_validation, performance_metrics
+from pmdarima import auto_arima
+from xgboost import XGBRegressor
+from flaml import AutoML
+from catboost import CatBoostRegressor
+from sklearn.model_selection import train_test_split, TimeSeriesSplit, ParameterGrid
+from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
+from scipy.stats import pearsonr
+from statsmodels.tsa.stattools import adfuller, kpss, acf
+from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.graphics.tsaplots import plot_acf
+import optuna
+from tqdm import tqdm
+
+# ==== Visualization Libraries ====
+import plotly.express as px
+import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+
+# ==== Supabase & Environment ====
 from supabase import create_client
 from dotenv import load_dotenv
-from supabase_utils import upload_forecast
-
+from supabase_utils import upload_forecast  # your custom upload function for forecast storage
 
 # ==== Streamlit Config ====
 st.set_page_config(
@@ -44,13 +45,16 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ==== Load Environment Variables FIRST ====
-load_dotenv()
+# ==== Load Environment Variables ====
+load_dotenv()  # must come before os.getenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+if not SUPABASE_URL or not SUPABASE_KEY:
+    st.error("Supabase configuration missing! Please check your .env file.")
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ==== Query Params from Dashboard ====
 query_params = st.experimental_get_query_params()
