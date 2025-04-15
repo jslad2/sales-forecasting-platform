@@ -21,6 +21,7 @@ from statsmodels.tsa.stattools import acf
 from datetime import datetime
 import time
 import os
+import uuid
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import catboost
