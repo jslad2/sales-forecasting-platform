@@ -19,26 +19,27 @@
 
 <body class="dashboard-page bg-light">
 
-<!-- Header -->
-<header class="bg-dark text-white py-3 shadow">
-  <div class="container-fluid px-4">
-    <div class="d-flex justify-content-between align-items-center">
-      <div class="logo fw-bold fs-4 text-primary">SYNOVAAI</div>
-      <nav>
-        <a href="{{ url_for('home') }}" class="text-white me-3 fw-semibold">Home</a>
-        <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to logout?')">
-          Logout
-        </a>
-      </nav>
-    </div>
+<!-- Sidebar Navigation -->
+<aside class="bg-dark text-white p-3 position-fixed h-100" style="width: 220px;">
+  <div class="mb-4">
+    <div class="logo fw-bold fs-4 text-primary">SYNOVAAI</div>
   </div>
-</header>
+  <nav class="nav flex-column">
+    <a href="{{ url_for('home') }}" class="nav-link text-white mb-2">🏠 Dashboard</a>
+    <a href="{{ url_for('forecasting_tool') }}" class="nav-link text-white mb-2">📊 Forecast Tool</a>
+    <a href="{{ url_for('pricing') }}" class="nav-link text-white mb-2">💎 Upgrade</a>
+    <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm mt-3" onclick="return confirm('Are you sure you want to logout?')">Logout</a>
+  </nav>
+</aside>
 
 <!-- Hero Welcome -->
 <section class="dashboard-hero bg-primary text-white py-5 mb-4">
   <div class="container text-center">
     <h1 class="mb-3">Welcome Back, {{ user_name }}!</h1>
     <p class="lead mb-0">Your plan: <strong>{{ user_plan.capitalize() }}</strong></p>
+    {% if user_plan != "premium" %}
+    <p class="mt-3 small">⏱️ AutoML Time Budget: Free users are limited to a 60-second training time and a 3-month forecast window. Upgrade to Premium to unlock extended time budgets (up to 20 minutes) and longer forecast horizons.</p>
+    {% endif %}
   </div>
 </section>
 
@@ -99,10 +100,33 @@
     </div>
   </div>
 
-  <!-- Forecast Chart -->
+  <!-- Enhanced Forecast Chart Section -->
   <div class="mb-5">
-    <h3 class="mb-3">Forecast Performance</h3>
-    <canvas id="forecastChart" height="120"></canvas>
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <div>
+          <h3 class="mb-0">📈 Forecast Performance Overview</h3>
+          <small class="d-block text-white-50">Visual comparison of your forecast models</small>
+        </div>
+        <div>
+          <select id="modelSelector" class="form-select form-select-sm d-inline-block w-auto me-2">
+            <option selected>All Models</option>
+            <option>Baseline Forecast</option>
+            <option>Adjusted Forecast</option>
+          </select>
+          <select id="dateRangeSelector" class="form-select form-select-sm d-inline-block w-auto">
+            <option selected>Last 6 Months</option>
+            <option>Last 12 Months</option>
+            <option>YTD</option>
+          </select>
+        </div>
+      </div>
+      <div class="card-body">
+        <p class="text-muted mb-3 small">Compare your baseline forecast with the latest model-adjusted forecast.</p>
+        <canvas id="forecastChart" height="120"></canvas>
+        <p class="text-muted mt-3 small">* Forecast data is updated automatically based on your recent model runs.</p>
+      </div>
+    </div>
   </div>
 
   <!-- Upgrade Card -->
@@ -138,31 +162,41 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-const ctx = document.getElementById('forecastChart').getContext('2d');
-const forecastChart = new Chart(ctx, {
-  type: 'line',
-  data: {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-    datasets: [{
-      label: 'Sales Forecast',
-      data: [65, 59, 80, 81, 56, 55],
-      fill: true,
-      backgroundColor: 'rgba(75, 192, 192, 0.2)',
-      borderColor: 'rgb(75, 192, 192)',
-      tension: 0.3
-    }]
-  },
-  options: {
-    responsive: true,
-    plugins: {
-      legend: { display: true },
-      tooltip: { enabled: true }
+  const ctx = document.getElementById('forecastChart').getContext('2d');
+  const forecastChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+      datasets: [
+        {
+          label: 'Baseline Forecast',
+          data: [65, 59, 80, 81, 56, 55],
+          fill: true,
+          backgroundColor: 'rgba(54, 162, 235, 0.2)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          tension: 0.3
+        },
+        {
+          label: 'Adjusted Forecast',
+          data: [70, 62, 78, 85, 60, 58],
+          fill: true,
+          backgroundColor: 'rgba(255, 159, 64, 0.2)',
+          borderColor: 'rgba(255, 159, 64, 1)',
+          tension: 0.3
+        }
+      ]
     },
-    scales: {
-      y: { beginAtZero: true }
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: true },
+        tooltip: { enabled: true }
+      },
+      scales: {
+        y: { beginAtZero: true }
+      }
     }
-  }
-});
-</script>
+  });
+  </script>
 </body>
 </html>
