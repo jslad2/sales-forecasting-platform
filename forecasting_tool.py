@@ -18,6 +18,7 @@ import optuna
 from sklearn.model_selection import train_test_split, TimeSeriesSplit
 import plotly.graph_objects as go
 from statsmodels.tsa.stattools import acf
+from datetime import datetime
 import time
 import os
 from supabase import create_client, Client
@@ -28,6 +29,8 @@ import concurrent.futures
 from scipy.stats import pearsonr
 import calendar
 import json
+from supabase_utils import upload_forecast
+
 
 st.set_page_config(
     layout="wide",
@@ -1331,8 +1334,29 @@ def main():
                             file_name="forecast.csv",
                             mime="text/csv"
                         )
+
+                        forecast_df = st.session_state.model_results[best_model]["Forecast"]
+
+                        csv_path = f"forecast_data/forecast_{user_id}.csv"
+                        forecast_df.to_csv(csv_path, index=False)
+
+                        if st.button("💾 Save Forecast to Dashboard"):
+                            upload_forecast(
+                                user_id=user_id,
+                                forecast_name=f"My Forecast {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                                file_path=csv_path,
+                                model_used=best_model,
+                                time_horizon=len(forecast_df),
+                                forecast_metrics={
+                                    "rmse": st.session_state.model_results[best_model]["RMSE"],
+                                    "mape": st.session_state.model_results[best_model]["MAPE"]
+                                }
+                            )
+                            st.success("✅ Forecast Saved to Dashboard!")
+
                     except Exception as e:
                         st.error(f"❌ Error generating download file: {e}")
+
                 else:
                     # FREE USERS PIPELINE (only AutoML)
                     # STEP 4 (Free): Train AutoML Model
