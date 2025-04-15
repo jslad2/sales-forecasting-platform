@@ -781,45 +781,64 @@ body.scrolled .top-button {
 
 /* === Dashboard Custom Styles === */
 .dashboard-page header {
-    position: relative;
-    top: 0;
-    left: 0;
-    transform: none;
-    background: #1f2937;
-    width: 100%;
-    max-width: 100%;
-    border-radius: 0;
-    padding: 15px 30px;
-    margin: 0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-.dashboard-hero {
+    background: linear-gradient(90deg, #2B3A42 0%, #354854 100%);
+    color: var(--white-color);
+  }
+  
+  .dashboard-hero {
     background: linear-gradient(135deg, #2B3A42, #354854);
+    color: var(--white-color);
+    padding: 80px 20px;
+  }
+  
+  .dashboard-container h4 {
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: var(--primary-color);
   }
   
   .dashboard-page .card {
+    border-radius: 16px;
     border: none;
-    border-radius: 12px;
-    transition: box-shadow 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
   }
   
-  .dashboard-page .card:hover {
-    box-shadow: 0 0 12px rgba(0, 0, 0, 0.12);
-  }
-  
-  .dashboard-page h3 {
-    font-weight: 600;
-  }
-  
-  .dashboard-page ul {
-    list-style-type: disc;
-    padding-left: 1.25rem;
+  .dashboard-page .card-body {
+    padding: 30px 20px;
   }
   
   .dashboard-page .btn {
-    font-weight: 500;
-  }  
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-weight: 600;
+  }
+  
+  .dashboard-page .btn-primary {
+    background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
+    border: none;
+  }
+  
+  .dashboard-page .btn-outline-primary {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+  }
+  
+  .dashboard-page .btn-outline-primary:hover {
+    background-color: var(--primary-color);
+    color: var(--white-color);
+  }
+  
+  .dashboard-page .btn-warning {
+    background: linear-gradient(90deg, #f59e0b 0%, #eab308 100%);
+    border: none;
+    color: var(--white-color);
+  }
+  
+  .dashboard-page footer {
+    background: #1f2937;
+    color: #cbd5e1;
+    padding: 40px 20px;
+  }
 
   /* Inventory Insights */
 .inventory-section h3 {

@@ -20,102 +20,81 @@
 <body class="dashboard-page bg-light">
 
 <!-- Header -->
-<header class="bg-dark text-white py-3 shadow">
-  <div class="container-fluid px-4">
-    <div class="d-flex justify-content-between align-items-center">
-      <div class="logo fw-bold fs-4 text-primary">SYNOVAAI</div>
-      <nav>
-        <a href="{{ url_for('home') }}" class="text-white me-3 fw-semibold">Home</a>
-        <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to logout?')">
-          Logout
-        </a>
-      </nav>
-    </div>
+<header class="bg-dark text-white py-3 shadow-sm">
+  <div class="container-fluid px-4 d-flex justify-content-between align-items-center">
+    <div class="logo fw-bold fs-4 text-primary">SynovaAI</div>
+    <nav>
+      <a href="{{ url_for('home') }}" class="text-white me-3 fw-semibold">Home</a>
+      <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to logout?')">
+        Logout
+      </a>
+    </nav>
   </div>
 </header>
 
-<!-- Hero Welcome -->
-<section class="dashboard-hero bg-primary text-white py-5 mb-4">
-  <div class="container text-center">
-    <h1 class="mb-3">Welcome Back, {{ user_name }}!</h1>
-    <p class="lead mb-0">Your plan: <strong>{{ user_plan.capitalize() }}</strong></p>
+<!-- Hero -->
+<section class="py-5 text-center bg-primary text-white">
+  <div class="container">
+    <h1 class="mb-2">Welcome back, {{ user_name }}!</h1>
+    <p>Your plan: <strong>{{ user_plan.capitalize() }}</strong></p>
   </div>
 </section>
 
-<!-- Main Dashboard Content -->
-<section class="dashboard-container container mb-5">
+<section class="container py-5">
 
   <!-- Tools -->
   <div class="card shadow-sm mb-5">
     <div class="card-body text-center">
-      <h4 class="mb-4">Your Tools</h4>
+      <h3 class="mb-4">Your Tools</h3>
       <div class="d-flex flex-wrap justify-content-center gap-3">
-
-        <!-- Open Forecasting Tool -->
-        <a href="https://synovaai-forecasting.streamlit.app/?user_id={{ user_name }}&subscription_level={{ user_plan }}"
-           target="_blank"
-           class="btn btn-primary">
-          📊 Open Forecasting Tool
+        <a href="https://synovaai-forecasting.streamlit.app/?user_id={{ user_name }}&subscription_level={{ user_plan }}" target="_blank" class="btn btn-primary">
+          Open Forecasting Tool
         </a>
-
-        <!-- Create New Forecast (same link for now) -->
-        <a href="https://synovaai-forecasting.streamlit.app/?user_id={{ user_name }}&subscription_level={{ user_plan }}"
-           target="_blank"
-           class="btn btn-outline-primary">
-          ➕ Create New Forecast
-        </a>
-
-        <!-- Upgrade to Premium (only show if not premium) -->
         {% if user_plan != "premium" %}
         <a href="{{ url_for('pricing') }}" class="btn btn-warning">
-          🚀 Upgrade to Premium
+          Upgrade to Premium
         </a>
         {% endif %}
-
       </div>
     </div>
   </div>
 
   <!-- Stats -->
-  <div class="row g-4 mb-5">
+  <div class="row g-4 mb-5 text-center">
     <div class="col-md-4">
-      <div class="card text-center shadow-sm h-100">
+      <div class="card shadow-sm">
         <div class="card-body">
-          <h6 class="text-secondary mb-2">Forecasts Generated</h6>
-          <p class="display-6 text-primary fw-bold">{{ forecast_count }}</p>
+          <h6 class="text-secondary">Forecasts Generated</h6>
+          <h3 class="text-primary fw-bold">{{ forecast_count }}</h3>
         </div>
       </div>
     </div>
     <div class="col-md-4">
-      <div class="card text-center shadow-sm h-100">
+      <div class="card shadow-sm">
         <div class="card-body">
-          <h6 class="text-secondary mb-2">Last Login</h6>
-          <p class="display-6 text-primary fw-bold">{{ last_login }}</p>
+          <h6 class="text-secondary">Last Login</h6>
+          <h3 class="text-primary fw-bold">{{ last_login }}</h3>
         </div>
       </div>
     </div>
     <div class="col-md-4">
-      <div class="card text-center shadow-sm h-100">
+      <div class="card shadow-sm">
         <div class="card-body">
-          <h6 class="text-secondary mb-2">Subscription Status</h6>
-          <p class="display-6 text-primary fw-bold">{{ user_plan.capitalize() }}</p>
+          <h6 class="text-secondary">Subscription</h6>
+          <h3 class="text-primary fw-bold">{{ user_plan.capitalize() }}</h3>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Forecast Chart -->
-  <div class="mb-5">
-    <h3 class="mb-3">Forecast Performance</h3>
-    <canvas id="forecastChart" height="120"></canvas>
-  </div>
+  <!-- Chart -->
+  <h3 class="mb-3">Forecast Performance</h3>
+  <canvas id="forecastChart" height="120"></canvas>
 
-  <!-- Upgrade Card -->
   {% if user_plan != "premium" %}
-  <div class="card shadow-sm border-warning">
+  <div class="card shadow-sm border-warning mt-5">
     <div class="card-body">
       <h5 class="card-title text-warning">Upgrade to Premium - $19.99/month</h5>
-      <p>Unlock the full power of SynovaAI:</p>
       <ul>
         <li>Unlimited AI forecasting</li>
         <li>Advanced insights & exports</li>
@@ -129,18 +108,13 @@
 </section>
 
 <!-- Footer -->
-<footer class="text-center bg-dark text-white py-4 mt-auto">
+<footer class="bg-dark text-white text-center py-4">
   <div class="container">
-    <p class="mb-1">
-      <a href="{{ url_for('forecasting_tool') }}" class="text-white text-decoration-underline">
-        Go to Forecast Tool
-      </a>
-    </p>
+    <p><a href="{{ url_for('forecasting_tool') }}" class="text-white text-decoration-underline">Go to Forecast Tool</a></p>
     <p class="mb-0">&copy; 2025 SynovaAI. All rights reserved.</p>
   </div>
 </footer>
 
-<!-- Scripts -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
@@ -170,5 +144,6 @@ const forecastChart = new Chart(ctx, {
   }
 });
 </script>
+
 </body>
 </html>
