@@ -34,8 +34,15 @@ import matplotlib.pyplot as plt
 
 # ==== Supabase & Environment ====
 from supabase import create_client
-from dotenv import load_dotenv
-from supabase_utils import upload_forecast  # your custom upload function for forecast storage
+# For local development, load environment variables from .env.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # must come before os.getenv()
+except ImportError:
+    pass
+
+# Optionally import your custom upload function if needed.
+from supabase_utils import upload_forecast  # your custom function for forecast storage
 
 # ==== Streamlit Config ====
 st.set_page_config(
@@ -45,16 +52,32 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ==== Load Environment Variables ====
-load_dotenv()  # must come before os.getenv()
+# ==== Load Supabase Credentials from Streamlit Secrets or Local Environment ====
+# Use st.secrets when available (e.g. on Streamlit Cloud); otherwise fallback to os.getenv
+def get_supabase_credentials():
+    SUPABASE_URL = None
+    SUPABASE_KEY = None
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+    if hasattr(st, "secrets") and st.secrets:
+        SUPABASE_URL = st.secrets.get("SUPABASE_URL")
+        SUPABASE_KEY = st.secrets.get("SUPABASE_KEY")
+
+    if not SUPABASE_URL:
+        SUPABASE_URL = os.getenv("SUPABASE_URL")
+    if not SUPABASE_KEY:
+        SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+    return SUPABASE_URL, SUPABASE_KEY
+
+SUPABASE_URL, SUPABASE_KEY = get_supabase_credentials()
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    st.error("Supabase configuration missing! Please check your .env file.")
-
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    st.error("Supabase configuration missing! Please add SUPABASE_URL and SUPABASE_KEY to your Streamlit secrets or .env file.")
+else:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        st.error(f"Failed to create Supabase client: {e}")
 
 # ==== Query Params from Dashboard ====
 query_params = st.experimental_get_query_params()
