@@ -29,6 +29,13 @@ from scipy.stats import pearsonr
 import calendar
 import json
 
+st.set_page_config(
+    layout="wide",
+    page_title="Time Series Forecasting",
+    page_icon="📈",
+    initial_sidebar_state="expanded"
+)
+
 # Read query params from URL (Passed from Flask Dashboard)
 query_params = st.experimental_get_query_params()
 user_id = query_params.get("user_id", ["guest"])[0]
@@ -874,14 +881,6 @@ def combined_score(rmse, corr, max_rmse, alpha, beta):
     return alpha * norm_rmse + beta * (1 - corr)
 
 def main():
-    # Set page and theme config
-    st.set_page_config(
-        layout="wide",
-        page_title="Time Series Forecasting",
-        page_icon="📈",
-        initial_sidebar_state="expanded"
-    )
-
     # Set theme toggle
     if "theme" not in st.session_state:
         st.session_state.theme = "light"
