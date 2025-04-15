@@ -1,3 +1,4 @@
+# ==== Python & ML Libraries ====
 import pandas as pd
 import streamlit as st
 from prophet import Prophet
@@ -22,17 +23,20 @@ from datetime import datetime
 import time
 import os
 import uuid
-from supabase import create_client, Client
-from dotenv import load_dotenv
-import catboost
-from tqdm import tqdm
-import concurrent.futures
-from scipy.stats import pearsonr
-import calendar
 import json
+import calendar
+from scipy.stats import pearsonr
+import concurrent.futures
+from tqdm import tqdm
+import catboost
+
+# ==== Supabase ====
+from supabase import create_client
+from dotenv import load_dotenv
 from supabase_utils import upload_forecast
 
 
+# ==== Streamlit Config ====
 st.set_page_config(
     layout="wide",
     page_title="Time Series Forecasting",
@@ -40,18 +44,27 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Read query params from URL (Passed from Flask Dashboard)
+# ==== Load Environment Variables FIRST ====
+load_dotenv()
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
+# ==== Query Params from Dashboard ====
 query_params = st.experimental_get_query_params()
 user_id = query_params.get("user_id", ["guest"])[0]
 subscription_level = query_params.get("subscription_level", ["free"])[0]
 
-# Show subscription notice if free plan
+# Optional Welcome Message
+st.markdown(f"### Welcome, {user_id}!")
+st.markdown(f"Your Subscription Level: **{subscription_level.capitalize()}**")
+
+# Free Tier Notice
 if subscription_level != "premium":
     st.info("You are using the Free version. Advanced features such as category adjustments, extended forecast horizons, hyperparameter tuning, and forecast downloads are disabled.")
 
-# Optional: Show Welcome Message
-st.markdown(f"### Welcome, {user_id}!")
-st.markdown(f"Your Subscription Level: **{subscription_level.capitalize()}**")
 
 def check_stationarity(series):
     adf_result = adfuller(series, autolag="AIC")
