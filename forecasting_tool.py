@@ -1336,6 +1336,14 @@ def main():
                 else:
                     # FREE USERS PIPELINE (only AutoML)
                     # STEP 4 (Free): Train AutoML Model
+                    st.markdown(
+                        """
+                        ⏱️ **AutoML Time Budget:**  
+                        Free users are limited to a 60-second training time and a 3-month forecast window.  
+                        
+                        Upgrade to Premium to unlock extended time budgets (up to 20 minutes) and longer forecast horizons.
+                        """
+                    )
                     step += 1
                     step_message.text(f"Step {step} of {total_steps}: Training AutoML model (Limited)...")
                     with st.spinner("🚀 Training AutoML Model..."):
