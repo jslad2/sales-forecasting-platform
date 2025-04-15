@@ -136,11 +136,6 @@ def how_we_help():
 def pricing():
     return render_template('pricing.html')
 
-# ✅ Pricing Page 2
-@app.route('/pricing2')
-def pricing():
-    return render_template('pricing2.html')
-
 # ✅ Success Page
 @app.route('/success')
 def success():
