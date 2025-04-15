@@ -969,7 +969,7 @@ def main():
                 data[date_column] = pd.to_datetime(data[date_column], errors="coerce")
 
             if subscription_level != "premium":
-                time_budget = 60
+                time_budget = 120
                 forecast_period = 3
             else:
                 st.markdown("### ⏱️ AutoML Time Budget")
