@@ -780,47 +780,61 @@ body.scrolled .top-button {
 }
 
 /* === Dashboard Custom Styles === */
+
 .dashboard-page header {
     background: linear-gradient(90deg, #2B3A42 0%, #354854 100%);
     color: var(--white-color);
+    padding: 15px 30px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
   }
   
   .dashboard-hero {
     background: linear-gradient(135deg, #2B3A42, #354854);
     color: var(--white-color);
-    padding: 80px 20px;
+    padding: 100px 20px 60px;
+    text-align: center;
   }
   
   .dashboard-container h4 {
-    font-size: 1.6rem;
+    font-size: 1.75rem;
     font-weight: 600;
     color: var(--primary-color);
+    margin-bottom: 1rem;
   }
   
   .dashboard-page .card {
     border-radius: 16px;
     border: none;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+  }
+  
+  .dashboard-page .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
   }
   
   .dashboard-page .card-body {
-    padding: 30px 20px;
+    padding: 32px 24px;
   }
   
   .dashboard-page .btn {
     border-radius: 8px;
-    padding: 12px 24px;
+    padding: 14px 28px;
     font-weight: 600;
+    transition: all 0.3s ease;
   }
   
   .dashboard-page .btn-primary {
     background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
     border: none;
+    color: var(--white-color);
   }
   
   .dashboard-page .btn-outline-primary {
     border-color: var(--primary-color);
     color: var(--primary-color);
+    background: transparent;
   }
   
   .dashboard-page .btn-outline-primary:hover {
@@ -838,7 +852,91 @@ body.scrolled .top-button {
     background: #1f2937;
     color: #cbd5e1;
     padding: 40px 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: center;
   }
+  
+  /* === Dashboard Sidebar Navigation === */
+  .dashboard-page aside {
+    background: #1e293b;
+    color: var(--white-color);
+    width: 220px;
+    height: 100vh;
+    padding: 20px 15px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    overflow-y: auto;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .dashboard-page aside .logo {
+    font-size: 1.8rem;
+    color: var(--secondary-color);
+    margin-bottom: 30px;
+    text-align: center;
+  }
+  
+  .dashboard-page aside .nav-link {
+    color: var(--white-color);
+    margin-bottom: 12px;
+    font-weight: 500;
+    padding: 10px 15px;
+    border-radius: 6px;
+    transition: background 0.3s ease;
+  }
+  
+  .dashboard-page aside .nav-link:hover {
+    background: var(--primary-color);
+    color: var(--white-color);
+  }
+  
+  /* === Chart Section Enhancements === */
+  .dashboard-container .chart-section {
+    margin-top: 60px;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  }
+  
+  .dashboard-container .chart-section h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+  }
+  
+  .dashboard-container .chart-section p.subheading {
+    font-size: 1rem;
+    color: var(--gray-color);
+    margin-bottom: 20px;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  
+  .dashboard-container .chart-section .btn-group {
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+  
+  .dashboard-container .chart-section select {
+    border-radius: 6px;
+    padding: 6px 12px;
+    border: 1px solid #ccc;
+    color: var(--text-color);
+    background: #f9fafb;
+    transition: border-color 0.3s ease;
+  }
+  
+  .dashboard-container .chart-section select:focus {
+    border-color: var(--primary-color);
+    outline: none;
+  }
+  
 
   /* Inventory Insights */
 .inventory-section h3 {
