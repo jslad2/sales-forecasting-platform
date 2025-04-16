@@ -24,16 +24,15 @@ import jwt as pyjwt  # avoid name collision
 # ─── Load Config ────────────────────────────────────────────────────────────────
 load_dotenv()
 
-# Streamlit-secret style would go here for Streamlit; for Flask we rely on .env
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-SENDGRID_SENDER = os.getenv("SENDGRID_SENDER")
-RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY")
-RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY")
+SUPABASE_URL           = os.getenv("SUPABASE_URL")
+SUPABASE_KEY           = os.getenv("SUPABASE_KEY")
+SENDGRID_API_KEY       = os.getenv("SENDGRID_API_KEY")
+SENDGRID_SENDER        = os.getenv("SENDGRID_SENDER")
+RECAPTCHA_SITE_KEY     = os.getenv("RECAPTCHA_SITE_KEY")
+RECAPTCHA_SECRET_KEY   = os.getenv("RECAPTCHA_SECRET_KEY")
 SERVICE_ACCOUNT_BASE64 = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_BASE64")
-SECRET_KEY = os.getenv("FLASK_SECRET_KEY") or os.urandom(32).hex()
-PROJECT_ID = os.getenv("GCP_PROJECT_ID", "synovaai-1741395134509")
+SECRET_KEY             = os.getenv("FLASK_SECRET_KEY") or os.urandom(32).hex()
+PROJECT_ID             = os.getenv("GCP_PROJECT_ID", "synovaai-1741395134509")
 
 # ─── Logging ────────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -87,9 +86,9 @@ def decode_jwt(token: str) -> dict:
 # ─── Flask App Setup ────────────────────────────────────────────────────────────
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-# ─── Build absolute paths to your local templates/ and static/ folders ─────────
-template_dir = os.path.join(HERE, "templates")
-static_dir   = os.path.join(HERE, "static")
+# ─── Build absolute paths to the real templates/ and static/ folders ───────────
+template_dir = os.path.abspath(os.path.join(HERE, "..", "templates"))
+static_dir   = os.path.abspath(os.path.join(HERE, "..", "static"))
 
 # ─── Initialize Flask, pointing at those folders ───────────────────────────────
 app = Flask(
