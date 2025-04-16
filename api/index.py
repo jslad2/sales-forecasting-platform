@@ -43,11 +43,20 @@ template_dir = os.path.join(HERE, "templates")
 static_dir   = os.path.join(HERE, "static")
 
 # ─── Initialize Flask, pointing at those folders ───────────────────────────────
+# ✅ Initialize Flask App
 app = Flask(
     __name__,
-    template_folder=template_dir,
-    static_folder=static_dir
+    template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")),
+    static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../static"))
 )
+
+# ✅ Configure logging properly
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+# ✅ Use a Secure Flask Secret Key
+SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "super_secure_fallback_key")
+app.config["SECRET_KEY"] = SECRET_KEY  # ✅ Set the secret key
 
 # ─── Logging ────────────────────────────────────────────────────────────────────
 logging.basicConfig(
