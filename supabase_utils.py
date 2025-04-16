@@ -24,8 +24,8 @@ def get_supabase_client():
         SUPABASE_KEY = os.getenv("SUPABASE_KEY")
     
     # For debugging purposes only; remove sensitive prints in production.
-    print("SUPABASE_URL:", SUPABASE_URL)
-    print("SUPABASE_KEY:", SUPABASE_KEY)
+    print("✔ Supabase config loaded.")
+
     
     if not SUPABASE_URL or not SUPABASE_KEY:
         raise Exception("Supabase URL or KEY is missing in your configuration. Check your st.secrets or .env file.")
@@ -33,6 +33,7 @@ def get_supabase_client():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def upload_forecast(user_id, forecast_name, file_path, model_used, time_horizon, forecast_metrics):
+    st.write("Saving Forecast to Supabase...")
     supabase = get_supabase_client()  # Initialize only when function is called
     
     file_id = str(uuid.uuid4())
@@ -68,16 +69,14 @@ def upload_forecast(user_id, forecast_name, file_path, model_used, time_horizon,
         "forecast_metrics": forecast_metrics,
         "forecast_file_url": file_url,
         "is_public": False,
+        "created_at": datetime.utcnow().isoformat()  # Optional fallback
     }
-    
-    # Insert forecast record into the Supabase "forecasts" table
+
     response = supabase.table("forecasts").insert(forecast_data).execute()
-    
+    st.write("✅ Insert Response:", response)
+
     if response.error:
         raise Exception(f"Error inserting forecast data: {response.error}")
-    
-    print("Forecast data insert response:", response.data)
-    return response
 
 # Example usage; be sure to update the file_path to an actual file for testing.
 if __name__ == "__main__":
