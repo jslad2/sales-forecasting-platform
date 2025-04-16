@@ -118,8 +118,8 @@ def token_required(f):
 def home():
     return render_template("index.html")
 
-@app.route("/services")
-def services():
+@app.route("/data-services")
+def data_services():
     return render_template("data_services.html")
 
 @app.route("/how-we-help")
