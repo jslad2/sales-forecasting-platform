@@ -98,6 +98,7 @@ app = Flask(
 )
 app.config["SECRET_KEY"] = SECRET_KEY
 
+
 # ─── Auth Decorator ─────────────────────────────────────────────────────────────
 from functools import wraps
 def token_required(f):
