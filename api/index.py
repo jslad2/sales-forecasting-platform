@@ -35,29 +35,6 @@ SERVICE_ACCOUNT_BASE64 = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_BASE64")
 SECRET_KEY = os.getenv("FLASK_SECRET_KEY") or os.urandom(32).hex()
 PROJECT_ID = os.getenv("GCP_PROJECT_ID", "synovaai-1741395134509")
 
-# ─── Determine the directory this file lives in ────────────────────────────────
-HERE = os.path.dirname(__file__)
-
-# ─── Build absolute paths to your local templates/ and static/ folders ─────────
-template_dir = os.path.join(HERE, "templates")
-static_dir   = os.path.join(HERE, "static")
-
-# ─── Initialize Flask, pointing at those folders ───────────────────────────────
-# ✅ Initialize Flask App
-app = Flask(
-    __name__,
-    template_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")),
-    static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), "../static"))
-)
-
-# ✅ Configure logging properly
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
-
-# ✅ Use a Secure Flask Secret Key
-SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "super_secure_fallback_key")
-app.config["SECRET_KEY"] = SECRET_KEY  # ✅ Set the secret key
-
 # ─── Logging ────────────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.DEBUG,
@@ -108,10 +85,17 @@ def decode_jwt(token: str) -> dict:
         raise Unauthorized("Invalid token")
 
 # ─── Flask App Setup ────────────────────────────────────────────────────────────
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+# ─── Build absolute paths to your local templates/ and static/ folders ─────────
+template_dir = os.path.join(HERE, "templates")
+static_dir   = os.path.join(HERE, "static")
+
+# ─── Initialize Flask, pointing at those folders ───────────────────────────────
 app = Flask(
     __name__,
-    template_folder=os.path.join(os.path.dirname(__file__), "templates"),
-    static_folder=os.path.join(os.path.dirname(__file__), "static")
+    template_folder=template_dir,
+    static_folder=static_dir
 )
 app.config["SECRET_KEY"] = SECRET_KEY
 
