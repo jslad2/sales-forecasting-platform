@@ -35,6 +35,20 @@ SERVICE_ACCOUNT_BASE64 = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_BASE64")
 SECRET_KEY = os.getenv("FLASK_SECRET_KEY") or os.urandom(32).hex()
 PROJECT_ID = os.getenv("GCP_PROJECT_ID", "synovaai-1741395134509")
 
+# ─── Determine the directory this file lives in ────────────────────────────────
+HERE = os.path.dirname(__file__)
+
+# ─── Build absolute paths to your local templates/ and static/ folders ─────────
+template_dir = os.path.join(HERE, "templates")
+static_dir   = os.path.join(HERE, "static")
+
+# ─── Initialize Flask, pointing at those folders ───────────────────────────────
+app = Flask(
+    __name__,
+    template_folder=template_dir,
+    static_folder=static_dir
+)
+
 # ─── Logging ────────────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.DEBUG,
