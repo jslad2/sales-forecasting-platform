@@ -147,3 +147,46 @@ def update_password():
 
     # GET: show form
     return render_template("update_password.html", token=token, email=email)
+
+@auth_bp.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        email    = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+
+        # Validate password
+        errors = []
+        if len(password) < 8:
+            errors.append("Password must be at least 8 characters.")
+        if not re.search(r"\d", password):
+            errors.append("Password must contain a number.")
+        if not re.search(r"[A-Z]", password):
+            errors.append("Password must contain an uppercase letter.")
+        if not re.search(r"[!@#$%^&*]", password):
+            errors.append("Password must contain a special character.")
+
+        if errors:
+            for e in errors:
+                flash(e, "error")
+            return redirect(url_for("auth.register"))
+
+        # Sign up with Supabase
+        try:
+            resp = supabase.auth.sign_up({"email": email, "password": password})
+            if resp.get("error"):
+                flash(f"Registration failed: {resp['error']['message']}", "error")
+                return redirect(url_for("auth.register"))
+
+            # Set default tier
+            user_id = resp["user"]["id"]
+            supabase.auth.update_user({"data": {"tier": "free"}}, user_id=user_id)
+
+            flash("Check your email to confirm your account.", "success")
+            return redirect(url_for("auth.login"))
+        except Exception as e:
+            logger.error(f"Register error: {e}")
+            flash("Registration error. Please try again.", "error")
+            return redirect(url_for("auth.register"))
+
+    # GET
+    return render_template("register.html")

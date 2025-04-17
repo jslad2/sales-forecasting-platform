@@ -4,15 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Pricing – SynovaAI</title>
-  <meta name="description" content="Choose the right AI-powered forecasting plan for your business. Start for free or upgrade to Pro for full access."/>
+  <meta name="description" content="Choose the right AI-powered forecasting plan for your business. Start for free or upgrade to Pro for full access.">
 
-  <!-- Open Graph -->
-  <meta property="og:title"       content="Pricing – SynovaAI"/>
-  <meta property="og:description" content="Choose the right AI-powered forecasting plan for your business. Start for free or upgrade to Pro for full access."/>
-  <meta property="og:image"       content="{{ url_for('static', filename='images/og-image.png') }}"/>
-  <meta property="og:url"         content="https://www.synovaai.com/pricing"/>
-
-  <!-- Google Analytics 4 -->
+  <!-- Google Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-LKEQTSKLCF"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -21,7 +15,13 @@
     gtag('config', 'G-LKEQTSKLCF');
   </script>
 
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <!-- Open Graph -->
+  <meta property="og:title" content="Pricing – SynovaAI"/>
+  <meta property="og:description" content="Choose the right AI-powered forecasting plan for your business. Start for free or upgrade to Pro for full access."/>
+  <meta property="og:image" content="{{ url_for('static', filename='images/og-image.png') }}"/>
+  <meta property="og:url" content="https://www.synovaai.com/pricing"/>
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
 </head>
 <body class="pricing-page">
 
@@ -29,79 +29,76 @@
   <header>
     <nav>
       <ul class="nav-links">
-        <li><a href="{{ url_for('pages.home') }}"          class="nav-link">Home</a></li>
-        <li><a href="{{ url_for('pages.data_services') }}" class="nav-link">Data Services</a></li>
-        <li><a href="{{ url_for('pages.pricing') }}"       class="nav-link active">Pricing</a></li>
-        <li><a href="{{ url_for('pages.contact') }}"       class="nav-link">Contact</a></li>
+        <li><a href="{{ url_for('pages.home') }}"           class="nav-link">Home</a></li>
+        <li><a href="{{ url_for('pages.data_services') }}"  class="nav-link">Data Services</a></li>
+        <li><a href="{{ url_for('pages.pricing') }}"        class="nav-link active">Pricing</a></li>
+        <li><a href="{{ url_for('pages.contact') }}"        class="nav-link">Contact</a></li>
         <li id="auth-buttons"></li>
       </ul>
     </nav>
     <div class="logo">SYNOVAAI</div>
   </header>
 
-  <!-- Hero Section -->
+  <!-- Hero -->
   <section class="hero">
-    <div class="hero-container">
-      <div class="hero-left">
-        <h1>Choose the Plan That Fits</h1>
-        <p>Start free or upgrade to Pro for advanced features, deeper forecasts, and downloads.</p>
-      </div>
-    </div>
+    <article class="hero-text">
+      <h1>Choose Your Plan</h1>
+      <p>Start with our free tier or upgrade to unlock full features.</p>
+    </article>
   </section>
 
   <!-- Pricing Table -->
   <section class="pricing-container">
     <div class="pricing-card">
       <h2>Free Tier</h2>
-      <p class="price">$0<span>/mo</span></p>
+      <p class="price">$0 <span>/ month</span></p>
       <ul>
-        <li>🔹 Basic forecasting</li>
+        <li>🔹 Access basic forecasting</li>
         <li>🔹 View sales predictions</li>
-        <li class="disabled">❌ CSV downloads</li>
-        <li class="disabled">❌ Extended horizons</li>
+        <li class="disabled">❌ No downloads</li>
+        <li class="disabled">❌ Limited forecast depth</li>
       </ul>
-      <a href="{{ url_for('register') }}" class="cta-button">Start for Free</a>
+      <a href="{{ url_for('auth.register') }}" class="cta-button">Start for Free</a>
     </div>
 
     <div class="pricing-card pro">
       <h2>Pro Plan</h2>
-      <p class="price">$19.99<span>/mo</span></p>
+      <p class="price">$19.99 <span>/ month</span></p>
       <ul>
         <li>✅ Full forecasting access</li>
-        <li>✅ Downloadable reports</li>
+        <li>✅ Download reports</li>
         <li>✅ Advanced analytics</li>
         <li>✅ Priority support</li>
       </ul>
-      <a href="https://buy.stripe.com/eVa00j89SeIM9hKeUU" class="cta-button pro-btn">Upgrade to Pro</a>
+      <a href="https://buy.stripe.com/eVa00j89SeIM9hKeUU" class="cta-button pro-btn">Upgrade to Pro</a>
     </div>
   </section>
 
   <!-- Back to Top -->
-  <button onclick="scrollToTop()" class="top-button" aria-label="Back to Top">⬆</button>
+  <button onclick="scrollToTop()" class="top-button" aria-label="Back to Top">⬆ Back to Top</button>
 
   <!-- Footer -->
   <footer>
     <p>&copy; 2025 SynovaAI. All rights reserved.</p>
   </footer>
 
-  <!-- Page Scripts -->
-  <script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>
   <script>
-    // Highlight active nav and render login/logout buttons
-    document.addEventListener('DOMContentLoaded', () => {
-      // Update auth buttons
+    document.addEventListener("DOMContentLoaded", () => {
+      // Highlight active nav link
+      document.querySelectorAll(".nav-link").forEach(a => {
+        a.classList.toggle("active", a.getAttribute("href") === window.location.pathname);
+      });
+      // Render auth buttons
       updateAuthButtons();
-
-      // Show/hide back-to-top on scroll
-      const topBtn = document.querySelector('.top-button');
-      window.addEventListener('scroll', () => {
-        topBtn.style.display = (window.scrollY > 300 ? 'block' : 'none');
+      // Back‑to‑top visibility
+      const topBtn = document.querySelector(".top-button");
+      window.addEventListener("scroll", () => {
+        topBtn.style.display = window.scrollY > 300 ? "block" : "none";
       });
     });
-
-    function scrollToTop() {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    function scrollToTop(){ window.scrollTo({ top: 0, behavior: "smooth" }); }
   </script>
+
+  <script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>
 </body>
 </html>
