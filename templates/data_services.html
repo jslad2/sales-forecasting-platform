@@ -26,14 +26,14 @@
 </head>
 
 <body class="data-services-page">
-    <!-- Header (Matches Homepage) -->
+    <!-- Header -->
     <header>
         <nav>
             <ul class="nav-links">
-                <li><a href="{{ url_for('home') }}" class="nav-link">Home</a></li>
-                <li><a href="{{ url_for('data_services') }}" class="nav-link active">Data Services</a></li>
-                <li><a href="{{ url_for('pricing') }}" class="nav-link">Pricing</a></li>
-                <li><a href="{{ url_for('contact') }}" class="nav-link">Contact</a></li>
+                <li><a href="{{ url_for('pages.home') }}"          class="nav-link">Home</a></li>
+                <li><a href="{{ url_for('pages.data_services') }}" class="nav-link active">Data Services</a></li>
+                <li><a href="{{ url_for('pages.pricing') }}"       class="nav-link">Pricing</a></li>
+                <li><a href="{{ url_for('pages.contact') }}"       class="nav-link">Contact</a></li>
                 <li id="auth-buttons"></li>
             </ul>
         </nav>
@@ -42,6 +42,14 @@
 
     <!-- Hero Section -->
     <section class="hero" style="background-image: url('static/images/data-services.png'); background-size: cover; background-position: center; color: white; padding: 220px 20px; text-align: center; position: relative;">
+    <section class="hero"
+             style="background-image: url('static/images/data-services.png');
+                    background-size: cover;
+                    background-position: center;
+                    color: white;
+                    padding: 220px 20px;
+                    text-align: center;
+                    position: relative;">
         <div class="content-container">
             <article class="hero-text">
                 <h1>Unlock the Power of Your Data</h1>
@@ -155,8 +163,8 @@
                 <h2>Ready to Transform Your Business?</h2>
                 <p>Start your AI-powered analytics journey today.</p>
                 <div class="cta-buttons">
-                    <a href="{{ url_for('pricing') }}" class="cta-button primary">View Plans</a>
-                    <a href="{{ url_for('contact') }}" class="cta-button secondary">Contact Sales</a>
+                    <a href="{{ url_for('pages.pricing') }}" class="cta-button primary">View Plans</a>
+                    <a href="{{ url_for('pages.contact') }}" class="cta-button secondary">Contact Sales</a>
                 </div>
             </div>
         </div>
@@ -170,9 +178,9 @@
         <div class="content-container">
             <p>&copy; 2025 SynovaAI. All rights reserved.</p>
             <div class="footer-links">
-                <a href="/privacy">Privacy Policy</a>
-                <a href="/terms">Terms of Service</a>
-                <a href="/contact">Contact</a>
+                <a href="{{ url_for('pages.privacy_policy') }}">Privacy Policy</a>
+                <a href="{{ url_for('pages.terms_of_service') }}">Terms of Service</a>
+                <a href="{{ url_for('pages.contact') }}">Contact</a>
             </div>
         </div>
     </footer>
@@ -180,27 +188,20 @@
     <!-- Scripts -->
     <script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>
     <script>
-        // Unified Scroll Handling (Matches Homepage)
         document.addEventListener("DOMContentLoaded", function() {
-            // Auth buttons
             updateAuthButtons();
 
-            // Header scroll effect
-            const header = document.querySelector("header");
+            const header   = document.querySelector("header");
+            const topButton = document.querySelector(".top-button");
+
             window.addEventListener("scroll", () => {
                 header.classList.toggle("scrolled", window.scrollY > 50);
-            });
-
-            // Back to top button
-            const topButton = document.querySelector(".top-button");
-            window.addEventListener("scroll", () => {
                 topButton.style.opacity = window.scrollY > 300 ? "1" : "0";
             });
 
-            // Service card animations
             const observer = new IntersectionObserver(entries => {
                 entries.forEach(entry => {
-                    if(entry.isIntersecting) {
+                    if (entry.isIntersecting) {
                         entry.target.classList.add("show");
                     }
                 });
