@@ -652,7 +652,7 @@ body.scrolled .top-button {
 
 .service-detail-image img {
     max-width: 200px;
-    width: 100%;
+    width: 20%;
     height: auto;
     margin: 0 auto;
   }  
