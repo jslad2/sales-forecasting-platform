@@ -22,6 +22,18 @@ def pricing():
 def success():
     return render_template("success.html")
 
+@pages_bp.route("/contact", methods=["GET","POST"])
+def contact():
+    return render_template("contact.html")
+
+@pages_bp.route("/privacy-policy")
+def privacy_policy():
+    return render_template("privacy_policy.html")
+
+@pages_bp.route("/terms-of-service")
+def terms_of_service():
+    return render_template("terms_of_service.html")
+
 @pages_bp.route("/contact", methods=["GET", "POST"])
 def contact():
     if request.method == "POST":
