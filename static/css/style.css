@@ -651,9 +651,11 @@ body.scrolled .top-button {
 }
 
 .service-detail-image img {
-    width: 120px;
+    max-width: 200px;
+    width: 100%;
     height: auto;
-}
+    margin: 0 auto;
+  }  
 
 .service-detail-content {
     flex: 1;
