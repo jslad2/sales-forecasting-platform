@@ -629,12 +629,14 @@ body.scrolled .top-button {
     margin: 0 auto 40px;
 }
 
+/* === Section wrapper === */
 .service-detail {
     padding: 60px 0;
     background-color: #F8F9FA;
-}
-
-.service-detail-container {
+  }
+  
+  /* === Inner panel === */
+  .service-detail-container {
     display: flex;
     align-items: center;
     max-width: 1200px;
@@ -644,48 +646,57 @@ body.scrolled .top-button {
     border-radius: 12px;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
     gap: 40px;
-}
-
-.service-detail-container.reverse {
+  }
+  
+  .service-detail-container.reverse {
     flex-direction: row-reverse;
-}
-
-.service-detail-image img {
-    width: 120px;
-    height: auto;
-}
-
-.service-detail-content {
-    flex: 1;
-}
-
-.service-detail-content h2 {
+  }
+  
+  /* === Image column === */
+  .service-image {
+    /* take up ~40% of the width */
+    flex: 0 0 40%;
+  }
+  
+  .service-image img {
+    display: block;      /* no inline whitespace */
+    max-width: 100%;     /* never exceed container */
+    height: auto;        /* maintain aspect ratio */
+    border-radius: 8px;  /* optional: soften corners */
+  }
+  
+  /* === Text column === */
+  .service-content {
+    flex: 1;             /* fill remaining space */
+  }
+  
+  .service-content h2 {
     font-size: 1.8rem;
     color: var(--primary-color);
     margin-bottom: 15px;
-}
-
-.service-detail-content p {
+  }
+  
+  .service-content p {
     font-size: 1.1rem;
     color: var(--gray-color);
     margin-bottom: 20px;
-}
-
-.service-detail-content ul {
+  }
+  
+  .service-content ul {
     list-style: none;
     padding: 0;
-}
-
-.service-detail-content ul li {
+  }
+  
+  .service-content ul li {
     font-size: 1.1rem;
     margin-bottom: 10px;
     display: flex;
     align-items: center;
-}
-
-.service-detail-content ul li strong {
+  }
+  
+  .service-content ul li strong {
     margin-left: 8px;
-}
+  }  
 
 /* ======================== */
 /* ===== Contact Page ===== */
