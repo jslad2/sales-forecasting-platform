@@ -29,10 +29,10 @@
   <header>
     <nav>
       <ul class="nav-links">
-        <li><a href="{{ url_for('home') }}" class="nav-link">Home</a></li>
-        <li><a href="{{ url_for('data_services') }}" class="nav-link">Data Services</a></li>
-        <li><a href="{{ url_for('pricing') }}" class="nav-link">Pricing</a></li>
-        <li><a href="{{ url_for('contact') }}" class="nav-link">Contact</a></li>
+        <li><a href="{{ url_for('pages.home') }}" class="nav-link">Home</a></li>
+        <li><a href="{{ url_for('pages.data_services') }}" class="nav-link">Data Services</a></li>
+        <li><a href="{{ url_for('pages.pricing') }}" class="nav-link">Pricing</a></li>
+        <li><a href="{{ url_for('pages.contact') }}" class="nav-link">Contact</a></li>
         <li id="auth-buttons"></li>
       </ul>
     </nav>
@@ -49,8 +49,8 @@
   
       <div class="hero-right">
         <div class="hero-buttons">
-          <a href="{{ url_for('data_services') }}" class="cta-button primary-button">Get Started</a>
-          <a href="{{ url_for('pricing') }}" class="cta-button secondary-button">See Pricing</a>
+          <a href="{{ url_for('pages.data_services') }}" class="cta-button primary-button">Get Started</a>
+          <a href="{{ url_for('pages.pricing') }}" class="cta-button secondary-button">See Pricing</a>
         </div>
         <p class="hero-trust-text">
           AI-Powered Forecasting. Real-Time Dashboards. Trusted by Growing Teams.
