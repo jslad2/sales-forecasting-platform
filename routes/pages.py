@@ -18,22 +18,6 @@ def how_we_help():
 def pricing():
     return render_template("pricing.html")
 
-@pages_bp.route("/success", methods=["GET"])
-def success():
-    return render_template("success.html")
-
-@pages_bp.route("/contact", methods=["GET","POST"])
-def contact():
-    return render_template("contact.html")
-
-@pages_bp.route("/privacy-policy")
-def privacy_policy():
-    return render_template("privacy_policy.html")
-
-@pages_bp.route("/terms-of-service")
-def terms_of_service():
-    return render_template("terms_of_service.html")
-
 @pages_bp.route("/contact", methods=["GET", "POST"])
 def contact():
     if request.method == "POST":
@@ -50,7 +34,7 @@ def contact():
         # e.g. verify_recaptcha(token), send_email(name, email, message), etc.
 
         flash("Your message has been sent successfully!", "success")
-        return redirect(url_for("pages.success"))
+        return redirect(url_for("pages.contact"))
 
     # GET
     return render_template("contact.html")
