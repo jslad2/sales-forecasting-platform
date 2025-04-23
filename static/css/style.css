@@ -639,13 +639,11 @@ body.scrolled .top-button {
     padding: 100px 20px 60px;
     text-align: center;
   }
-  
   .pricing-hero h1 {
     font-size: 2.75rem;
     color: var(--primary-color);
     margin-bottom: 0.5rem;
   }
-  
   .pricing-hero p {
     font-size: 1.1rem;
     color: var(--gray-color);
@@ -675,12 +673,10 @@ body.scrolled .top-button {
     text-align: center;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
-  
   .pricing-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
+    transform: translateY(-6px);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
   }
-  
   .pricing-card.pro {
     border: 2px solid var(--accent-color);
   }
@@ -691,32 +687,28 @@ body.scrolled .top-button {
     color: var(--primary-color);
     margin-bottom: 1rem;
   }
-  
   .pricing-card .price {
     font-size: 2.4rem;
     margin: 0.5rem 0 1.5rem;
     color: var(--secondary-color);
   }
-  
   .pricing-card .price span {
     font-size: 1rem;
     color: var(--gray-color);
   }
-  
   .pricing-card ul {
     list-style: none;
     padding: 0;
     margin-bottom: 1.5rem;
   }
-  
   .pricing-card ul li {
     margin: 0.5rem 0;
     font-size: 1rem;
     color: var(--text-color);
   }
-  
   .pricing-card ul li.disabled {
     opacity: 0.5;
+    text-decoration: line-through;
   }
   
   /* — CTA Button — */
@@ -731,12 +723,10 @@ body.scrolled .top-button {
     color: #fff;
     transition: background 0.3s ease, transform 0.2s ease;
   }
-  
   .pricing-card .cta-button:hover {
     background: var(--accent-color);
     transform: translateY(-2px);
   }
-  
   .pricing-card.pro .cta-button.pro-btn {
     background: var(--accent-color);
   }
@@ -757,23 +747,38 @@ body.scrolled .top-button {
     transition: opacity 0.3s ease-in-out, transform 0.2s ease-in-out;
     z-index: 999;
   }
-  
   .top-button:hover {
     background-color: var(--accent-color);
     transform: scale(1.1);
   }
-  
   body.scrolled .top-button {
     opacity: 1;
   }
   
-  /* — Mobile Tweaks — */
+  /* — Responsive Adjustments — */
   @media (max-width: 768px) {
     .pricing-container {
       flex-direction: column;
       align-items: center;
     }
   }
+  
+  /* — Header Override for Pricing Page — */
+  .pricing-page header {
+    background-color: var(--white-color);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  }
+  .pricing-page header .logo {
+    color: var(--primary-color);
+  }
+  .pricing-page header nav a {
+    color: var(--text-color);
+  }
+  .pricing-page header nav a:hover {
+    background-color: var(--accent-color);
+    color: var(--white-color);
+  }
+  
   
 
 /* ==== Service Details ==== */
