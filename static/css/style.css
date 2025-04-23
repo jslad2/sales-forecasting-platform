@@ -629,88 +629,150 @@ body.scrolled .top-button {
     margin: 0 auto 40px;
 }
 
-/* ————— Pricing Hero ————— */
+/* ======================== */
+/* ===== Pricing Page ===== */
+/* ======================== */
+
+/* — Hero Section — */
 .pricing-hero {
     background: var(--background-color);
-    padding: 80px 20px;
+    padding: 100px 20px 60px;
     text-align: center;
   }
+  
   .pricing-hero h1 {
     font-size: 2.75rem;
     color: var(--primary-color);
     margin-bottom: 0.5rem;
   }
+  
   .pricing-hero p {
     font-size: 1.1rem;
     color: var(--gray-color);
+    max-width: 700px;
+    margin: 0 auto;
   }
   
-  /* ————— Cards Container ————— */
+  /* — Cards Container — */
   .pricing-container {
     display: flex;
     justify-content: center;
     flex-wrap: wrap;
     gap: 2rem;
     max-width: 1200px;
-    margin: 2rem auto 4rem;
+    margin: 3rem auto 5rem;
     padding: 0 20px;
   }
   
-  /* ————— Individual Card ————— */
+  /* — Individual Card — */
   .pricing-card {
     background: var(--white-color);
-    border-radius: 12px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
     padding: 2rem;
     width: 100%;
-    max-width: 300px;
+    max-width: 320px;
     text-align: center;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
+  
+  .pricing-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
+  }
+  
   .pricing-card.pro {
     border: 2px solid var(--accent-color);
   }
   
   /* — Typography inside cards — */
   .pricing-card h2 {
-    font-size: 1.5rem;
+    font-size: 1.6rem;
     color: var(--primary-color);
     margin-bottom: 1rem;
   }
+  
   .pricing-card .price {
-    font-size: 2rem;
+    font-size: 2.4rem;
     margin: 0.5rem 0 1.5rem;
     color: var(--secondary-color);
   }
+  
+  .pricing-card .price span {
+    font-size: 1rem;
+    color: var(--gray-color);
+  }
+  
   .pricing-card ul {
     list-style: none;
     padding: 0;
     margin-bottom: 1.5rem;
   }
+  
   .pricing-card ul li {
     margin: 0.5rem 0;
     font-size: 1rem;
     color: var(--text-color);
   }
+  
   .pricing-card ul li.disabled {
     opacity: 0.5;
   }
   
-  /* — Buttons — */
+  /* — CTA Button — */
   .pricing-card .cta-button {
     display: inline-block;
-    padding: 0.75rem 1.5rem;
+    padding: 0.8rem 1.8rem;
     border-radius: 9999px;
     text-decoration: none;
     font-weight: bold;
+    font-size: 1rem;
     background: var(--secondary-color);
     color: #fff;
-    transition: background 0.3s ease;
+    transition: background 0.3s ease, transform 0.2s ease;
   }
+  
+  .pricing-card .cta-button:hover {
+    background: var(--accent-color);
+    transform: translateY(-2px);
+  }
+  
   .pricing-card.pro .cta-button.pro-btn {
     background: var(--accent-color);
   }
-  .pricing-card .cta-button:hover {
-    filter: brightness(0.9);
+  
+  /* — Back to Top Button — */
+  .top-button {
+    position: fixed;
+    bottom: 20px;
+    right: 30px;
+    background-color: var(--secondary-color);
+    color: var(--white-color);
+    border: none;
+    padding: 14px 18px;
+    font-size: 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out, transform 0.2s ease-in-out;
+    z-index: 999;
+  }
+  
+  .top-button:hover {
+    background-color: var(--accent-color);
+    transform: scale(1.1);
+  }
+  
+  body.scrolled .top-button {
+    opacity: 1;
+  }
+  
+  /* — Mobile Tweaks — */
+  @media (max-width: 768px) {
+    .pricing-container {
+      flex-direction: column;
+      align-items: center;
+    }
   }
   
 
