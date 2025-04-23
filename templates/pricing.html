@@ -23,21 +23,22 @@
 
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
 </head>
-
 <body class="pricing-page">
 
   <!-- Header -->
-  <header>
-    <div class="logo">SYNOVAAI</div>
-    <nav>
-      <ul class="nav-links">
-        <li><a href="{{ url_for('pages.home') }}" class="nav-link">Home</a></li>
-        <li><a href="{{ url_for('pages.data_services') }}" class="nav-link">Data Services</a></li>
-        <li><a href="{{ url_for('pages.pricing') }}" class="nav-link active">Pricing</a></li>
-        <li><a href="{{ url_for('pages.contact') }}" class="nav-link">Contact</a></li>
-        <li id="auth-buttons"></li>
-      </ul>
-    </nav>
+  <header class="scrolled">
+    <div class="header-container">
+      <div class="logo">SYNOVAAI</div>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="{{ url_for('pages.home') }}" class="nav-link">Home</a></li>
+          <li><a href="{{ url_for('pages.data_services') }}" class="nav-link">Data Services</a></li>
+          <li><a href="{{ url_for('pages.pricing') }}" class="nav-link active">Pricing</a></li>
+          <li><a href="{{ url_for('pages.contact') }}" class="nav-link">Contact</a></li>
+          <li id="auth-buttons"></li>
+        </ul>
+      </nav>
+    </div>
   </header>
 
   <!-- Hero -->
@@ -46,7 +47,7 @@
     <p>Start with our free tier or upgrade to unlock full features.</p>
   </section>
 
-  <!-- Pricing Cards -->
+  <!-- Pricing Table -->
   <section class="pricing-container">
     <div class="pricing-card">
       <h2>Free Tier</h2>
@@ -57,7 +58,7 @@
         <li class="disabled">❌ No downloads</li>
         <li class="disabled">❌ Limited forecast depth</li>
       </ul>
-      <a href="{{ url_for('auth.register') }}" class="cta-button" aria-label="Register for free">Start for Free</a>
+      <a href="{{ url_for('auth.register') }}" class="cta-button">Start for Free</a>
     </div>
 
     <div class="pricing-card pro">
@@ -69,7 +70,7 @@
         <li>✅ Advanced analytics</li>
         <li>✅ Priority support</li>
       </ul>
-      <a href="https://buy.stripe.com/eVa00j89SeIM9hKeUU" class="cta-button pro-btn" aria-label="Upgrade to Pro Plan">Upgrade to Pro</a>
+      <a href="https://buy.stripe.com/eVa00j89SeIM9hKeUU" class="cta-button pro-btn">Upgrade to Pro</a>
     </div>
   </section>
 
@@ -81,27 +82,21 @@
     <p>&copy; 2025 SynovaAI. All rights reserved.</p>
   </footer>
 
-  <!-- Scripts -->
   <script>
     document.addEventListener("DOMContentLoaded", () => {
-      // Highlight nav
+      // Highlight active nav link
       document.querySelectorAll(".nav-link").forEach(a => {
         a.classList.toggle("active", a.getAttribute("href") === window.location.pathname);
       });
-
-      // Show auth buttons (placeholder for auth.js logic)
-      updateAuthButtons?.();
-
-      // Show "Back to Top" button on scroll
+      // Render auth buttons
+      updateAuthButtons();
+      // Back-to-top visibility
       const topBtn = document.querySelector(".top-button");
       window.addEventListener("scroll", () => {
         topBtn.style.display = window.scrollY > 300 ? "block" : "none";
       });
     });
-
-    function scrollToTop() {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+    function scrollToTop(){ window.scrollTo({ top: 0, behavior: "smooth" }); }
   </script>
   <script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>
 </body>
