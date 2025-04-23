@@ -26,19 +26,17 @@
 <body class="pricing-page">
 
   <!-- Header -->
-  <header class="scrolled">
-    <div class="header-container">
-      <div class="logo">SYNOVAAI</div>
-      <nav>
-        <ul class="nav-links">
-          <li><a href="{{ url_for('pages.home') }}" class="nav-link">Home</a></li>
-          <li><a href="{{ url_for('pages.data_services') }}" class="nav-link">Data Services</a></li>
-          <li><a href="{{ url_for('pages.pricing') }}" class="nav-link active">Pricing</a></li>
-          <li><a href="{{ url_for('pages.contact') }}" class="nav-link">Contact</a></li>
-          <li id="auth-buttons"></li>
-        </ul>
-      </nav>
-    </div>
+  <header>
+    <nav>
+      <ul class="nav-links">
+        <li><a href="{{ url_for('pages.home') }}"          class="nav-link">Home</a></li>
+        <li><a href="{{ url_for('pages.data_services') }}" class="nav-link">Data Services</a></li>
+        <li><a href="{{ url_for('pages.pricing') }}"       class="nav-link">Pricing</a></li>
+        <li><a href="{{ url_for('pages.contact') }}"       class="nav-link">Contact</a></li>
+        <li id="auth-buttons"></li>
+      </ul>
+    </nav>
+    <div class="logo">SYNOVAAI</div>
   </header>
 
   <!-- Hero -->
