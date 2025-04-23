@@ -629,51 +629,52 @@ body.scrolled .top-button {
     margin: 0 auto 40px;
 }
 
-/* Pricing Page Layout */
+/* ————— Pricing Hero ————— */
 .pricing-hero {
     background: var(--background-color);
-    padding: 100px 20px;
+    padding: 80px 20px;
     text-align: center;
   }
   .pricing-hero h1 {
-    font-size: 2.5rem;
+    font-size: 2.75rem;
     color: var(--primary-color);
-    margin-bottom: 10px;
+    margin-bottom: 0.5rem;
   }
   .pricing-hero p {
     font-size: 1.1rem;
     color: var(--gray-color);
   }
   
-  /* Cards Container */
+  /* ————— Cards Container ————— */
   .pricing-container {
     display: flex;
     justify-content: center;
     flex-wrap: wrap;
     gap: 2rem;
     max-width: 1200px;
-    margin: 0 auto 80px;
+    margin: 2rem auto 4rem;
     padding: 0 20px;
   }
   
-  /* Individual Card */
+  /* ————— Individual Card ————— */
   .pricing-card {
     background: var(--white-color);
     border-radius: 12px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.08);
     padding: 2rem;
-    width: 280px;
+    width: 100%;
+    max-width: 300px;
     text-align: center;
   }
   .pricing-card.pro {
     border: 2px solid var(--accent-color);
   }
   
-  /* Card Typography */
+  /* — Typography inside cards — */
   .pricing-card h2 {
     font-size: 1.5rem;
-    margin-bottom: 1rem;
     color: var(--primary-color);
+    margin-bottom: 1rem;
   }
   .pricing-card .price {
     font-size: 2rem;
@@ -694,7 +695,7 @@ body.scrolled .top-button {
     opacity: 0.5;
   }
   
-  /* Buttons */
+  /* — Buttons — */
   .pricing-card .cta-button {
     display: inline-block;
     padding: 0.75rem 1.5rem;
@@ -709,7 +710,7 @@ body.scrolled .top-button {
     background: var(--accent-color);
   }
   .pricing-card .cta-button:hover {
-    background: darken(var(--secondary-color), 10%);
+    filter: brightness(0.9);
   }
   
 
