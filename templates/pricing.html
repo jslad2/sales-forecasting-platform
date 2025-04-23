@@ -29,10 +29,10 @@
   <header>
     <nav>
       <ul class="nav-links">
-        <li><a href="{{ url_for('pages.home') }}"           class="nav-link">Home</a></li>
-        <li><a href="{{ url_for('pages.data_services') }}"  class="nav-link">Data Services</a></li>
-        <li><a href="{{ url_for('pages.pricing') }}"        class="nav-link active">Pricing</a></li>
-        <li><a href="{{ url_for('pages.contact') }}"        class="nav-link">Contact</a></li>
+        <li><a href="{{ url_for('pages.home') }}"          class="nav-link">Home</a></li>
+        <li><a href="{{ url_for('pages.data_services') }}" class="nav-link">Data Services</a></li>
+        <li><a href="{{ url_for('pages.pricing') }}"       class="nav-link active">Pricing</a></li>
+        <li><a href="{{ url_for('pages.contact') }}"       class="nav-link">Contact</a></li>
         <li id="auth-buttons"></li>
       </ul>
     </nav>
@@ -40,11 +40,9 @@
   </header>
 
   <!-- Hero -->
-  <section class="hero">
-    <article class="hero-text">
-      <h1>Choose Your Plan</h1>
-      <p>Start with our free tier or upgrade to unlock full features.</p>
-    </article>
+  <section class="pricing-hero">
+    <h1>Choose Your Plan</h1>
+    <p>Start with our free tier or upgrade to unlock full features.</p>
   </section>
 
   <!-- Pricing Table -->
@@ -70,7 +68,7 @@
         <li>✅ Advanced analytics</li>
         <li>✅ Priority support</li>
       </ul>
-      <a href="https://buy.stripe.com/eVa00j89SeIM9hKeUU" class="cta-button pro-btn">Upgrade to Pro</a>
+      <a href="https://buy.stripe.com/eVa00j89SeIM9hKeUU" class="cta-button pro-btn">Upgrade to Pro</a>
     </div>
   </section>
 
@@ -90,7 +88,7 @@
       });
       // Render auth buttons
       updateAuthButtons();
-      // Back‑to‑top visibility
+      // Back-to-top visibility
       const topBtn = document.querySelector(".top-button");
       window.addEventListener("scroll", () => {
         topBtn.style.display = window.scrollY > 300 ? "block" : "none";
@@ -98,7 +96,6 @@
     });
     function scrollToTop(){ window.scrollTo({ top: 0, behavior: "smooth" }); }
   </script>
-
   <script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>
 </body>
 </html>
