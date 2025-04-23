@@ -633,6 +633,11 @@ body.scrolled .top-button {
 /* ===== Pricing Page ===== */
 /* ======================== */
 
+/* Make header pop visually */
+body.pricing-page {
+    background-color: #f4f6f8; /* Slightly darker than --background-color */
+  }
+
 /* — Hero Section — */
 .pricing-hero {
     background: var(--background-color);
