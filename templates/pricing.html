@@ -16,10 +16,10 @@
   </script>
 
   <!-- Open Graph -->
-  <meta property="og:title"       content="Pricing – SynovaAI"/>
+  <meta property="og:title" content="Pricing – SynovaAI"/>
   <meta property="og:description" content="Choose the right AI-powered forecasting plan for your business. Start for free or upgrade to Pro for full access."/>
-  <meta property="og:image"       content="{{ url_for('static', filename='images/og-image.png') }}"/>
-  <meta property="og:url"         content="https://www.synovaai.com/pricing"/>
+  <meta property="og:image" content="{{ url_for('static', filename='images/og-image.png') }}"/>
+  <meta property="og:url" content="https://www.synovaai.com/pricing"/>
 
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
 </head>
@@ -45,7 +45,7 @@
     <p>Start with our free tier or upgrade to unlock full features.</p>
   </section>
 
-  <!-- Pricing Cards -->
+  <!-- Pricing Table -->
   <section class="pricing-container">
     <div class="pricing-card">
       <h2>Free Tier</h2>
@@ -56,7 +56,7 @@
         <li class="disabled">❌ No downloads</li>
         <li class="disabled">❌ Limited forecast depth</li>
       </ul>
-      <a href="{{ url_for('pages.register') }}" class="cta-button">Start for Free</a>
+      <a href="{{ url_for('auth.register') }}" class="cta-button">Start for Free</a>
     </div>
 
     <div class="pricing-card pro">
@@ -82,13 +82,13 @@
 
   <script>
     document.addEventListener("DOMContentLoaded", () => {
-      // highlight the active nav link
+      // Highlight active nav link
       document.querySelectorAll(".nav-link").forEach(a => {
         a.classList.toggle("active", a.getAttribute("href") === window.location.pathname);
       });
-      // render login/logout
+      // Render auth buttons
       updateAuthButtons();
-      // back-to-top visibility
+      // Back-to-top visibility
       const topBtn = document.querySelector(".top-button");
       window.addEventListener("scroll", () => {
         topBtn.style.display = window.scrollY > 300 ? "block" : "none";
