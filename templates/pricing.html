@@ -6,6 +6,12 @@
   <title>Pricing – SynovaAI</title>
   <meta name="description" content="Choose the right AI-powered forecasting plan for your business. Start for free or upgrade to Pro for full access.">
 
+  <!-- Open Graph -->
+  <meta property="og:title" content="Pricing – SynovaAI"/>
+  <meta property="og:description" content="Choose the right AI-powered forecasting plan for your business. Start for free or upgrade to Pro for full access."/>
+  <meta property="og:image" content="{{ url_for('static', filename='images/og-image.png') }}"/>
+  <meta property="og:url" content="https://www.synovaai.com/pricing"/>
+
   <!-- Google Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-LKEQTSKLCF"></script>
   <script>
@@ -15,31 +21,25 @@
     gtag('config', 'G-LKEQTSKLCF');
   </script>
 
-  <!-- Open Graph -->
-  <meta property="og:title" content="Pricing – SynovaAI"/>
-  <meta property="og:description" content="Choose the right AI-powered forecasting plan for your business. Start for free or upgrade to Pro for full access."/>
-  <meta property="og:image" content="{{ url_for('static', filename='images/og-image.png') }}"/>
-  <meta property="og:url" content="https://www.synovaai.com/pricing"/>
-
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
 </head>
-<body class="pricing-page">
 
+<body class="pricing-page">
   <!-- Header -->
   <header>
     <nav>
       <ul class="nav-links">
-        <li><a href="{{ url_for('pages.home') }}"          class="nav-link">Home</a></li>
+        <li><a href="{{ url_for('pages.home') }}" class="nav-link">Home</a></li>
         <li><a href="{{ url_for('pages.data_services') }}" class="nav-link">Data Services</a></li>
-        <li><a href="{{ url_for('pages.pricing') }}"       class="nav-link">Pricing</a></li>
-        <li><a href="{{ url_for('pages.contact') }}"       class="nav-link">Contact</a></li>
+        <li><a href="{{ url_for('pages.pricing') }}" class="nav-link active">Pricing</a></li>
+        <li><a href="{{ url_for('pages.contact') }}" class="nav-link">Contact</a></li>
         <li id="auth-buttons"></li>
       </ul>
     </nav>
     <div class="logo">SYNOVAAI</div>
   </header>
 
-  <!-- Hero -->
+  <!-- Hero Section -->
   <section class="pricing-hero">
     <h1>Choose Your Plan</h1>
     <p>Start with our free tier or upgrade to unlock full features.</p>
@@ -77,25 +77,33 @@
 
   <!-- Footer -->
   <footer>
-    <p>&copy; 2025 SynovaAI. All rights reserved.</p>
+    <div class="content-container">
+      <p>&copy; 2025 SynovaAI. All rights reserved.</p>
+      <div class="footer-links">
+        <a href="{{ url_for('static', filename='privacy_policy.html') }}">Privacy Policy</a>
+        <a href="{{ url_for('static', filename='terms_of_service.html') }}">Terms of Service</a>
+        <a href="{{ url_for('pages.contact') }}">Contact</a>
+      </div>
+    </div>
   </footer>
 
+  <!-- Scripts -->
+  <script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>
   <script>
     document.addEventListener("DOMContentLoaded", () => {
-      // Highlight active nav link
-      document.querySelectorAll(".nav-link").forEach(a => {
-        a.classList.toggle("active", a.getAttribute("href") === window.location.pathname);
-      });
-      // Render auth buttons
       updateAuthButtons();
-      // Back-to-top visibility
-      const topBtn = document.querySelector(".top-button");
+      const header    = document.querySelector("header");
+      const topButton = document.querySelector(".top-button");
+
       window.addEventListener("scroll", () => {
-        topBtn.style.display = window.scrollY > 300 ? "block" : "none";
+        header.classList.toggle("scrolled", window.scrollY > 50);
+        topButton.style.opacity = window.scrollY > 300 ? "1" : "0";
       });
     });
-    function scrollToTop(){ window.scrollTo({ top: 0, behavior: "smooth" }); }
+
+    function scrollToTop() {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   </script>
-  <script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>
 </body>
 </html>
