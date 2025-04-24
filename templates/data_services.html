@@ -25,15 +25,13 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
 </head>
 
-<body class="data-services-page">
-  <!-- Header -->
-  <header>
+<header>
     <nav>
       <ul class="nav-links">
-        <li><a href="{{ url_for('pages.home') }}"            class="nav-link">Home</a></li>
-        <li><a href="{{ url_for('pages.data_services') }}"   class="nav-link active">Data Services</a></li>
-        <li><a href="{{ url_for('pages.pricing') }}"         class="nav-link">Pricing</a></li>
-        <li><a href="{{ url_for('pages.contact') }}"         class="nav-link">Contact</a></li>
+        <li><a href="{{ url_for('pages.home') }}"          class="nav-link">Home</a></li>
+        <li><a href="{{ url_for('pages.data_services') }}" class="nav-link">Data Services</a></li>
+        <li><a href="{{ url_for('pages.pricing') }}"       class="nav-link">Pricing</a></li>
+        <li><a href="{{ url_for('pages.contact') }}"       class="nav-link">Contact</a></li>
         <li id="auth-buttons"></li>
       </ul>
     </nav>
