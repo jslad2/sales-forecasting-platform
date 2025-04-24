@@ -638,12 +638,13 @@ body.pricing-page {
     background-color: #f3f5f8; /* slightly darker for page background */
   }
   
-  /* — Hero Section — */
-  .pricing-hero {
-    background: linear-gradient(to bottom, #f5f7fa 0%, #ffffff 100%);
+/* — Hero Section — */
+.pricing-hero {
+    background: linear-gradient(135deg, #e0f7fa, #f0fdfc); /* soft teal & white blend */
     padding: 120px 20px 70px;
     text-align: center;
     box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+    border-bottom: 1px solid #e2e8f0;
   }
   
   .pricing-hero h1 {
@@ -657,7 +658,7 @@ body.pricing-page {
     color: var(--gray-color);
     max-width: 700px;
     margin: 0 auto;
-  }
+  }  
   
   /* — Cards Container — */
   .pricing-container {
