@@ -72,11 +72,36 @@
     </div>
   </section>
 
+  
+<section class="cta">
+  <div class="cta-container">
+    <h2>Ready to Forecast Smarter?</h2>
+    <p>Join businesses already using SynovaAI to unlock data-driven decisions and stay ahead of demand.</p>
+    <div class="cta-buttons">
+      <a href="{{ url_for('pages.contact') }}" class="cta-button primary-button">Contact Sales</a>
+    </div>
+  </div>
+</section>
+
+
   <!-- Back to Top -->
   <button onclick="scrollToTop()" class="top-button" aria-label="Back to Top">⬆ Back to Top</button>
 
   <!-- Footer -->
-  <footer>
+  
+<footer>
+  <div class="footer-container">
+    <div class="footer-left">
+      <p>&copy; 2025 SynovaAI. All rights reserved.</p>
+    </div>
+    <div class="footer-right">
+      <a href="{{ url_for('static', filename='privacy_policy.html') }}">Privacy Policy</a>
+      <a href="{{ url_for('static', filename='terms_of_service.html') }}">Terms of Service</a>
+      <a href="{{ url_for('pages.contact') }}">Contact</a>
+    </div>
+  </div>
+</footer>
+
     <div class="content-container">
       <p>&copy; 2025 SynovaAI. All rights reserved.</p>
       <div class="footer-links">
