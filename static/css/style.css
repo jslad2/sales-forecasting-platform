@@ -220,11 +220,13 @@ header.scrolled nav a:hover {
 /* ======================== */
 .service-grid {
   display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 30px;
   width: 90%;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 20px 0;
+  padding: 40px 0;
+  justify-items: center;
 }
 .service-card {
   background: var(--white-color);
