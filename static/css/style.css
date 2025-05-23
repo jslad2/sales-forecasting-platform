@@ -240,6 +240,15 @@ header.scrolled nav a:hover {
   transform: translateY(-6px);
   box-shadow: 0 8px 20px rgba(0,0,0,0.1);
 }
+.service-card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+.service-card-link:hover .service-card {
+  transform: translateY(-6px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
 .service-card img {
   margin-bottom: 20px;
 }
