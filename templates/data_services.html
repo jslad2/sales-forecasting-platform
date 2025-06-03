@@ -41,85 +41,80 @@
     <div class="logo">SYNOVAAI</div>
   </header>
 
-<!-- Hero Section -->
-<section
-  class="hero"
-  style="
-    background-image: url('{{ url_for('static', filename='images/data-services.png') }}');
-    background-size: cover;
-    background-position: center;
-    color: white;
-    padding: 220px 20px;
-    text-align: center;
-    position: relative;
-">
-  <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.6); z-index: 1;"></div>
-  <div class="content-container" style="position: relative; z-index: 2;">
-    <article class="hero-text">
-      <h1 style="font-size: 2.5rem; font-weight: 700; color: #ffffff;">Unlock the Power of Your Data</h1>
-      <p style="font-size: 1.25rem; color: #e0e0e0;">Ttransform your business with AI‑driven insights and analytics.</p>
-    </article>
-  </div>
-</section>
-
-
-<!-- Services Grid -->
-<section id="data-services" class="data-services">
-  <div class="content-container">
-    <h2>What We Offer</h2>
-    <p class="section-intro">
-      At SynovaAI, we provide cutting‑edge AI‑driven solutions to help you make better business decisions.
-    </p>
-
-    <div class="service-grid">
-
-      <a href="#forecasting" class="service-card-link">
-        <div class="service-card">
-          <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="Forecasting" width="80"/>
-          <h3>AI‑Powered Forecasting</h3>
-          <p>Predict trends, optimize inventory, and maximize revenue.</p>
-        </div>
-      </a>
-
-      <a href="#dashboards" class="service-card-link">
-        <div class="service-card">
-          <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Dashboards" width="80"/>
-          <h3>Interactive Dashboards</h3>
-          <p>Gain real‑time insights with customizable dashboards.</p>
-        </div>
-      </a>
-
-      <a href="#consulting" class="service-card-link">
-        <div class="service-card">
-          <img src="{{ url_for('static', filename='images/support-icon.png') }}" alt="Consulting" width="80"/>
-          <h3>Support & Consulting</h3>
-          <p>Expert guidance in BI tools and data strategy.</p>
-        </div>
-      </a>
-
+  <!-- Hero Section -->
+  <section
+    class="hero"
+    style="
+      background-image: url('{{ url_for('static', filename='images/data-services.png') }}');
+      background-size: cover;
+      background-position: center;
+      padding: 220px 20px;
+      text-align: center;
+      position: relative;
+  ">
+    <div style="position: absolute; inset: 0; background-color: rgba(0,0,0,0.6); z-index: 1;"></div>
+    <div class="content-container" style="position: relative; z-index: 2;">
+      <article class="hero-text">
+        <h1 style="font-size: 2.5rem; font-weight: 700; color: #fff;">Unlock the Power of Your Data</h1>
+        <p style="font-size: 1.25rem; color: #e0e0e0;">Transform your business with AI-driven insights and analytics.</p>
+      </article>
     </div>
-  </div>
-</section>
+  </section>
+
+  <!-- Services Grid -->
+  <section id="data-services" class="data-services">
+    <div class="content-container">
+      <h2>What We Offer</h2>
+      <p class="section-intro">
+        At SynovaAI, we provide cutting-edge AI-driven solutions to help you make better business decisions.
+      </p>
+
+      <div class="service-grid">
+
+        <a href="#forecasting" class="service-card-link">
+          <div class="service-card">
+            <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="Forecasting" width="80"/>
+            <h3>AI-Powered Forecasting</h3>
+            <p>Predict trends, optimize inventory, and maximize revenue.</p>
+          </div>
+        </a>
+
+        <a href="#dashboards" class="service-card-link">
+          <div class="service-card">
+            <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Dashboards" width="80"/>
+            <h3>Interactive Dashboards</h3>
+            <p>Gain real-time insights with customizable dashboards.</p>
+          </div>
+        </a>
+
+        <a href="#consulting" class="service-card-link">
+          <div class="service-card">
+            <img src="{{ url_for('static', filename='images/support-icon.png') }}" alt="Consulting" width="80"/>
+            <h3>Support & Consulting</h3>
+            <p>Expert guidance in BI tools and data strategy.</p>
+          </div>
+        </a>
+
+      </div><!-- /.service-grid -->
+
+    </div><!-- /.content-container -->
+  </section><!-- /#data-services -->
 
   <!-- Forecasting -->
-<section id="forecasting" class="service-detail alt-bg">
+  <section id="forecasting" class="service-detail alt-bg" style="margin-top:80px; scroll-margin-top:140px;">
     <div class="content-container">
       <div class="service-detail-container">
         <div class="service-image">
-          <img
-            src="{{ url_for('static', filename='images/forecasting-icon.png') }}"
-            alt="Forecasting"
-            loading="lazy"
-          />
+          <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="Forecasting" loading="lazy"/>
         </div>
         <div class="service-content">
-          <h2>AI‑Powered Forecasting</h2>
+          <h2>AI-Powered Forecasting</h2>
           <p>
             Leverage advanced machine learning to predict future demand, optimize inventory,
             and streamline planning with real-time accuracy.
           </p>
           <ul class="feature-list">
-            <li>✅ Real‑time sales predictions</li>
+            <li>✅ Real-time sales predictions</li>
             <li>✅ Inventory optimization</li>
             <li>✅ Customizable reporting</li>
           </ul>
@@ -127,17 +122,13 @@
       </div>
     </div>
   </section>
-  
+
   <!-- Dashboards -->
-  <section id="dashboards" class="service-detail">
+  <section id="dashboards" class="service-detail" style="margin-top:80px; scroll-margin-top:140px;">
     <div class="content-container">
       <div class="service-detail-container reverse">
         <div class="service-image">
-          <img
-            src="{{ url_for('static', filename='images/dashboard-icon.png') }}"
-            alt="Dashboards"
-            loading="lazy"
-          />
+          <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Dashboards" loading="lazy"/>
         </div>
         <div class="service-content">
           <h2>Interactive Dashboards</h2>
@@ -147,24 +138,20 @@
           </p>
           <ul class="feature-list">
             <li>📊 Custom KPI tracking</li>
-            <li>📈 Multi‑source integration</li>
+            <li>📈 Multi-source integration</li>
             <li>🔗 API connectivity</li>
           </ul>
         </div>
       </div>
     </div>
   </section>
-  
+
   <!-- Consulting -->
-  <section id="consulting" class="service-detail alt-bg">
+  <section id="consulting" class="service-detail alt-bg" style="margin-top:80px; scroll-margin-top:140px;">
     <div class="content-container">
       <div class="service-detail-container">
         <div class="service-image">
-          <img
-            src="{{ url_for('static', filename='images/support-icon.png') }}"
-            alt="Consulting"
-            loading="lazy"
-          />
+          <img src="{{ url_for('static', filename='images/support-icon.png') }}" alt="Consulting" loading="lazy"/>
         </div>
         <div class="service-content">
           <h2>Expert Support & Consulting</h2>
@@ -180,14 +167,14 @@
         </div>
       </div>
     </div>
-  </section>  
+  </section>
 
   <!-- CTA -->
   <section class="cta">
     <div class="content-container">
       <div class="cta-container">
         <h2>Ready to Transform Your Business?</h2>
-        <p>Start your AI‑powered analytics journey today.</p>
+        <p>Start your AI-powered analytics journey today.</p>
         <div class="cta-buttons">
           <a href="{{ url_for('pages.pricing') }}" class="cta-button primary">View Plans</a>
           <a href="{{ url_for('pages.contact') }}" class="cta-button secondary">Contact Sales</a>
@@ -200,7 +187,6 @@
   <button onclick="scrollToTop()" class="top-button" aria-label="Back to Top">↑</button>
 
   <!-- Footer -->
-  
   <footer>
     <div class="footer-container">
       <div class="footer-left">
@@ -212,7 +198,7 @@
         <a href="{{ url_for('pages.contact') }}">Contact</a>
       </div>
     </div>
-  </footer> 
+  </footer>
 
   <!-- Scripts -->
   <script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>
