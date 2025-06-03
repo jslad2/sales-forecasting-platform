@@ -4,53 +4,38 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-# 1) Make sure setuptools & wheel are installed first (so build backends work)
-setuptools = "*"
-wheel = "*"
-
-# 2) Cython is needed by packages that build C-extensions (pmdarima, etc.)
-Cython = ">=0.29.21"
-
-# 3) Instead of pystan, install cmdstanpy for Prophet’s backend on Python 3.12+
-cmdstanpy = ">=1.0.4"
-
-# 4) Pin Prophet to 1.1.4 (it will detect CmdStanPy automatically)
+streamlit = "==1.26.0"
+pandas = "==1.5.3"
+numpy = "==1.24.3"
 prophet = "==1.1.4"
-
-# 5) Pin pmdarima to a version with published wheels
 pmdarima = "==2.0.3"
-
-# 6) The rest of your data-science stack (unchanged)
-streamlit       = "==1.26.0"
-pandas          = "==1.5.3"
-numpy           = "==1.24.3"
-xgboost         = "==1.7.5"
-matplotlib      = "==3.7.1"
-plotly          = "==5.15.0"
-statsmodels     = "==0.13.5"
-optuna          = "==3.2.0"
-flaml           = "==2.3.2"
-scikit-learn    = "==1.2.2"
-holidays        = "==0.28"
-lightgbm        = "==3.3.5"
-catboost        = "==1.2.2"
-shap            = "==0.42.1"
-joblib          = "==1.2.0"
-threadpoolctl   = "==3.1.0"
-python-dotenv   = "==0.21.1"
-tqdm            = "==4.64.1"
-tenacity        = "==8.2.2"
-pytz            = "==2022.7.1"
-tzdata          = "==2022.7"
-pydeck          = "==0.8.0"
-cycler          = "==0.11.0"
-kiwisolver      = "==1.4.4"
-pyparsing       = "==3.0.9"
-fonttools       = "==4.39.3"
-fpdf            = "==1.7.2"
-convertdate     = "==2.4.0"
-pymeeus         = "==0.5.11"
-patsy           = "==0.5.3"
+xgboost = "==1.7.5"
+matplotlib = "==3.7.1"
+plotly = "==5.15.0"
+statsmodels = "==0.13.5"
+optuna = "==3.2.0"
+flaml = "==2.3.2"
+scikit-learn = "==1.2.2"
+holidays = "==0.28"
+lightgbm = "==3.3.5"
+catboost = "==1.2.2"
+shap = "==0.42.1"
+joblib = "==1.2.0"
+threadpoolctl = "==3.1.0"
+python-dotenv = "==0.21.1"
+tqdm = "==4.64.1"
+tenacity = "==8.2.2"
+pytz = "==2022.7.1"
+tzdata = "==2022.7"
+pydeck = "==0.8.0"
+cycler = "==0.11.0"
+kiwisolver = "==1.4.4"
+pyparsing = "==3.0.9"
+fonttools = "==4.39.3"
+fpdf = "==1.7.2"
+convertdate = "==2.4.0"
+pymeeus = "==0.5.11"
+patsy = "==0.5.3"
 
 [dev-packages]
 pytest = "==7.2.2"
