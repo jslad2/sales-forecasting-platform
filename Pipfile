@@ -4,31 +4,29 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+# 1) Install Cython first so that downstream C extensions can compile
+Cython = ">=0.29.21"
+
+# 2) Prophet requires a Stan backend; we’ll use pystan here
+pystan = "~=3.8.0"
+
+# 3) Pin Prophet to a version known to include wheels for Python 3.9
+prophet = "==1.1.4"
+
+# 4) Pin pmdarima to a version that ships prebuilt wheels
+pmdarima = "==2.0.3"
+
+# 5) The rest of your data-science stack
 streamlit = "==1.26.0"
 pandas = "==1.5.3"
 numpy = "==1.24.3"
-prophet = "==1.1.4"
-pmdarima = "==2.0.3"
 xgboost = "==1.7.5"
 matplotlib = "==3.7.1"
 plotly = "==5.15.0"
 statsmodels = "==0.13.5"
 optuna = "==3.2.0"
-flaml = "==2.3.2"
-scikit-learn = "==1.2.2"
-holidays = "==0.28"
-lightgbm = "==3.3.5"
-catboost = "==1.2.2"
-shap = "==0.42.1"
-joblib = "==1.2.0"
-threadpoolctl = "==3.1.0"
-python-dotenv = "==0.21.1"
-tqdm = "==4.64.1"
-tenacity = "==8.2.2"
-pytz = "==2022.7.1"
-tzdata = "==2022.7"
-pydeck = "==0.8.0"
-cycler = "==0.11.0"
+
+# Any additional libraries you were using:
 kiwisolver = "==1.4.4"
 pyparsing = "==3.0.9"
 fonttools = "==4.39.3"
