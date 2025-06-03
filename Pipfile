@@ -4,23 +4,23 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-# 1) Ensure setuptools & wheel are available first
+# 1) Make sure setuptools & wheel are installed first (so build backends work)
 setuptools = "*"
 wheel = "*"
 
-# 2) Cython is needed by packages that compile C extensions
+# 2) Cython is needed by packages that build C-extensions (pmdarima, etc.)
 Cython = ">=0.29.21"
 
-# 3) Prophet needs a Stan backend; install pystan before prophet
-pystan = "~=3.8.0"
+# 3) Instead of pystan, install cmdstanpy for Prophet’s backend on Python 3.12+
+cmdstanpy = ">=1.0.4"
 
-# 4) Pin Prophet to a version known to include wheels for Python 3.9
+# 4) Pin Prophet to 1.1.4 (it will detect CmdStanPy automatically)
 prophet = "==1.1.4"
 
-# 5) Pin pmdarima to a version that ships prebuilt wheels
+# 5) Pin pmdarima to a version with published wheels
 pmdarima = "==2.0.3"
 
-# 6) The rest of your data-science stack
+# 6) The rest of your data-science stack (unchanged)
 streamlit       = "==1.26.0"
 pandas          = "==1.5.3"
 numpy           = "==1.24.3"
