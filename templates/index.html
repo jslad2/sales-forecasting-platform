@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SynovaAI - Effortless AI Sales Forecasting</title>
   <meta name="description" content="Effortless AI Sales Forecasting for businesses. Generate accurate sales forecasts in minutes — no data science required.">
 
@@ -11,7 +11,6 @@
   <meta property="og:image" content="{{ url_for('static', filename='images/og-image.png') }}">
   <meta property="og:url" content="https://www.synovaai.com">
 
-  <!-- Google Analytics 4 -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-LKEQTSKLCF"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -29,10 +28,10 @@
   <header>
     <nav>
       <ul class="nav-links">
-        <li><a href="{{ url_for('pages.home') }}"          class="nav-link">Home</a></li>
+        <li><a href="{{ url_for('pages.home') }}" class="nav-link">Home</a></li>
         <li><a href="{{ url_for('pages.data_services') }}" class="nav-link">Data Services</a></li>
-        <li><a href="{{ url_for('pages.pricing') }}"       class="nav-link">Pricing</a></li>
-        <li><a href="{{ url_for('pages.contact') }}"       class="nav-link">Contact</a></li>
+        <li><a href="{{ url_for('pages.pricing') }}" class="nav-link">Pricing</a></li>
+        <li><a href="{{ url_for('pages.contact') }}" class="nav-link">Contact</a></li>
         <li id="auth-buttons"></li>
       </ul>
     </nav>
@@ -40,34 +39,24 @@
   </header>
 
   <!-- Hero Section -->
-  <section
-    class="hero"
-    style="
-      background-image: url('{{ url_for('static', filename='images/hero-background6.png') }}');
-      background-size: cover;
-      background-position: center;
-      color: white;
-      padding: 220px 20px;
-      position: relative;
-    "
-  >
+  <section class="hero"
+           style="background-image: url('{{ url_for('static', filename='images/hero-background6.png') }}');
+                  background-size: cover;
+                  background-position: center;
+                  color: white;
+                  padding: 220px 20px;
+                  position: relative;">
     <div class="hero-container">
       <div class="hero-left">
         <h1>Effortless AI Sales Forecasting</h1>
         <p>
-          Turn raw data into actionable insights to plan smarter, sell better, and stay
-          ahead of demand.
+          Turn raw data into actionable insights to plan smarter, sell better, and stay ahead of demand.
         </p>
       </div>
-
       <div class="hero-right">
         <div class="hero-buttons">
-          <a href="{{ url_for('pages.data_services') }}" class="cta-button primary-button">
-            Get Started
-          </a>
-          <a href="{{ url_for('pages.pricing') }}" class="cta-button secondary-button">
-            See Pricing
-          </a>
+          <a href="{{ url_for('pages.data_services') }}" class="cta-button primary-button">Get Started</a>
+          <a href="{{ url_for('pages.pricing') }}" class="cta-button secondary-button">See Pricing</a>
         </div>
         <p class="hero-trust-text">
           AI‑Powered Forecasting. Real‑Time Dashboards. Trusted by Growing Teams.
@@ -79,6 +68,7 @@
   <!-- Tools Overview -->
   <section id="data-services" class="data-services">
     <div class="content-container">
+      <p class="section-tagline">Our Tools</p>
       <h2>What We Offer</h2>
       <p class="section-intro">
         At SynovaAI, we provide cutting‑edge AI‑driven solutions to help you make better business decisions.
@@ -104,7 +94,6 @@
         </div>
       </div>
 
-      <!-- Section Divider brought into container -->
       <p class="section-divider">Trusted by teams driving smarter decisions every day.</p>
     </div>
   </section>
@@ -112,7 +101,9 @@
   <!-- Call to Action Section -->
   <section class="cta"
            style="background-image: url('{{ url_for('static', filename='images/cta-background.jpg') }}');
-                  background-size: cover; background-position: center; color: white;">
+                  background-size: cover;
+                  background-position: center;
+                  color: white;">
     <div class="cta-container">
       <h2>Take the Guesswork Out of Your Sales Strategy</h2>
       <p>Join businesses already using SynovaAI to unlock data-driven decisions and stay ahead of demand.</p>
@@ -144,7 +135,7 @@
     document.addEventListener("DOMContentLoaded", function() {
       updateAuthButtons();
 
-      const header    = document.querySelector("header");
+      const header = document.querySelector("header");
       const topButton = document.querySelector(".top-button");
 
       window.addEventListener("scroll", function() {
@@ -169,6 +160,5 @@
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   </script>  
-
 </body>
 </html>
