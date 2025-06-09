@@ -413,12 +413,14 @@ footer {
 body.pricing-page {
   background: #f3f5f8;
 }
+
 .pricing-hero {
-  background: linear-gradient(135deg,#e0f7fa,#f0fdfc);
+  background: linear-gradient(135deg, #e0f7fa, #f0fdfc);
   padding: 120px 20px 70px;
   text-align: center;
-  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.05);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.05);
 }
+
 .pricing-container {
   display: flex;
   gap: 2rem;
@@ -427,56 +429,72 @@ body.pricing-page {
   max-width: 1200px;
   margin: 3rem auto 5rem;
 }
+
 .pricing-card {
   background: var(--white-color);
   border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
   padding: 2.5rem;
   width: 100%;
   max-width: 340px;
   text-align: center;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition: transform 0.4s ease, box-shadow 0.4s ease, opacity 0.6s ease;
   opacity: 0;
   transform: translateY(20px);
 }
+
 .pricing-card.show {
   opacity: 1;
   transform: translateY(0);
 }
+
+.pricing-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.08);
+}
+
 .pricing-card h2 {
   font-size: 1.5rem;
   margin-bottom: 1rem;
+  color: var(--primary-color);
 }
+
 .pricing-card .price {
   font-size: 2.4rem;
   color: var(--secondary-color);
   margin: 0.5rem 0 1.5rem;
 }
+
 .pricing-card ul {
   list-style: none;
   padding: 0;
   margin: 1.5rem 0 2rem;
 }
+
 .pricing-card ul li {
   padding: 8px 0;
   font-size: 1rem;
 }
+
 .pricing-card ul li.disabled {
   color: var(--gray-color);
   opacity: 0.5;
   text-decoration: line-through;
 }
+
 .pricing-card a.cta-button {
   font-size: 1rem;
   padding: 12px 28px;
   display: inline-block;
+  border-radius: 9999px;
+  text-decoration: none;
 }
+
 .pricing-card.pro {
   border: 2px solid var(--accent-color);
-  transform: scale(1.03);
-  z-index: 1;
   position: relative;
 }
+
 .pricing-card.pro::before {
   content: "Popular";
   position: absolute;
@@ -489,8 +507,9 @@ body.pricing-page {
   font-weight: bold;
   padding: 4px 12px;
   border-radius: 12px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
+
 
 /* ======================== */
 /* ==== CONTACT PAGE ====== */
