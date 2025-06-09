@@ -25,6 +25,7 @@
 </head>
 
 <body class="pricing-page">
+
   <!-- Header -->
   <header>
     <nav>
@@ -42,7 +43,7 @@
   <!-- Hero Section -->
   <section class="pricing-hero">
     <h1>Choose Your Plan</h1>
-    <p>Start with our free tier or upgrade to unlock full features.</p>
+    <p>Start with our free tier or upgrade to unlock full features and insights.</p>
   </section>
 
   <!-- Pricing Table -->
@@ -51,44 +52,46 @@
       <h2>Free Tier</h2>
       <p class="price">$0 <span>/ month</span></p>
       <ul>
-        <li>🔹 Access basic forecasting</li>
-        <li>🔹 View sales predictions</li>
-        <li class="disabled">❌ No downloads</li>
-        <li class="disabled">❌ Limited forecast depth</li>
+        <li>Basic forecasting tools</li>
+        <li>View interactive dashboards</li>
+        <li class="disabled">Downloadable reports</li>
+        <li class="disabled">Full analytics features</li>
       </ul>
-      <a href="{{ url_for('auth.register') }}" class="cta-button">Start for Free</a>
+      <a href="{{ url_for('auth.register') }}" class="cta-button primary-button">Start for Free</a>
     </div>
 
     <div class="pricing-card pro">
       <h2>Pro Plan</h2>
       <p class="price">$19.99 <span>/ month</span></p>
       <ul>
-        <li>✅ Full forecasting access</li>
-        <li>✅ Download reports</li>
-        <li>✅ Advanced analytics</li>
-        <li>✅ Priority support</li>
+        <li>Full AI-powered forecasting access</li>
+        <li>Downloadable PDF/CSV reports</li>
+        <li>Advanced insights & custom views</li>
+        <li>Priority customer support</li>
       </ul>
-      <a href="https://buy.stripe.com/eVa00j89SeIM9hKeUU" class="cta-button pro-btn">Upgrade to Pro</a>
+      <a href="https://buy.stripe.com/eVa00j89SeIM9hKeUU" class="cta-button secondary-button">Upgrade to Pro</a>
     </div>
   </section>
 
-  
-<section class="cta">
-  <div class="cta-container">
-    <h2>Ready to Forecast Smarter?</h2>
-    <p>Join businesses already using SynovaAI to unlock data-driven decisions and stay ahead of demand.</p>
-    <div class="cta-buttons">
-      <a href="{{ url_for('pages.contact') }}" class="cta-button primary-button">Contact Sales</a>
+  <!-- CTA Section -->
+  <section class="cta"
+           style="background-image: url('{{ url_for('static', filename='images/cta-background.jpg') }}');
+                  background-size: cover;
+                  background-position: center;
+                  color: white;">
+    <div class="cta-container">
+      <h2>Ready to Forecast Smarter?</h2>
+      <p>Join businesses already using SynovaAI to unlock data-driven decisions and stay ahead of demand.</p>
+      <div class="cta-buttons">
+        <a href="{{ url_for('pages.contact') }}" class="cta-button primary-button">Contact Sales</a>
+      </div>
     </div>
-  </div>
-</section>
-
+  </section>
 
   <!-- Back to Top -->
   <button onclick="scrollToTop()" class="top-button" aria-label="Back to Top">⬆ Back to Top</button>
 
   <!-- Footer -->
-  
   <footer>
     <div class="footer-container">
       <div class="footer-left">
@@ -100,7 +103,7 @@
         <a href="{{ url_for('pages.contact') }}">Contact</a>
       </div>
     </div>
-  </footer> 
+  </footer>
 
   <!-- Scripts -->
   <script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>
