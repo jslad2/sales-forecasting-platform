@@ -48,19 +48,41 @@
                   position: relative;">
     <div class="hero-container">
       <div class="hero-left">
-        <h1>Effortless AI Sales Forecasting</h1>
+        <h1>AI Sales Forecasting in Minutes, Not Days</h1>
         <p>
-          Turn raw data into actionable insights to plan smarter, sell better, and stay ahead of demand.
+          No data science required. Get accurate predictions to drive your business forward.
         </p>
+        <ul class="hero-benefits">
+          <li>95% forecast accuracy</li>
+          <li>No technical skills needed</li>
+          <li>Actionable insights in minutes</li>
+          <li>Real-time dashboard updates</li>
+        </ul>
       </div>
       <div class="hero-right">
         <div class="hero-buttons">
-          <a href="{{ url_for('pages.data_services') }}" class="cta-button primary-button">Get Started</a>
+          <a href="{{ url_for('pages.data_services') }}" class="cta-button primary-button">Start Free Trial</a>
           <a href="{{ url_for('pages.pricing') }}" class="cta-button secondary-button">See Pricing</a>
         </div>
         <p class="hero-trust-text">
-          AI‑Powered Forecasting. Real‑Time Dashboards. Trusted by Growing Teams.
+          Trusted by 500+ teams driving smarter decisions every day
         </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Social Proof Section -->
+  <section class="social-proof">
+    <div class="content-container">
+      <div class="logos-container">
+        <img src="{{ url_for('static', filename='images/logo-company1.png') }}" alt="Company 1">
+        <img src="{{ url_for('static', filename='images/logo-company2.png') }}" alt="Company 2">
+        <img src="{{ url_for('static', filename='images/logo-company3.png') }}" alt="Company 3">
+        <img src="{{ url_for('static', filename='images/logo-company4.png') }}" alt="Company 4">
+      </div>
+      <div class="testimonial">
+        <p>"SynovaAI reduced our forecasting time by 80% while improving accuracy. The insights helped us optimize inventory and reduce waste significantly."</p>
+        <div class="author">- Sarah K., Director of Operations</div>
       </div>
     </div>
   </section>
@@ -71,7 +93,7 @@
       <p class="section-tagline">Our Tools</p>
       <h2>What We Offer</h2>
       <p class="section-intro">
-        At SynovaAI, we provide cutting‑edge AI‑driven solutions to help you make better business decisions.
+        Cutting-edge AI-driven solutions to transform your sales strategy and business decisions.
       </p>
 
       <div class="service-grid">
@@ -105,10 +127,20 @@
                   background-position: center;
                   color: white;">
     <div class="cta-container">
-      <h2>Take the Guesswork Out of Your Sales Strategy</h2>
-      <p>Join businesses already using SynovaAI to unlock data-driven decisions and stay ahead of demand.</p>
+      <h2>Ready to transform your sales forecasting?</h2>
+      <div class="cta-benefits">
+        <div class="benefit-card">
+          <div class="benefit-number">30%</div>
+          <p>Average reduction in forecasting errors</p>
+        </div>
+        <div class="benefit-card">
+          <div class="benefit-number">4.8/5</div>
+          <p>Customer satisfaction rating</p>
+        </div>
+      </div>
       <div class="cta-buttons">
-        <a href="{{ url_for('pages.pricing') }}" class="cta-button primary-button">See Pricing Plans</a>
+        <a href="{{ url_for('pages.pricing') }}" class="cta-button primary-button">Start Free Trial</a>
+        <a href="{{ url_for('pages.demo') }}" class="cta-button secondary-button">Watch Demo</a>
       </div>
     </div>
   </section>
@@ -119,13 +151,34 @@
   <!-- Footer -->
   <footer>
     <div class="footer-container">
-      <div class="footer-left">
-        <p>&copy; 2025 SynovaAI. All rights reserved.</p>
+      <div class="footer-column">
+        <div class="logo">SYNOVAAI</div>
+        <p>AI-powered sales forecasting for modern businesses</p>
       </div>
+      <div class="footer-column">
+        <h4>Product</h4>
+        <a href="{{ url_for('pages.features') }}">Features</a>
+        <a href="{{ url_for('pages.pricing') }}">Pricing</a>
+        <a href="{{ url_for('pages.integrations') }}">Integrations</a>
+      </div>
+      <div class="footer-column">
+        <h4>Resources</h4>
+        <a href="{{ url_for('pages.blog') }}">Blog</a>
+        <a href="{{ url_for('pages.docs') }}">Documentation</a>
+        <a href="{{ url_for('pages.webinars') }}">Webinars</a>
+      </div>
+      <div class="footer-column">
+        <h4>Company</h4>
+        <a href="{{ url_for('pages.about') }}">About</a>
+        <a href="{{ url_for('pages.careers') }}">Careers</a>
+        <a href="{{ url_for('pages.contact') }}">Contact</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2025 SynovaAI. All rights reserved.</p>
       <div class="footer-right">
         <a href="{{ url_for('static', filename='privacy_policy.html') }}">Privacy Policy</a>
         <a href="{{ url_for('static', filename='terms_of_service.html') }}">Terms of Service</a>
-        <a href="{{ url_for('pages.contact') }}">Contact</a>
       </div>
     </div>
   </footer> 
