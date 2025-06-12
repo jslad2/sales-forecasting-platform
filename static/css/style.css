@@ -133,7 +133,6 @@ header.scrolled nav a:hover {
   padding: 0 20px;
   box-sizing: border-box;
 }
-
 .hero-container {
   display: flex;
   flex-wrap: wrap;
@@ -297,11 +296,6 @@ header.scrolled nav a:hover {
 /* ======================== */
 .data-services {
   background-color: #f9fafa;
-  padding: 80px 20px;
-  margin-bottom: 60px;
-}
-.data-services {
-  background: linear-gradient(180deg, #f8f9fa 0%, #edf2f7 100%);
   padding: 80px 20px;
   margin-bottom: 60px;
 }
