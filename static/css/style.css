@@ -133,10 +133,7 @@ header.scrolled nav a:hover {
   padding: 0 20px;
   box-sizing: border-box;
 }
-.content-container {
-  border-radius: 12px;
-  padding: 40px 20px;
-}
+
 .hero-container {
   display: flex;
   flex-wrap: wrap;
