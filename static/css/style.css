@@ -415,10 +415,10 @@ body.pricing-page {
 }
 
 .pricing-hero {
-  background: #0a415d; /* slightly darker for better contrast */
-  padding: 120px 20px 70px;
+  background: #0a415d;
+  color: white; /* force white text in hero */
+  padding: 160px 20px 100px; /* more vertical padding for visual space */
   text-align: center;
-  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.05);
 }
 
 .pricing-tagline {
@@ -432,7 +432,6 @@ body.pricing-page {
 }
 
 .pricing-container {
-  background: #0a415d;
   display: flex;
   gap: 2rem;
   justify-content: center;
