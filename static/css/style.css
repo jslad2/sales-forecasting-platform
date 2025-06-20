@@ -415,7 +415,7 @@ body.pricing-page {
 }
 
 .pricing-hero {
-  background: linear-gradient(135deg, #e0f7fa, #f0fdfc);
+  background: #e0f2f8; /* pastel blue-gray */
   padding: 120px 20px 70px;
   text-align: center;
   box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.05);
