@@ -432,6 +432,7 @@ body.pricing-page {
 }
 
 .pricing-container {
+  background: #0a415d;
   display: flex;
   gap: 2rem;
   justify-content: center;
