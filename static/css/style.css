@@ -415,14 +415,23 @@ body.pricing-page {
 }
 
 .pricing-hero {
-  background: #136986; /* pastel blue-gray */
+  background: #e0f2f8; /* slightly darker for better contrast */
   padding: 120px 20px 70px;
   text-align: center;
   box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.05);
 }
 
+.pricing-tagline {
+  text-align: center;
+  font-weight: 600;
+  color: var(--secondary-color);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 0.9rem;
+  margin: -30px auto 30px;
+}
+
 .pricing-container {
-  background: #136986; /* pastel blue-gray */
   display: flex;
   gap: 2rem;
   justify-content: center;
@@ -442,6 +451,7 @@ body.pricing-page {
   transition: transform 0.4s ease, box-shadow 0.4s ease, opacity 0.6s ease;
   opacity: 0;
   transform: translateY(20px);
+  position: relative;
 }
 
 .pricing-card.show {
@@ -491,24 +501,23 @@ body.pricing-page {
   text-decoration: none;
 }
 
+/* Pro Plan Highlight */
 .pricing-card.pro {
   border: 2px solid var(--accent-color);
-  position: relative;
 }
 
-.pricing-card.pro::before {
-  content: "Popular";
+.badge-popular {
   position: absolute;
-  top: -12px;
+  top: -20px;
   left: 50%;
   transform: translateX(-50%);
   background: var(--accent-color);
   color: white;
   font-size: 0.75rem;
   font-weight: bold;
-  padding: 4px 12px;
-  border-radius: 12px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  padding: 6px 14px;
+  border-radius: 9999px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 
