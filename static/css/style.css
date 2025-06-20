@@ -297,7 +297,7 @@ header.scrolled nav a:hover {
 .data-services {
   background-color: #f9fafa;
   padding: 80px 20px;
-  margin-bottom: 40px; /* tightened spacing */
+  margin-bottom: 40px;
 }
 
 .service-grid {
@@ -305,7 +305,7 @@ header.scrolled nav a:hover {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 30px;
   width: 100%;
-  max-width: 1200px; /* match detail section width for consistency */
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -366,24 +366,26 @@ header.scrolled nav a:hover {
   color: var(--gray-color);
 }
 
-/* ==== STAGGERED SERVICE DETAIL SECTIONS ==== */
+/* ============================ */
+/* === SERVICE DETAIL SECTIONS */
+/* ============================ */
 .service-detail-wrapper {
   width: 100%;
-  max-width: 1200px; /* match grid width */
+  max-width: 1200px;
   margin: 0 auto;
   padding: 0 20px;
 }
 
 .service-detail {
-  padding: 20px 0;
-  margin-top: 40px;
+  padding: 40px 0;
+  background-color: #ffffff;
 }
 
 .service-detail-container {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between; /* better horizontal alignment */
+  justify-content: center;
   gap: 2rem;
   margin-bottom: 40px;
 }
@@ -394,7 +396,7 @@ header.scrolled nav a:hover {
 
 .service-detail .service-image {
   flex: 1 1 300px;
-  max-width: 350px;
+  max-width: 400px;
   text-align: center;
 }
 
@@ -405,17 +407,40 @@ header.scrolled nav a:hover {
 
 .service-detail .service-content {
   flex: 1 1 400px;
-  min-width: 280px;
+  max-width: 600px;
+  text-align: left;
 }
 
 .service-detail .service-content p {
   margin-bottom: 0.75rem;
+  font-size: 1.05rem;
+  color: var(--gray-color);
 }
 
 .service-detail .service-content ul {
+  list-style: none;
+  padding-left: 0;
   margin-top: 1rem;
-  margin-bottom: 0;
 }
+
+.service-detail .service-content ul li {
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+  .service-detail-container,
+  .service-detail-container.reverse {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .service-detail .service-content {
+    text-align: center;
+  }
+}
+
 
 /* OPTIONAL: Ensure detail sections center content on small screens */
 @media (max-width: 768px) {
