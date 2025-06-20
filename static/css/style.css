@@ -524,6 +524,24 @@ body.pricing-page {
   border: 2px solid var(--accent-color);
 }
 
+.secondary-button {
+  background: linear-gradient(90deg, #ff8c00, #ffa726); /* orange gradient */
+  color: white;
+  font-weight: 600;
+  border: none;
+  border-radius: 9999px;
+  padding: 12px 28px;
+  display: inline-block;
+  margin-top: 20px;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.secondary-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(255, 140, 0, 0.25);
+}
+
 /* "Most Popular" Badge */
 .badge-popular {
   position: absolute;
