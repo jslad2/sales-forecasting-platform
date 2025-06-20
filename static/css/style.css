@@ -299,6 +299,7 @@ header.scrolled nav a:hover {
   padding: 80px 20px;
   margin-bottom: 60px;
 }
+
 .service-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -307,6 +308,7 @@ header.scrolled nav a:hover {
   max-width: 1300px;
   margin: 0 auto;
 }
+
 .service-card {
   background: var(--white-color);
   border-radius: 16px;
@@ -323,6 +325,7 @@ header.scrolled nav a:hover {
   transform: translateY(20px);
   transition: all 0.6s cubic-bezier(0.215, 0.61, 0.355, 1);
 }
+
 .service-card.show {
   opacity: 1;
   transform: translateY(0);
@@ -330,20 +333,24 @@ header.scrolled nav a:hover {
 .service-card:nth-child(1) { transition-delay: 0.1s; }
 .service-card:nth-child(2) { transition-delay: 0.2s; }
 .service-card:nth-child(3) { transition-delay: 0.3s; }
+
 .service-card:hover {
   transform: translateY(-6px);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
 }
+
 .service-card img {
   height: 80px;
   margin-bottom: 24px;
   filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.1));
 }
+
 .service-card h3 {
   font-size: 1.4rem;
   color: var(--primary-color);
   margin-bottom: 10px;
 }
+
 .service-card p {
   color: var(--gray-color);
   font-size: 1rem;
@@ -351,12 +358,37 @@ header.scrolled nav a:hover {
   margin-bottom: 0;
   flex-grow: 1;
 }
+
 .section-divider {
   margin-top: 40px;
   font-size: 0.95rem;
   text-align: center;
   color: var(--gray-color);
 }
+
+/* ==== STAGGERED SERVICE DETAIL SECTIONS ==== */
+.service-detail-container {
+  display: flex;
+  gap: 3rem;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 60px;
+}
+
+.service-detail-container.reverse {
+  flex-direction: row-reverse;
+}
+
+.service-detail .service-image {
+  flex: 1 1 300px;
+  text-align: center;
+}
+
+.service-detail .service-content {
+  flex: 1 1 400px;
+}
+
 
 /* ======================== */
 /* ===== FOOTER STYLES ==== */
