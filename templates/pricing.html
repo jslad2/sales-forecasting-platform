@@ -46,9 +46,12 @@
     <p>Start with our free tier or upgrade to unlock full features and insights.</p>
   </section>
 
+  <!-- Section Tagline -->
+  <div class="section-tagline" style="text-align: center; margin-bottom: 10px;">No hidden fees. Cancel anytime.</div>
+
   <!-- Pricing Table -->
   <section class="pricing-container">
-    <div class="pricing-card">
+    <div class="pricing-card show">
       <h2>Free Tier</h2>
       <p class="price">$0 <span>/ month</span></p>
       <ul>
@@ -60,7 +63,8 @@
       <a href="{{ url_for('auth.register') }}" class="cta-button primary-button">Start for Free</a>
     </div>
 
-    <div class="pricing-card pro">
+    <div class="pricing-card pro show">
+      <div class="badge-popular">Most Popular</div>
       <h2>Pro Plan</h2>
       <p class="price">$19.99 <span>/ month</span></p>
       <ul>
