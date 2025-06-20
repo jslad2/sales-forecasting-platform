@@ -297,7 +297,7 @@ header.scrolled nav a:hover {
 .data-services {
   background-color: #f9fafa;
   padding: 80px 20px;
-  margin-bottom: 40px; /* tightened from 60px */
+  margin-bottom: 40px; /* tightened spacing */
 }
 
 .service-grid {
@@ -305,7 +305,7 @@ header.scrolled nav a:hover {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 30px;
   width: 100%;
-  max-width: 1300px;
+  max-width: 1200px; /* match detail section width for consistency */
   margin: 0 auto;
 }
 
@@ -367,26 +367,34 @@ header.scrolled nav a:hover {
 }
 
 /* ==== STAGGERED SERVICE DETAIL SECTIONS ==== */
+.service-detail-wrapper {
+  width: 100%;
+  max-width: 1200px; /* match grid width */
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.service-detail {
+  padding: 20px 0;
+  margin-top: 40px;
+}
+
 .service-detail-container {
   display: flex;
-  gap: 2rem; /* tighter gap between image/content */
-  align-items: center;
-  justify-content: center;
   flex-wrap: wrap;
-  margin-bottom: 40px; /* tightened from 60px */
+  align-items: center;
+  justify-content: space-between; /* better horizontal alignment */
+  gap: 2rem;
+  margin-bottom: 40px;
 }
 
 .service-detail-container.reverse {
   flex-direction: row-reverse;
 }
 
-.service-detail {
-  padding: 20px 0;
-  margin-top: 40px; /* tightened from 80px if previously set */
-}
-
 .service-detail .service-image {
   flex: 1 1 300px;
+  max-width: 350px;
   text-align: center;
 }
 
@@ -397,6 +405,7 @@ header.scrolled nav a:hover {
 
 .service-detail .service-content {
   flex: 1 1 400px;
+  min-width: 280px;
 }
 
 .service-detail .service-content p {
@@ -408,13 +417,21 @@ header.scrolled nav a:hover {
   margin-bottom: 0;
 }
 
-.service-detail-wrapper {
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
-}
+/* OPTIONAL: Ensure detail sections center content on small screens */
+@media (max-width: 768px) {
+  .service-detail-container {
+    flex-direction: column;
+    text-align: center;
+  }
 
+  .service-detail-container.reverse {
+    flex-direction: column;
+  }
+
+  .service-detail .service-content {
+    text-align: center;
+  }
+}
 
 /* ======================== */
 /* ===== FOOTER STYLES ==== */
