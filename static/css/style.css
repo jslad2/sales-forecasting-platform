@@ -414,13 +414,16 @@ body.pricing-page {
   background: #f3f6f8;
 }
 
+/* Hero Section */
 .pricing-hero {
   background: #0a415d;
-  color: white; /* force white text in hero */
-  padding: 160px 20px 100px; /* more vertical padding for visual space */
+  color: white;
+  padding: 160px 20px 100px;
   text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06); /* subtle separator */
 }
 
+/* Tagline Text */
 .pricing-tagline {
   text-align: center;
   font-weight: 600;
@@ -431,51 +434,62 @@ body.pricing-page {
   margin: -30px auto 30px;
 }
 
+/* Container for Pricing Cards */
 .pricing-container {
   display: flex;
-  gap: 2rem;
-  justify-content: center;
   flex-wrap: wrap;
+  justify-content: center;
+  gap: 2rem;
   max-width: 1200px;
   margin: 3rem auto 5rem;
+  padding: 0 1rem;
 }
 
+/* Individual Card Styling */
 .pricing-card {
   background: var(--white-color);
   border-radius: 20px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
   padding: 2.5rem;
-  width: 100%;
   max-width: 340px;
+  width: 100%;
   text-align: center;
-  transition: transform 0.4s ease, box-shadow 0.4s ease, opacity 0.6s ease;
   opacity: 0;
   transform: translateY(20px);
+  transition: all 0.4s ease;
   position: relative;
+  animation: fadeInUp 0.6s ease forwards;
 }
 
-.pricing-card.show {
-  opacity: 1;
-  transform: translateY(0);
+/* Fade-in animation on load */
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
+/* Hover Effect */
 .pricing-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.08);
 }
 
+/* Card Headings */
 .pricing-card h2 {
   font-size: 1.5rem;
   margin-bottom: 1rem;
   color: var(--primary-color);
 }
 
+/* Price Display */
 .pricing-card .price {
   font-size: 2.4rem;
   color: var(--secondary-color);
   margin: 0.5rem 0 1.5rem;
 }
 
+/* Feature List */
 .pricing-card ul {
   list-style: none;
   padding: 0;
@@ -485,27 +499,32 @@ body.pricing-page {
 .pricing-card ul li {
   padding: 8px 0;
   font-size: 1rem;
+  color: var(--text-color);
 }
 
 .pricing-card ul li.disabled {
   color: var(--gray-color);
-  opacity: 0.5;
+  opacity: 0.6;
   text-decoration: line-through;
 }
 
+/* CTA Button */
 .pricing-card a.cta-button {
   font-size: 1rem;
   padding: 12px 28px;
-  display: inline-block;
   border-radius: 9999px;
+  display: inline-block;
   text-decoration: none;
+  transition: background-color 0.3s ease, transform 0.3s ease;
+  cursor: pointer;
 }
 
-/* Pro Plan Highlight */
+/* Highlight for Pro Plan */
 .pricing-card.pro {
   border: 2px solid var(--accent-color);
 }
 
+/* "Most Popular" Badge */
 .badge-popular {
   position: absolute;
   top: -20px;
@@ -515,11 +534,11 @@ body.pricing-page {
   color: white;
   font-size: 0.75rem;
   font-weight: bold;
-  padding: 6px 14px;
+  padding: 0.4em 1em;
   border-radius: 9999px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1;
 }
-
 
 /* ======================== */
 /* ==== CONTACT PAGE ====== */
