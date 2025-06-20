@@ -411,11 +411,11 @@ footer {
 /* ===== PRICING PAGE ===== */
 /* ======================== */
 body.pricing-page {
-  background: #2e739e;
+  background: #f3f6f8;
 }
 
 .pricing-hero {
-  background: #e0f2f8; /* pastel blue-gray */
+  background: #136986; /* pastel blue-gray */
   padding: 120px 20px 70px;
   text-align: center;
   box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.05);
