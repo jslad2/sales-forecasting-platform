@@ -422,6 +422,7 @@ body.pricing-page {
 }
 
 .pricing-container {
+  background: #136986; /* pastel blue-gray */
   display: flex;
   gap: 2rem;
   justify-content: center;
