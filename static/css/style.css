@@ -297,7 +297,7 @@ header.scrolled nav a:hover {
 .data-services {
   background-color: #f9fafa;
   padding: 80px 20px;
-  margin-bottom: 60px;
+  margin-bottom: 40px; /* tightened from 60px */
 }
 
 .service-grid {
@@ -315,7 +315,6 @@ header.scrolled nav a:hover {
   padding: 48px 28px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.04);
   text-align: center;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -330,6 +329,7 @@ header.scrolled nav a:hover {
   opacity: 1;
   transform: translateY(0);
 }
+
 .service-card:nth-child(1) { transition-delay: 0.1s; }
 .service-card:nth-child(2) { transition-delay: 0.2s; }
 .service-card:nth-child(3) { transition-delay: 0.3s; }
@@ -342,7 +342,7 @@ header.scrolled nav a:hover {
 .service-card img {
   height: 80px;
   margin-bottom: 24px;
-  filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.1));
+  filter: drop-shadow(1px 2px 2px rgba(0, 0, 0, 0.1));
 }
 
 .service-card h3 {
@@ -360,7 +360,7 @@ header.scrolled nav a:hover {
 }
 
 .section-divider {
-  margin-top: 40px;
+  margin-top: 30px;
   font-size: 0.95rem;
   text-align: center;
   color: var(--gray-color);
@@ -369,15 +369,20 @@ header.scrolled nav a:hover {
 /* ==== STAGGERED SERVICE DETAIL SECTIONS ==== */
 .service-detail-container {
   display: flex;
-  gap: 3rem;
+  gap: 2rem; /* tighter gap between image/content */
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  margin-bottom: 60px;
+  margin-bottom: 40px; /* tightened from 60px */
 }
 
 .service-detail-container.reverse {
   flex-direction: row-reverse;
+}
+
+.service-detail {
+  padding: 20px 0;
+  margin-top: 40px; /* tightened from 80px if previously set */
 }
 
 .service-detail .service-image {
@@ -385,9 +390,24 @@ header.scrolled nav a:hover {
   text-align: center;
 }
 
+.service-detail .service-image img {
+  max-width: 100%;
+  height: auto;
+}
+
 .service-detail .service-content {
   flex: 1 1 400px;
 }
+
+.service-detail .service-content p {
+  margin-bottom: 0.75rem;
+}
+
+.service-detail .service-content ul {
+  margin-top: 1rem;
+  margin-bottom: 0;
+}
+
 
 
 /* ======================== */
