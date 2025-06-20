@@ -25,16 +25,16 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
 </head>
 
-<body class="home-page">
+<body class="data-services-page">
 
   <!-- Header -->
   <header>
     <nav>
       <ul class="nav-links">
-        <li><a href="{{ url_for('pages.home') }}"          class="nav-link">Home</a></li>
-        <li><a href="{{ url_for('pages.data_services') }}" class="nav-link">Data Services</a></li>
-        <li><a href="{{ url_for('pages.pricing') }}"       class="nav-link">Pricing</a></li>
-        <li><a href="{{ url_for('pages.contact') }}"       class="nav-link">Contact</a></li>
+        <li><a href="{{ url_for('pages.home') }}" class="nav-link">Home</a></li>
+        <li><a href="{{ url_for('pages.data_services') }}" class="nav-link active">Data Services</a></li>
+        <li><a href="{{ url_for('pages.pricing') }}" class="nav-link">Pricing</a></li>
+        <li><a href="{{ url_for('pages.contact') }}" class="nav-link">Contact</a></li>
         <li id="auth-buttons"></li>
       </ul>
     </nav>
@@ -42,145 +42,117 @@
   </header>
 
   <!-- Hero Section -->
-  <section
-    class="hero"
-    style="
-      background-image: url('{{ url_for('static', filename='images/data-services.png') }}');
-      background-size: cover;
-      background-position: center;
-      padding: 220px 20px;
-      text-align: center;
-      position: relative;
-  ">
-    <div style="position: absolute; inset: 0; background-color: rgba(0,0,0,0.6); z-index: 1;"></div>
+  <section class="hero" style="
+    background-image: url('{{ url_for('static', filename='images/data-services.png') }}');
+    background-size: cover;
+    background-position: center;
+    padding: 200px 20px 120px;
+    position: relative;
+    text-align: center;
+    color: white;">
+    <div class="hero-overlay" style="position: absolute; inset: 0; background-color: rgba(0,0,0,0.6); z-index: 1;"></div>
     <div class="content-container" style="position: relative; z-index: 2;">
-      <article class="hero-text">
-        <h1 style="font-size: 2.5rem; font-weight: 700; color: #fff;">Unlock the Power of Your Data</h1>
-        <p style="font-size: 1.25rem; color: #e0e0e0;">Transform your business with AI-driven insights and analytics.</p>
-      </article>
+      <h1 style="font-size: 2.8rem; font-weight: 700;">Unlock the Power of Your Data</h1>
+      <p style="font-size: 1.2rem; color: #e0e0e0;">Transform your business with AI-driven insights and analytics.</p>
     </div>
   </section>
 
-  <!-- Services Grid -->
-  <section id="data-services" class="data-services">
+  <!-- Intro -->
+  <section class="intro-section" style="padding: 60px 20px 30px; text-align: center;">
     <div class="content-container">
-      <h2>What We Offer</h2>
-      <p class="section-intro">
-        At SynovaAI, we provide cutting-edge AI-driven solutions to help you make better business decisions.
+      <h2>Our Data Services</h2>
+      <p class="section-intro" style="color: #666; max-width: 700px; margin: 10px auto 0;">
+        SynovaAI provides cutting-edge AI-driven solutions to empower smarter, faster business decisions.
       </p>
+    </div>
+  </section>
 
-      <div class="service-grid">
+  <!-- Service Cards -->
+  <section id="data-services" class="data-services" style="background: #f9fafa; padding: 60px 20px;">
+    <div class="content-container service-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 30px; max-width: 1200px; margin: 0 auto;">
+      <a href="#forecasting" class="service-card" style="text-align: center; background: white; padding: 40px 30px; border-radius: 16px; box-shadow: 0 6px 16px rgba(0,0,0,0.04); text-decoration: none;">
+        <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="Forecasting" width="80" style="margin-bottom: 20px;" />
+        <h3 style="font-size: 1.4rem; color: var(--primary-color); margin-bottom: 10px;">AI-Powered Forecasting</h3>
+        <p style="color: #666;">Predict trends, optimize inventory, and maximize revenue.</p>
+      </a>
 
-        <a href="#forecasting" class="service-card-link">
-          <div class="service-card">
-            <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="Forecasting" width="80"/>
-            <h3>AI-Powered Forecasting</h3>
-            <p>Predict trends, optimize inventory, and maximize revenue.</p>
-          </div>
-        </a>
+      <a href="#dashboards" class="service-card" style="text-align: center; background: white; padding: 40px 30px; border-radius: 16px; box-shadow: 0 6px 16px rgba(0,0,0,0.04); text-decoration: none;">
+        <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Dashboards" width="80" style="margin-bottom: 20px;" />
+        <h3 style="font-size: 1.4rem; color: var(--primary-color); margin-bottom: 10px;">Interactive Dashboards</h3>
+        <p style="color: #666;">Gain real-time insights with customizable dashboards.</p>
+      </a>
 
-        <a href="#dashboards" class="service-card-link">
-          <div class="service-card">
-            <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Dashboards" width="80"/>
-            <h3>Interactive Dashboards</h3>
-            <p>Gain real-time insights with customizable dashboards.</p>
-          </div>
-        </a>
-
-        <a href="#consulting" class="service-card-link">
-          <div class="service-card">
-            <img src="{{ url_for('static', filename='images/support-icon.png') }}" alt="Consulting" width="80"/>
-            <h3>Support & Consulting</h3>
-            <p>Expert guidance in BI tools and data strategy.</p>
-          </div>
-        </a>
-
-      </div><!-- /.service-grid -->
-
-    </div><!-- /.content-container -->
-  </section><!-- /#data-services -->
+      <a href="#consulting" class="service-card" style="text-align: center; background: white; padding: 40px 30px; border-radius: 16px; box-shadow: 0 6px 16px rgba(0,0,0,0.04); text-decoration: none;">
+        <img src="{{ url_for('static', filename='images/support-icon.png') }}" alt="Consulting" width="80" style="margin-bottom: 20px;" />
+        <h3 style="font-size: 1.4rem; color: var(--primary-color); margin-bottom: 10px;">Support & Consulting</h3>
+        <p style="color: #666;">Expert guidance in BI tools and data strategy.</p>
+      </a>
+    </div>
+  </section>
 
   <!-- Forecasting -->
-  <section id="forecasting" class="service-detail alt-bg" style="margin-top:80px; scroll-margin-top:140px;">
-  <div class="content-container">
-    <div class="service-detail-container">
-      <div class="service-image">
-        <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="Forecasting" loading="lazy"/>
-      </div>
-      <div class="service-content">
-        <h2>AI-Powered Forecasting</h2>
-        <h4 style="color: var(--secondary-color); margin-bottom: 10px;">Smarter planning, fewer surprises</h4>
-        <p>
-          Leverage advanced machine learning to predict future demand, optimize inventory,
-          and streamline planning with real-time accuracy.
-        </p>
-        <ul class="feature-list">
-          <li>✅ Real-time sales predictions</li>
-          <li>✅ Inventory optimization</li>
-          <li>✅ Customizable reporting</li>
-        </ul>
-      </div>
+<section id="forecasting" class="service-detail alt-bg" style="padding: 80px 20px; scroll-margin-top: 140px;">
+  <div class="content-container service-detail-container" style="display: flex; flex-wrap: wrap; gap: 40px; max-width: 1200px; margin: 0 auto;">
+    <div class="service-image" style="flex: 1 1 300px;">
+      <img src="{{ url_for('static', filename='images/forecasting-icon.png') }}" alt="Forecasting" loading="lazy" />
+    </div>
+    <div class="service-content" style="flex: 2 1 400px;">
+      <h2>AI-Powered Forecasting</h2>
+      <h4 style="color: var(--secondary-color); margin-bottom: 10px;">Smarter planning, fewer surprises</h4>
+      <p>Leverage advanced machine learning to predict future demand, optimize inventory, and streamline planning with real-time accuracy.</p>
+      <ul class="feature-list">
+        <li>✅ Real-time sales predictions</li>
+        <li>✅ Inventory optimization</li>
+        <li>✅ Customizable reporting</li>
+      </ul>
     </div>
   </div>
 </section>
 
-
-  <!-- Dashboards -->
-  <section id="dashboards" class="service-detail" style="margin-top:80px; scroll-margin-top:140px;">
-    <div class="content-container">
-      <div class="service-detail-container reverse">
-        <div class="service-image">
-          <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Dashboards" loading="lazy"/>
-        </div>
-        <div class="service-content">
-          <h2>Interactive Dashboards</h2>
-          <p>
-            Track performance and KPIs through modern dashboards powered by Power BI and
-            custom analytics layers—anywhere, anytime.
-          </p>
-          <ul class="feature-list">
-            <li>📊 Custom KPI tracking</li>
-            <li>📈 Multi-source integration</li>
-            <li>🔗 API connectivity</li>
-          </ul>
-        </div>
-      </div>
+<!-- Dashboards (reversed) -->
+<section id="dashboards" class="service-detail" style="padding: 80px 20px; scroll-margin-top: 140px;">
+  <div class="content-container service-detail-container reverse" style="display: flex; flex-wrap: wrap-reverse; gap: 40px; max-width: 1200px; margin: 0 auto;">
+    <div class="service-image" style="flex: 1 1 300px;">
+      <img src="{{ url_for('static', filename='images/dashboard-icon.png') }}" alt="Dashboards" loading="lazy" />
     </div>
-  </section>
-
-  <!-- Consulting -->
-  <section id="consulting" class="service-detail alt-bg" style="margin-top:80px; scroll-margin-top:140px;">
-    <div class="content-container">
-      <div class="service-detail-container">
-        <div class="service-image">
-          <img src="{{ url_for('static', filename='images/support-icon.png') }}" alt="Consulting" loading="lazy"/>
-        </div>
-        <div class="service-content">
-          <h2>Expert Support & Consulting</h2>
-          <p>
-            From strategy to execution, our data experts help you implement AI tools,
-            optimize BI platforms, and design scalable pipelines.
-          </p>
-          <ul class="feature-list">
-            <li>🎯 BI tool optimization</li>
-            <li>📊 Data pipeline design</li>
-            <li>🚀 AI implementation</li>
-          </ul>
-        </div>
-      </div>
+    <div class="service-content" style="flex: 2 1 400px;">
+      <h2>Interactive Dashboards</h2>
+      <p>Track performance and KPIs through modern dashboards powered by Power BI and custom analytics layers—anywhere, anytime.</p>
+      <ul class="feature-list">
+        <li>📊 Custom KPI tracking</li>
+        <li>📈 Multi-source integration</li>
+        <li>🔗 API connectivity</li>
+      </ul>
     </div>
-  </section>
+  </div>
+</section>
+
+<!-- Consulting -->
+<section id="consulting" class="service-detail alt-bg" style="padding: 80px 20px; scroll-margin-top: 140px;">
+  <div class="content-container service-detail-container" style="display: flex; flex-wrap: wrap; gap: 40px; max-width: 1200px; margin: 0 auto;">
+    <div class="service-image" style="flex: 1 1 300px;">
+      <img src="{{ url_for('static', filename='images/support-icon.png') }}" alt="Consulting" loading="lazy" />
+    </div>
+    <div class="service-content" style="flex: 2 1 400px;">
+      <h2>Expert Support & Consulting</h2>
+      <p>From strategy to execution, our data experts help you implement AI tools, optimize BI platforms, and design scalable pipelines.</p>
+      <ul class="feature-list">
+        <li>🎯 BI tool optimization</li>
+        <li>📊 Data pipeline design</li>
+        <li>🚀 AI implementation</li>
+      </ul>
+    </div>
+  </div>
+</section>
 
   <!-- CTA -->
-  <section class="cta">
+  <section class="cta-section" style="background: linear-gradient(135deg,#2B3A42,#354854); color: white; text-align: center; padding: 100px 20px;">
     <div class="content-container">
-      <div class="cta-container">
-        <h2>Ready to Transform Your Business?</h2>
-        <p>Start your AI-powered analytics journey today.</p>
-        <div class="cta-buttons">
-          <a href="{{ url_for('pages.pricing') }}" class="cta-button primary">View Plans</a>
-          <a href="{{ url_for('pages.contact') }}" class="cta-button secondary">Contact Sales</a>
-        </div>
+      <h2>Ready to Transform Your Business?</h2>
+      <p style="max-width: 600px; margin: 0 auto 30px;">Start your AI-powered analytics journey today.</p>
+      <div class="cta-buttons" style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+        <a href="{{ url_for('pages.pricing') }}" class="cta-button primary-button">View Plans</a>
+        <a href="{{ url_for('pages.contact') }}" class="cta-button secondary-button">Contact Sales</a>
       </div>
     </div>
   </section>
